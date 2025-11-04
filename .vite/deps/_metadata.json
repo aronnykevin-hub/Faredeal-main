@@ -1,13 +1,34 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    port: 3000,
-    host: true
+{
+  "name": "Global_Temperature_Readings",
+  "version": "1.2.0",
+  "description": "Daily average global temperature recordings from 1950 to 2024.",
+  "author": {
+    "name": "Data Science Team",
+    "email": "data@example.com"
   },
-  build: {
-    outDir: 'dist'
-  }
-});
+  "lastModified": "2025-10-31T10:00:00Z",
+  "license": "CC-BY-4.0",
+  "fields": [
+    {
+      "name": "date_key",
+      "dataType": "datetime",
+      "description": "The date of the recording."
+    },
+    {
+      "name": "avg_temp_c",
+      "dataType": "float",
+      "description": "The average daily temperature in Celsius."
+    },
+    {
+      "name": "source_station_id",
+      "dataType": "integer",
+      "description": "Identifier for the recording weather station."
+    }
+  ],
+  "dataFiles": [
+    {
+      "name": "temps_2024.csv",
+      "row_count": 365
+    }
+  ]
+}
