@@ -1,0 +1,2826 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  FiTruck, FiPackage, FiDollarSign, FiTrendingUp, FiBarChart, 
+  FiPieChart, FiTarget, FiAward, FiClock, FiAlertTriangle,
+  FiCalendar, FiMail, FiBell, FiSettings, FiLogOut, FiSearch,
+  FiFilter, FiDownload, FiRefreshCw, FiEye, FiEdit, FiTrash2,
+  FiPlus, FiMinus, FiChevronRight, FiChevronDown, FiStar,
+  FiHeart, FiZap, FiShield, FiGift, FiNavigation, FiMapPin,
+  FiSmartphone, FiHeadphones, FiCamera, FiWatch, FiHome,
+  FiCreditCard, FiMessageCircle, FiShare2, FiThumbsUp,
+  FiBookmark, FiGrid, FiList, FiInfo, FiHelpCircle,
+  FiMaximize, FiMinimize, FiRotateCw, FiUpload, FiPrinter,
+  FiTag, FiHash, FiImage, FiCheckCircle, FiXCircle, FiUsers,
+  FiShoppingCart, FiPercent, FiFlag, FiWifi, FiSend, FiFileText
+} from 'react-icons/fi';
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, ComposedChart
+} from 'recharts';
+import { supabase } from '../services/supabase';
+import { notificationService } from '../services/notificationService';
+import PaymentService from '../services/paymentService';
+import AddProductModal from '../components/AddProductModal';
+
+const SupplierPortal = () => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [loading, setLoading] = useState(true);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [supplierProfile, setSupplierProfile] = useState({
+    name: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    address: '',
+    category: '',
+    rating: 0,
+    partnershipYears: 0,
+    avatar: '🇺🇬',
+    status: '',
+    paymentTerms: '',
+    creditLimit: 0,
+    businessLicense: '',
+    taxID: '',
+    exportLicense: '',
+    languages: [],
+    certifications: [],
+    specialties: [],
+    deliveryAreas: []
+  });
+
+  // Ugandan Supplier Performance Data
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    totalOrders: 0,
+    totalRevenue: 0,
+    onTimeDelivery: 0,
+    qualityRating: 0,
+    activeProducts: 0,
+    pendingOrders: 0,
+    avgOrderValue: 0,
+    customerSatisfaction: 0,
+    mobileMoneyTransactions: 0,
+    bankTransferTransactions: 0,
+    weeklyGrowth: 0,
+    monthlyGrowth: 0,
+    exportOrders: 0,
+    localOrders: 0,
+    seasonalProductsAvailable: 0,
+    organicCertifiedProducts: 0,
+    paidOrders: 0,
+    unpaidOrders: 0,
+    partiallyPaidOrders: 0,
+    totalPaid: 0,
+    totalOutstanding: 0
+  });
+
+  const [orderHistory, setOrderHistory] = useState([]);
+
+  const [pendingOrders, setPendingOrders] = useState([]);
+
+  const [productCatalog, setProductCatalog] = useState([]);
+
+  const [revenueData, setRevenueData] = useState([]);
+
+  const [performanceInsights] = useState([]);
+
+  const [notifications] = useState([]);
+
+  const [partnershipGoals] = useState([]);
+
+  // Enhanced payment history for supplier view (with setState for database updates)
+  const [paymentHistory, setPaymentHistory] = useState([]);
+
+  const [paymentFilter, setPaymentFilter] = useState('all');
+
+  // Enhanced payment history for supplier to view their own payments
+  const [supplierPaymentHistory] = useState([]);
+
+  // Payment statistics
+  const [paymentStats] = useState({
+    totalPaid: 0,
+    totalPending: 0,
+    totalOverdue: 0,
+    averagePaymentTime: '0 days',
+    onTimePaymentRate: 0,
+    totalEarnings: 0,
+    processingFees: 0
+  });
+
+  // Edit Profile States
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [editedProfile, setEditedProfile] = useState({});
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Edit Financial Details States
+  const [isEditingFinancial, setIsEditingFinancial] = useState(false);
+  const [editedFinancial, setEditedFinancial] = useState({});
+  const [isSavingFinancial, setIsSavingFinancial] = useState(false);
+
+  // Profile Picture Upload States
+  const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
+  const [profilePicUrl, setProfilePicUrl] = useState(null);
+
+  // Helper function to calculate years from created date
+  const calculateYears = (createdAt) => {
+    if (!createdAt) return 0;
+    const years = Math.floor((new Date() - new Date(createdAt)) / (1000 * 60 * 60 * 24 * 365));
+    return years;
+  };
+
+  // Load supplier profile from database
+  const loadSupplierProfile = async (userId) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      console.log('🔍 Loading supplier profile for user:', user.email, 'auth_id:', user.id);
+
+      // Query users table by auth_id (OAuth connection)
+      const { data: supplier, error: suppError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      if (suppError && suppError.code !== 'PGRST116') {
+        console.error('Error fetching supplier profile:', suppError);
+        throw suppError;
+      }
+
+      if (supplier) {
+        console.log('✅ Supplier profile found:', supplier);
+        
+        // Check approval status (don't check profile_completed since it's already done in auth page)
+        if (!supplier.is_active) {
+          // Account pending approval - show welcome message
+          console.log('⏳ Supplier account pending approval');
+          notificationService.show('🎉 Profile completed! Your application is pending admin approval. You can view your dashboard with limited access.', 'info', 8000);
+          // Don't return - let them see their profile with limited access
+        } else {
+          // Account is approved - show success message
+          notificationService.show('✅ Welcome back! Your account is active.', 'success', 3000);
+        }
+        
+        // Parse JSON fields if they exist
+        const certifications = supplier.certifications || [];
+        const deliveryAreas = ['Kampala', 'Entebbe', 'Mukono', 'Wakiso', 'Jinja'];
+        const languages = ['English', 'Luganda', 'Swahili'];
+
+        // Get profile picture from database first, fallback to localStorage
+        const storageKey = `supplier_profile_pic_${supplier.id}`;
+        const localProfilePic = localStorage.getItem(storageKey);
+        const profilePicture = supplier.profile_picture || localProfilePic || null;
+
+        setSupplierProfile({
+          id: supplier.id,
+          name: supplier.company_name || supplier.full_name || 'Your Company',
+          contactPerson: supplier.full_name || '',
+          email: supplier.email || user.email || '',
+          phone: supplier.phone || '',
+          address: supplier.address || '',
+          rating: 4.5, // Default rating, can be calculated later
+          paymentTerms: 'Net 30 Days',
+          creditLimit: 0,
+          businessLicense: supplier.business_license || '',
+          taxID: supplier.tax_number || '',
+          exportLicense: '',
+          category: supplier.category || 'Supplier',
+          avatar: '🇺🇬',
+          profile_image_url: profilePicture,
+          status: 'Active Premium Supplier',
+          partnershipYears: calculateYears(supplier.created_at),
+          languages: languages,
+          certifications: certifications,
+          specialties: [],
+          deliveryAreas: deliveryAreas
+        });
+        
+        // Set profile pic URL state - prioritize database over localStorage
+        if (profilePicture) {
+          setProfilePicUrl(profilePicture);
+          console.log('Loaded profile picture from:', supplier.profile_picture ? 'database' : 'localStorage');
+        }
+      } else {
+        // No supplier profile found - show error but don't redirect
+        console.log('⚠️ No supplier profile found for auth_id:', user.id);
+        notificationService.show('⚠️ Unable to load profile. Please contact support if this persists.', 'error', 5000);
+        // Don't redirect - let user see the portal
+      }
+    } catch (error) {
+      console.error('Error loading supplier profile:', error);
+    }
+  };
+
+  // Save edited profile to Supabase
+  const saveSupplierProfile = async () => {
+    try {
+      setIsSavingProfile(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('No authenticated user');
+        return;
+      }
+
+      console.log('💾 Saving supplier profile for auth_id:', user.id);
+      console.log('📝 Profile data to save:', editedProfile);
+
+      // Prepare update data - using users table column names (no contact_person field)
+      const updateData = {
+        company_name: editedProfile.name || supplierProfile.name,
+        full_name: editedProfile.contactPerson || supplierProfile.contactPerson, // Use full_name instead
+        phone: editedProfile.phone || supplierProfile.phone,
+        address: editedProfile.address || supplierProfile.address,
+        category: editedProfile.category || supplierProfile.category
+      };
+
+      console.log('📤 Sending to database:', updateData);
+
+      // First check if user exists in users table
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('id, auth_id, role')
+        .eq('auth_id', user.id)
+        .single();
+
+      if (checkError) {
+        console.error('❌ Error checking user:', checkError);
+        alert('Failed to save: User profile not found. Please complete your profile first from the sign-in page.');
+        return;
+      }
+
+      if (!existingUser) {
+        console.error('❌ No user found with auth_id:', user.id);
+        alert('Failed to save: User profile not found. Please complete your profile first from the sign-in page.');
+        return;
+      }
+
+      console.log('✅ User found:', existingUser);
+
+      // Update in Supabase users table by auth_id
+      const { data: updatedUsers, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('auth_id', user.id)
+        .select();
+
+      if (error) {
+        console.error('❌ Error saving profile:', error);
+        alert('Failed to save profile changes: ' + error.message);
+        return;
+      }
+
+      if (!updatedUsers || updatedUsers.length === 0) {
+        console.error('❌ Update returned no rows');
+        alert('Failed to save: Update did not complete.');
+        return;
+      }
+
+      console.log('✅ Profile saved successfully!', updatedUsers[0]);
+
+      // Update local state
+      setSupplierProfile(prev => ({
+        ...prev,
+        name: updateData.company_name,
+        contactPerson: updateData.full_name,
+        phone: updateData.phone,
+        address: updateData.address,
+        category: updateData.category,
+        languages: editedProfile.languages || supplierProfile.languages,
+        specialties: editedProfile.specialties || supplierProfile.specialties,
+        deliveryAreas: editedProfile.deliveryAreas || supplierProfile.deliveryAreas
+      }));
+
+      setIsEditingProfile(false);
+      setEditedProfile({});
+      
+      // Reload profile from database to get fresh data
+      await loadSupplierProfile();
+      
+      alert('✅ Profile updated successfully!');
+    } catch (error) {
+      console.error('❌ Error saving profile:', error);
+      alert('Failed to save profile changes: ' + error.message);
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  // Start editing profile
+  const startEditingProfile = () => {
+    setEditedProfile({
+      name: supplierProfile.name,
+      contactPerson: supplierProfile.contactPerson,
+      phone: supplierProfile.phone,
+      address: supplierProfile.address,
+      category: supplierProfile.category,
+      languages: supplierProfile.languages,
+      specialties: supplierProfile.specialties,
+      deliveryAreas: supplierProfile.deliveryAreas
+    });
+    setIsEditingProfile(true);
+  };
+
+  // Cancel editing
+  const cancelEditingProfile = () => {
+    setIsEditingProfile(false);
+    setEditedProfile({});
+  };
+
+  // Handle profile field change
+  const handleProfileFieldChange = (field, value) => {
+    setEditedProfile(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Save financial details to Supabase
+  const saveFinancialDetails = async () => {
+    try {
+      setIsSavingFinancial(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('No authenticated user');
+        return;
+      }
+
+      // Prepare update data
+      const updateData = {
+        payment_terms: editedFinancial.paymentTerms || supplierProfile.paymentTerms,
+        payment_terms_days: parseInt(editedFinancial.paymentTermsDays) || 30,
+        credit_limit_ugx: parseFloat(editedFinancial.creditLimit) || 0,
+        mobile_money_provider: editedFinancial.mobileMoneyEnabled ? 'MTN' : 'None',
+        updated_at: new Date().toISOString()
+      };
+
+      // Update in Supabase users table
+      const { error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier');
+
+      if (error) {
+        console.error('Error saving financial details:', error);
+        alert('Failed to save financial details: ' + error.message);
+        return;
+      }
+
+      // Update local state
+      setSupplierProfile(prev => ({
+        ...prev,
+        paymentTerms: updateData.payment_terms,
+        creditLimit: updateData.credit_limit_ugx
+      }));
+
+      setIsEditingFinancial(false);
+      setEditedFinancial({});
+      alert('✅ Financial details updated successfully!');
+    } catch (error) {
+      console.error('Error saving financial details:', error);
+      alert('Failed to save financial details');
+    } finally {
+      setIsSavingFinancial(false);
+    }
+  };
+
+  // Start editing financial details
+  const startEditingFinancial = () => {
+    setEditedFinancial({
+      paymentTerms: supplierProfile.paymentTerms,
+      creditLimit: supplierProfile.creditLimit,
+      mobileMoneyEnabled: true,
+      bankTransferEnabled: true,
+      cashEnabled: false
+    });
+    setIsEditingFinancial(true);
+  };
+
+  // Cancel editing financial
+  const cancelEditingFinancial = () => {
+    setIsEditingFinancial(false);
+    setEditedFinancial({});
+  };
+
+  // Handle financial field change
+  const handleFinancialFieldChange = (field, value) => {
+    setEditedFinancial(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle profile picture upload
+  const handleProfilePictureUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 2MB for better performance)
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image size should be less than 2MB');
+      return;
+    }
+
+    try {
+      setUploadingProfilePic(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        alert('No authenticated user');
+        return;
+      }
+
+      // Get supplier profile - use existing supplierProfile state
+      if (!supplierProfile.id) {
+        alert('Supplier profile not loaded yet. Please wait for profile to load.');
+        return;
+      }
+
+      const supplierId = supplierProfile.id;
+
+      // Convert image to base64 and store in both localStorage and database
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result;
+        
+        try {
+          // Store in localStorage with supplier ID as key (for quick loading)
+          const storageKey = `supplier_profile_pic_${supplierId}`;
+          localStorage.setItem(storageKey, base64String);
+          
+          console.log('Profile picture saved to localStorage:', storageKey);
+          
+          // Save to database (users table)
+          const { error } = await supabase
+            .from('users')
+            .update({ 
+              profile_picture: base64String,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', supplierId)
+            .eq('role', 'supplier');
+
+          if (error) {
+            console.error('Error saving to database:', error);
+            alert('⚠️ Profile picture saved locally but failed to save to database');
+          } else {
+            console.log('Profile picture saved to database successfully');
+            alert('✅ Profile picture updated successfully!');
+          }
+          
+          // Update local state immediately
+          setProfilePicUrl(base64String);
+          
+          // Also update the supplier profile state
+          setSupplierProfile(prev => ({
+            ...prev,
+            profile_image_url: base64String
+          }));
+          
+        } catch (error) {
+          console.error('Error in upload process:', error);
+          alert('⚠️ Profile picture saved locally but failed to save to database');
+        } finally {
+          // Force upload state to false
+          setUploadingProfilePic(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        setUploadingProfilePic(false);
+        alert('Failed to read image file');
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('Error uploading profile picture:', error);
+      alert('Failed to upload profile picture');
+    } finally {
+      setUploadingProfilePic(false);
+    }
+  };
+
+  // Load performance metrics from database
+  const loadPerformanceMetrics = async (userId) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.error('No authenticated user');
+        return;
+      }
+
+      // Get supplier ID from users table
+      const { data: supplier } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      const supplierId = supplier?.id;
+      if (!supplierId) {
+        console.log('No supplier profile found for performance metrics');
+        return;
+      }
+
+      // Get total orders
+      const { count: totalOrders } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('supplier_id', supplierId);
+
+      // Get pending orders
+      const { count: pendingOrders } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('supplier_id', supplierId)
+        .in('status', ['pending_approval', 'approved', 'sent_to_supplier', 'confirmed']);
+
+      // Get all orders for calculations
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('total_amount_ugx, status, order_date, expected_delivery_date, actual_delivery_date')
+        .eq('supplier_id', supplierId);
+
+      // Calculate total revenue (received and completed orders)
+      const totalRevenue = orders
+        ?.filter(o => o.status === 'received' || o.status === 'completed')
+        .reduce((sum, o) => sum + (parseFloat(o.total_amount_ugx) || 0), 0) || 0;
+
+      // Calculate average order value
+      const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+      // Calculate on-time delivery
+      const deliveredOrders = orders?.filter(o => o.status === 'received' || o.status === 'completed') || [];
+      const onTimeOrders = deliveredOrders.filter(o => {
+        if (!o.expected_delivery_date || !o.actual_delivery_date) return false;
+        return new Date(o.actual_delivery_date) <= new Date(o.expected_delivery_date);
+      });
+      const onTimeDelivery = deliveredOrders.length > 0 
+        ? Math.round((onTimeOrders.length / deliveredOrders.length) * 100)
+        : 0;
+
+      // Get active products count from supplier_products
+      const { count: activeProducts } = await supabase
+        .from('supplier_products')
+        .select('*', { count: 'exact', head: true })
+        .eq('supplier_id', supplierId)
+        .eq('is_active', true);
+
+      // Get payment statistics
+      const { data: invoices } = await supabase
+        .from('supplier_invoices')
+        .select('payment_status, amount_paid_ugx, balance_due_ugx')
+        .eq('supplier_id', supplierId);
+
+      const paidOrders = invoices?.filter(i => i.payment_status === 'paid').length || 0;
+      const unpaidOrders = invoices?.filter(i => i.payment_status === 'unpaid').length || 0;
+      const partiallyPaidOrders = invoices?.filter(i => i.payment_status === 'partially_paid').length || 0;
+      const totalPaid = invoices?.reduce((sum, i) => sum + (parseFloat(i.amount_paid_ugx) || 0), 0) || 0;
+      const totalOutstanding = invoices?.reduce((sum, i) => sum + (parseFloat(i.balance_due_ugx) || 0), 0) || 0;
+
+      // Get payment method distribution from supplier_payments
+      const { data: payments } = await supabase
+        .from('supplier_payments')
+        .select('payment_method')
+        .eq('supplier_id', supplierId);
+
+      const mobileMoneyCount = payments?.filter(p => p.payment_method === 'mobile_money').length || 0;
+      const bankTransferCount = payments?.filter(p => p.payment_method === 'bank_transfer').length || 0;
+      const totalPayments = payments?.length || 1; // Avoid division by zero
+
+      const mobileMoneyPercentage = Math.round((mobileMoneyCount / totalPayments) * 100);
+      const bankTransferPercentage = Math.round((bankTransferCount / totalPayments) * 100);
+
+      setPerformanceMetrics({
+        totalOrders: totalOrders || 0,
+        totalRevenue: totalRevenue,
+        onTimeDelivery: onTimeDelivery,
+        qualityRating: parseFloat(supplier?.quality_rating) || 0,
+        activeProducts: activeProducts || 0,
+        pendingOrders: pendingOrders || 0,
+        avgOrderValue: avgOrderValue,
+        customerSatisfaction: parseFloat(supplier?.quality_rating) || 0,
+        mobileMoneyTransactions: mobileMoneyPercentage,
+        bankTransferTransactions: bankTransferPercentage,
+        weeklyGrowth: 0,
+        monthlyGrowth: 0,
+        exportOrders: 0,
+        localOrders: totalOrders || 0,
+        seasonalProductsAvailable: 0,
+        organicCertifiedProducts: 0,
+        // Payment statistics
+        paidOrders: paidOrders,
+        unpaidOrders: unpaidOrders,
+        partiallyPaidOrders: partiallyPaidOrders,
+        totalPaid: totalPaid,
+        totalOutstanding: totalOutstanding
+      });
+    } catch (error) {
+      console.error('Error loading performance metrics:', error);
+    }
+  };
+
+  // Load order history from database
+  const loadOrderHistory = async (userId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: supplier } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      if (!supplier?.id) return;
+
+      // Get completed/received orders
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('supplier_id', supplier.id)
+        .in('status', ['received', 'completed', 'cancelled'])
+        .order('order_date', { ascending: false })
+        .limit(10);
+
+      // Get payment/invoice info for these orders
+      const orderIds = orders?.map(o => o.id) || [];
+      const { data: invoices } = await supabase
+        .from('supplier_invoices')
+        .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
+        .in('purchase_order_id', orderIds);
+
+      // Create invoice lookup map
+      const invoiceMap = {};
+      invoices?.forEach(inv => {
+        invoiceMap[inv.purchase_order_id] = inv;
+      });
+
+      const formatted = orders?.map(order => {
+        const invoice = invoiceMap[order.id];
+        return {
+          id: order.po_number,
+          orderId: order.id,
+          date: new Date(order.order_date).toLocaleDateString(),
+          items: order.items?.length || 0,
+          amount: parseFloat(order.total_amount_ugx) || 0,
+          status: order.status === 'completed' ? 'delivered' : 
+                  order.status === 'received' ? 'received' : 'cancelled',
+          rating: 5,
+          products: order.items?.map(item => item.product_name).join(', ') || 'N/A',
+          payment_status: invoice?.payment_status || 'unpaid',
+          amount_paid: invoice?.amount_paid_ugx || 0,
+          balance_due: invoice?.balance_due_ugx || order.total_amount_ugx
+        };
+      }) || [];
+
+      setOrderHistory(formatted);
+    } catch (error) {
+      console.error('Error loading order history:', error);
+    }
+  };
+
+  // Load product catalog from database
+  const loadProductCatalog = async (userId) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get supplier from users table
+      const { data: supplier } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      if (!supplier?.id) {
+        console.log('No supplier profile found');
+        return;
+      }
+
+      const { data: products } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          sku,
+          selling_price,
+          category:categories(name),
+          inventory(current_stock, status)
+        `)
+        .eq('supplier_id', supplier.id)
+        .order('name');
+
+      const formatted = products?.map(product => ({
+        id: product.id,
+        name: product.name,
+        category: product.category?.name || 'Uncategorized',
+        price: parseFloat(product.selling_price) || 0,
+        stock: product.inventory?.[0]?.current_stock || 0,
+        status: 'active',
+        unit: 'unit',
+        season: 'year-round'
+      })) || [];
+
+      setProductCatalog(formatted);
+    } catch (error) {
+      console.error('Error loading product catalog:', error);
+    }
+  };
+
+  // Load revenue data for charts
+  const loadRevenueData = async (userId) => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Get supplier from users table
+      const { data: supplier } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      if (!supplier?.id) {
+        console.log('No supplier profile found');
+        return;
+      }
+
+      // Get orders from last 6 months
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('total_amount, status, order_date')
+        .eq('supplier_id', supplier.id)
+        .eq('status', 'received')
+        .gte('order_date', sixMonthsAgo.toISOString().split('T')[0])
+        .order('order_date');
+
+      // Group by month
+      const revenueByMonth = {};
+      orders?.forEach(order => {
+        const month = new Date(order.order_date).toLocaleDateString('en-US', { month: 'short' });
+        if (!revenueByMonth[month]) {
+          revenueByMonth[month] = { name: month, revenue: 0, orders: 0, products: 0 };
+        }
+        revenueByMonth[month].revenue += parseFloat(order.total_amount) || 0;
+        revenueByMonth[month].orders += 1;
+      });
+
+      const revenueArray = Object.values(revenueByMonth);
+      if (revenueArray.length > 0) {
+        setRevenueData(revenueArray);
+      }
+    } catch (error) {
+      console.error('Error loading revenue data:', error);
+    }
+  };
+
+  // Load pending orders from Manager Portal
+  const loadPendingOrders = async (userId) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: supplier } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .maybeSingle();
+
+      // Get current user to find their orders
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (!currentUser) {
+        console.log('No authenticated user');
+        return;
+      }
+
+      // First try to get supplier profile to find their ID
+      let supplierId = supplier?.id;
+      
+      // If no supplier profile, look up user in users table by auth_id
+      if (!supplierId) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', currentUser.id)
+          .eq('role', 'supplier')
+          .maybeSingle();
+        
+        supplierId = userData?.id;
+      }
+
+      if (!supplierId) {
+        console.log('No supplier ID found - cannot load orders');
+        return;
+      }
+
+      console.log('Loading orders for supplier ID:', supplierId);
+
+      // Get orders sent to this supplier
+      const { data: orders, error } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('supplier_id', supplierId)
+        .in('status', ['sent_to_supplier', 'confirmed', 'approved', 'pending_approval', 'received', 'completed'])
+        .order('order_date', { ascending: false });
+
+      if (error) {
+        console.error('Error loading pending orders:', error);
+        return;
+      }
+
+      // Get payment/invoice info for these orders
+      const orderIds = orders?.map(o => o.id) || [];
+      const { data: invoices } = await supabase
+        .from('supplier_invoices')
+        .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
+        .in('purchase_order_id', orderIds);
+
+      // Create invoice lookup map
+      const invoiceMap = {};
+      invoices?.forEach(inv => {
+        invoiceMap[inv.purchase_order_id] = inv;
+      });
+
+      const formatted = orders?.map(order => {
+        const invoice = invoiceMap[order.id];
+        return {
+          id: order.po_number || order.id,
+          orderId: order.id,
+          date: new Date(order.order_date).toLocaleDateString(),
+          items: order.items?.length || 0,
+          amount: parseFloat(order.total_amount_ugx) || 0,
+          status: order.status === 'sent_to_supplier' ? 'processing' : 
+                  order.status === 'confirmed' ? 'confirmed' :
+                  order.status === 'received' ? 'received' :
+                  order.status === 'completed' ? 'completed' : 'processing',
+          expectedDelivery: order.expected_delivery_date ? 
+            new Date(order.expected_delivery_date).toLocaleDateString() : 'TBD',
+          products: order.items?.map(item => item.product_name).join(', ') || 'Various items',
+          priority: order.priority || 'normal',
+          deliveryAddress: order.delivery_address,
+          notes: order.notes,
+          payment_status: invoice?.payment_status || 'unpaid',
+          amount_paid: invoice?.amount_paid_ugx || 0,
+          balance_due: invoice?.balance_due_ugx || order.total_amount_ugx,
+          fullOrder: order
+        };
+      }) || [];
+
+      setPendingOrders(formatted);
+      console.log(`Loaded ${formatted.length} orders with payment status`);
+    } catch (error) {
+      console.error('Error loading pending orders:', error);
+    }
+  };
+
+  // Main data loading function
+  const loadSupplierData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('No user logged in');
+        return;
+      }
+
+      console.log('Loading supplier data for user:', user.id);
+      
+      // Load all data
+      await Promise.all([
+        loadSupplierProfile(user.id),
+        loadPerformanceMetrics(user.id),
+        loadOrderHistory(user.id),
+        loadPendingOrders(user.id),
+        loadProductCatalog(user.id),
+        loadRevenueData(user.id)
+      ]);
+      
+      console.log('Supplier data loaded successfully');
+    } catch (error) {
+      console.error('Error loading supplier data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    // Load supplier data from database
+    loadSupplierData();
+    // Load payment data from database
+    loadPaymentData();
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Function to load payment data from database
+  const loadPaymentData = async () => {
+    try {
+      // In a real app, you'd get the supplier ID from authentication context
+      const supplierId = supplierProfile.id || 'demo-supplier-id';
+      
+      // Attempt to load from database, fallback to mock data on error
+      const dbPayments = await PaymentService.getSupplierPaymentHistory(supplierId);
+      
+      if (dbPayments && dbPayments.length > 0) {
+        setPaymentHistory(dbPayments);
+        toast.success('Payment data loaded from database');
+      } else {
+        // Use existing mock data if no database records
+        console.log('Using mock payment data - no database records found');
+      }
+    } catch (error) {
+      console.log('Database not available, using mock data:', error.message);
+      // Mock data is already set in useState, so no action needed
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const formatNumber = (num) => {
+    return new Intl.NumberFormat('en-US').format(num);
+  };
+
+  // Payment status helper functions
+  const getPaymentStatusColor = (status) => {
+    switch(status) {
+      case 'paid': return 'bg-green-100 text-green-800';
+      case 'unpaid': return 'bg-red-100 text-red-800';
+      case 'partial': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPaymentStatusIcon = (status) => {
+    switch(status) {
+      case 'paid': return '✅';
+      case 'unpaid': return '❌';
+      case 'partial': return '⚡';
+      default: return '❓';
+    }
+  };
+
+  const getPaymentMethodIcon = (method) => {
+    switch(method) {
+      case 'mobile_money': return '📱';
+      case 'bank_transfer': return '🏦';
+      case 'check': return '📝';
+      case 'cash': return '💰';
+      default: return '💳';
+    }
+  };
+
+  const getFilteredPaymentHistory = () => {
+    if (paymentFilter === 'all') return paymentHistory;
+    return paymentHistory.filter(payment => payment.status === paymentFilter);
+  };
+
+  const getPaymentStats = () => {
+    const total = paymentHistory.length;
+    const paid = paymentHistory.filter(p => p.status === 'paid').length;
+    const unpaid = paymentHistory.filter(p => p.status === 'unpaid').length;
+    const partial = paymentHistory.filter(p => p.status === 'partial').length;
+    const totalAmount = paymentHistory.reduce((sum, p) => sum + p.amount, 0);
+    const paidAmount = paymentHistory.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0) +
+                     paymentHistory.filter(p => p.status === 'partial').reduce((sum, p) => sum + (p.paidAmount || 0), 0);
+    const outstandingAmount = totalAmount - paidAmount;
+    
+    return { total, paid, unpaid, partial, totalAmount, paidAmount, outstandingAmount };
+  };
+
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const COLORS = ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'];
+
+  const renderProfile = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      {/* Profile Header Card */}
+      <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-700 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="p-8">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center space-x-6">
+              {/* Company Logo/Avatar */}
+              <div className="relative group">
+                <div className="w-32 h-32 bg-white rounded-2xl flex items-center justify-center shadow-xl overflow-hidden">
+                  {profilePicUrl || supplierProfile.profile_image_url ? (
+                    <img 
+                      src={profilePicUrl || supplierProfile.profile_image_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-6xl">{supplierProfile.avatar}</span>
+                  )}
+                </div>
+                
+                {/* Upload Button Overlay */}
+                <label 
+                  htmlFor="profile-pic-upload"
+                  className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 rounded-2xl flex items-center justify-center cursor-pointer transition-all duration-300"
+                >
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-white text-center">
+                    {uploadingProfilePic ? (
+                      <div className="flex flex-col items-center">
+                        <FiRefreshCw className="h-8 w-8 animate-spin mb-2" />
+                        <span className="text-xs">Uploading...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <FiCamera className="h-8 w-8 mb-2" />
+                        <span className="text-xs font-medium">Change Photo</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    id="profile-pic-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureUpload}
+                    disabled={uploadingProfilePic}
+                    className="hidden"
+                  />
+                </label>
+
+                <div className="absolute bottom-0 right-0 w-10 h-10 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
+                  <FiCheckCircle className="text-white h-5 w-5" />
+                </div>
+                <div className="absolute -top-2 -right-2 px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full animate-pulse">
+                  PREMIUM
+                </div>
+              </div>
+              
+              {/* Company Info */}
+              <div className="text-white">
+                <h1 className="text-4xl font-bold mb-2">{supplierProfile.name}</h1>
+                <p className="text-xl text-purple-200 mb-4">{supplierProfile.category}</p>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center space-x-2">
+                    <FiUsers className="h-5 w-5" />
+                    <span>Contact: {supplierProfile.contactPerson}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <FiMail className="h-5 w-5" />
+                    <span>{supplierProfile.email}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <FiSmartphone className="h-5 w-5" />
+                    <span>{supplierProfile.phone}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <FiMapPin className="h-5 w-5" />
+                    <span>Kampala, Uganda</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex flex-col space-y-2">
+              <button 
+                onClick={() => setShowAddProductModal(true)}
+                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all flex items-center space-x-2 font-medium shadow-lg"
+              >
+                <FiPlus className="h-4 w-4" />
+                <span>Add Product</span>
+              </button>
+              <button 
+                onClick={startEditingProfile}
+                className="px-4 py-2 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition-all flex items-center space-x-2 font-medium shadow-md hover:shadow-lg"
+              >
+                <FiEdit className="h-4 w-4" />
+                <span>Edit Profile</span>
+              </button>
+              <button className="px-4 py-2 bg-white/20 backdrop-blur-sm text-white rounded-lg hover:bg-white/30 transition-all flex items-center space-x-2 font-medium">
+                <FiSettings className="h-4 w-4" />
+                <span>Settings</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Bar */}
+        <div className="bg-black/30 backdrop-blur-sm px-8 py-4">
+          <div className="grid grid-cols-5 gap-6">
+            <div className="text-center">
+              <p className="text-purple-200 text-sm mb-1">Total Revenue</p>
+              <p className="text-white text-2xl font-bold">UGX {(performanceMetrics.totalRevenue / 1000000).toFixed(1)}M</p>
+            </div>
+            <div className="text-center">
+              <p className="text-purple-200 text-sm mb-1">Total Orders</p>
+              <p className="text-white text-2xl font-bold">{performanceMetrics.totalOrders}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-purple-200 text-sm mb-1">Quality Rating</p>
+              <p className="text-white text-2xl font-bold flex items-center justify-center">
+                {supplierProfile.rating}
+                <FiStar className="h-5 w-5 text-yellow-400 ml-1 fill-current" />
+              </p>
+            </div>
+            <div className="text-center">
+              <p className="text-purple-200 text-sm mb-1">On-Time Delivery</p>
+              <p className="text-white text-2xl font-bold">{performanceMetrics.onTimeDelivery}%</p>
+            </div>
+            <div className="text-center">
+              <p className="text-purple-200 text-sm mb-1">Partnership</p>
+              <p className="text-white text-2xl font-bold">{supplierProfile.partnershipYears} Years</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile Details Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Business Information */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Business Information</h3>
+            <FiHome className="h-6 w-6 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-500">Company Name</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.name}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Business License</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.businessLicense}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Tax ID (TIN)</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.taxID}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Export License</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.exportLicense}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Category</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.category}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Status</p>
+              <span className="inline-flex items-center px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                {supplierProfile.status}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Contact & Location */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Contact & Location</h3>
+            <FiMapPin className="h-6 w-6 text-gray-400" />
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-500">Contact Person</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.contactPerson}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Email Address</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.email}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Phone Number</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.phone}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Business Address</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.address}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Languages</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {supplierProfile.languages.map(lang => (
+                  <span key={lang} className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                    {lang}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Delivery Areas</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {supplierProfile.deliveryAreas.slice(0, 3).map(area => (
+                  <span key={area} className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                    {area}
+                  </span>
+                ))}
+                <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                  +{supplierProfile.deliveryAreas.length - 3} more
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Financial Details */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Financial Details</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={startEditingFinancial}
+                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                title="Edit Financial Details"
+              >
+                <FiEdit className="h-5 w-5" />
+              </button>
+              <FiDollarSign className="h-6 w-6 text-gray-400" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-500">Payment Terms</p>
+              <p className="text-base font-semibold text-gray-900">{supplierProfile.paymentTerms}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Credit Limit</p>
+              <p className="text-base font-semibold text-gray-900">
+                UGX {(supplierProfile.creditLimit / 1000000).toFixed(1)}M
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Payment Methods</p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium flex items-center">
+                  <FiSmartphone className="h-3 w-3 mr-1" />
+                  Mobile Money
+                </span>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium flex items-center">
+                  <FiCreditCard className="h-3 w-3 mr-1" />
+                  Bank Transfer
+                </span>
+                <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-medium flex items-center">
+                  <FiDollarSign className="h-3 w-3 mr-1" />
+                  Cash
+                </span>
+              </div>
+            </div>
+            <div className="pt-4 border-t">
+              <p className="text-sm text-gray-500 mb-3">Transaction Distribution</p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-700">Mobile Money</span>
+                  <span className="font-semibold">{performanceMetrics.mobileMoneyTransactions}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-500 h-2 rounded-full" 
+                    style={{ width: `${performanceMetrics.mobileMoneyTransactions}%` }}
+                  ></div>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-3">
+                  <span className="text-gray-700">Bank Transfer</span>
+                  <span className="font-semibold">{performanceMetrics.bankTransferTransactions}%</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full" 
+                    style={{ width: `${performanceMetrics.bankTransferTransactions}%` }}
+                  ></div>
+                </div>
+                <div className="flex items-center justify-between text-sm mt-3">
+                  <span className="text-gray-700">Cash</span>
+                  <span className="font-semibold">
+                    {100 - performanceMetrics.mobileMoneyTransactions - performanceMetrics.bankTransferTransactions}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-yellow-500 h-2 rounded-full" 
+                    style={{ width: `${100 - performanceMetrics.mobileMoneyTransactions - performanceMetrics.bankTransferTransactions}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Certifications & Specialties */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Certifications */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Certifications & Compliance</h3>
+            <FiShield className="h-6 w-6 text-green-500" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {supplierProfile.certifications.map((cert, index) => (
+              <div key={index} className="flex items-center space-x-3 p-4 bg-green-50 rounded-xl border-2 border-green-200">
+                <FiCheckCircle className="h-8 w-8 text-green-600" />
+                <div>
+                  <p className="font-semibold text-gray-900">{cert}</p>
+                  <p className="text-xs text-gray-600">Certified</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 p-4 bg-blue-50 rounded-xl">
+            <div className="flex items-start space-x-3">
+              <FiInfo className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-blue-900">Compliance Status</p>
+                <p className="text-xs text-blue-700 mt-1">All certifications are up to date and verified</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Specialties */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Product Specialties</h3>
+            <FiPackage className="h-6 w-6 text-purple-500" />
+          </div>
+          <div className="space-y-3">
+            {supplierProfile.specialties.map((specialty, index) => (
+              <div key={index} className="flex items-center justify-between p-4 bg-purple-50 rounded-xl border-2 border-purple-200">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center">
+                    <FiStar className="h-5 w-5 text-white" />
+                  </div>
+                  <p className="font-semibold text-gray-900">{specialty}</p>
+                </div>
+                <FiChevronRight className="h-5 w-5 text-gray-400" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="p-3 bg-gradient-to-br from-green-50 to-green-100 rounded-xl text-center">
+              <p className="text-sm text-green-600 mb-1">Organic Products</p>
+              <p className="text-2xl font-bold text-gray-900">{performanceMetrics.organicCertifiedProducts}</p>
+            </div>
+            <div className="p-3 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl text-center">
+              <p className="text-sm text-orange-600 mb-1">Seasonal Items</p>
+              <p className="text-2xl font-bold text-gray-900">{performanceMetrics.seasonalProductsAvailable}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance Metrics */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Performance Overview</h3>
+          <FiTrendingUp className="h-6 w-6 text-green-500" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl">
+            <FiPackage className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+            <p className="text-sm text-blue-600 mb-1">Active Products</p>
+            <p className="text-2xl font-bold text-gray-900">{performanceMetrics.activeProducts}</p>
+            <p className="text-xs text-gray-600 mt-1">In catalog</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl">
+            <FiTruck className="h-8 w-8 text-green-600 mx-auto mb-2" />
+            <p className="text-sm text-green-600 mb-1">On-Time Delivery</p>
+            <p className="text-2xl font-bold text-gray-900">{performanceMetrics.onTimeDelivery}%</p>
+            <p className="text-xs text-gray-600 mt-1">Success rate</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl">
+            <FiStar className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+            <p className="text-sm text-purple-600 mb-1">Customer Rating</p>
+            <p className="text-2xl font-bold text-gray-900">{performanceMetrics.customerSatisfaction}</p>
+            <p className="text-xs text-gray-600 mt-1">Out of 5.0</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl">
+            <FiDollarSign className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+            <p className="text-sm text-orange-600 mb-1">Avg Order Value</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {(performanceMetrics.avgOrderValue / 1000).toFixed(0)}K
+            </p>
+            <p className="text-xs text-gray-600 mt-1">UGX</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Achievements & Recognition */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Achievements & Recognition</h3>
+          <FiAward className="h-6 w-6 text-yellow-500" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border-2 border-yellow-300">
+            <div className="text-4xl mb-2">🏆</div>
+            <p className="text-sm font-bold text-gray-900">Premium Supplier</p>
+            <p className="text-xs text-gray-600">{supplierProfile.partnershipYears} Years Partner</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
+            <div className="text-4xl mb-2">⭐</div>
+            <p className="text-sm font-bold text-gray-900">Top Rated</p>
+            <p className="text-xs text-gray-600">{supplierProfile.rating} Rating</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-300">
+            <div className="text-4xl mb-2">🎯</div>
+            <p className="text-sm font-bold text-gray-900">Quality Leader</p>
+            <p className="text-xs text-gray-600">Certified Organic</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
+            <div className="text-4xl mb-2">💎</div>
+            <p className="text-sm font-bold text-gray-900">Trusted Partner</p>
+            <p className="text-xs text-gray-600">Verified Business</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderOverview = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              {getGreeting()}, {supplierProfile.contactPerson}! 👋
+            </h1>
+            <p className="text-purple-100 text-lg">
+              Welcome to your supplier dashboard - {supplierProfile.name}
+            </p>
+            <div className="flex items-center mt-4 space-x-4">
+              <div className="flex items-center space-x-2">
+                <FiClock className="h-5 w-5" />
+                <span>{currentTime.toLocaleTimeString()}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <FiCalendar className="h-5 w-5" />
+                <span>{currentTime.toLocaleDateString()}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <FiStar className="h-5 w-5" />
+                <span>{supplierProfile.rating} Rating</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-4xl mb-2">🏢</div>
+            <p className="text-purple-100">Partnership Strong!</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { title: 'Total Revenue', value: formatCurrency(performanceMetrics.totalRevenue), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '+18.5%' },
+          { title: 'Total Orders', value: formatNumber(performanceMetrics.totalOrders), icon: FiPackage, color: 'from-blue-500 to-blue-600', change: '+12.3%' },
+          { title: 'On-Time Delivery', value: `${performanceMetrics.onTimeDelivery}%`, icon: FiTruck, color: 'from-purple-500 to-purple-600', change: '+2.1%' },
+          { title: 'Quality Rating', value: performanceMetrics.qualityRating, icon: FiStar, color: 'from-yellow-500 to-yellow-600', change: '+0.3' }
+        ].map((metric, index) => (
+          <div key={index} className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-600 text-sm font-medium">{metric.title}</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
+                <p className="text-green-600 text-sm font-medium mt-1">{metric.change}</p>
+              </div>
+              <div className={`p-3 rounded-lg bg-gradient-to-r ${metric.color}`}>
+                <metric.icon className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Payment Statistics */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">💰 Payment Status Overview</h3>
+          <FiDollarSign className="h-6 w-6 text-green-500" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-300">
+            <div className="text-3xl mb-2">✅</div>
+            <p className="text-sm text-green-700 font-semibold mb-1">Paid Orders</p>
+            <p className="text-2xl font-bold text-green-800">{performanceMetrics.paidOrders || 0}</p>
+            <p className="text-xs text-green-600 mt-1">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border-2 border-yellow-300">
+            <div className="text-3xl mb-2">⚠️</div>
+            <p className="text-sm text-yellow-700 font-semibold mb-1">Half Paid</p>
+            <p className="text-2xl font-bold text-yellow-800">{performanceMetrics.partiallyPaidOrders || 0}</p>
+            <p className="text-xs text-yellow-600 mt-1">Partial Payments</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border-2 border-red-300">
+            <div className="text-3xl mb-2">❌</div>
+            <p className="text-sm text-red-700 font-semibold mb-1">Unpaid Orders</p>
+            <p className="text-2xl font-bold text-red-800">{performanceMetrics.unpaidOrders || 0}</p>
+            <p className="text-xs text-red-600 mt-1">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
+            <div className="text-3xl mb-2">💵</div>
+            <p className="text-sm text-blue-700 font-semibold mb-1">Total Received</p>
+            <p className="text-xl font-bold text-blue-800">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+            <p className="text-xs text-blue-600 mt-1">Payments Received</p>
+          </div>
+          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
+            <div className="text-3xl mb-2">📊</div>
+            <p className="text-sm text-purple-700 font-semibold mb-1">Outstanding</p>
+            <p className="text-xl font-bold text-purple-800">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
+            <p className="text-xs text-purple-600 mt-1">Balance Due</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Revenue Chart */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Revenue Trends</h3>
+          <div className="flex space-x-2">
+            {['6m', '1y', '2y'].map((range) => (
+              <button
+                key={range}
+                className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-300"
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart data={revenueData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Area type="monotone" dataKey="revenue" fill="#8B5CF6" fillOpacity={0.3} />
+            <Line type="monotone" dataKey="revenue" stroke="#8B5CF6" strokeWidth={3} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Partnership Goals */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">Partnership Goals Progress</h3>
+        <div className="space-y-4">
+          {partnershipGoals.map((goal) => (
+            <div key={goal.id} className="border rounded-lg p-4 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-gray-900">{goal.title}</h4>
+                <span className="text-sm text-gray-500">{goal.progress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                <div 
+                  className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(goal.progress, 100)}%` }}
+                ></div>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Target: {typeof goal.target === 'number' && goal.target > 1000 ? formatCurrency(goal.target) : goal.target}</span>
+                <span>Current: {typeof goal.current === 'number' && goal.current > 1000 ? formatCurrency(goal.current) : goal.current}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Handle order confirmation
+  const handleConfirmOrder = async (orderId) => {
+    if (!confirm('Confirm this order? This will notify FAREDEAL that you accept the order.')) return;
+
+    try {
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({
+          status: 'confirmed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('po_number', orderId);
+
+      if (error) throw error;
+
+      alert('✅ Order confirmed successfully!');
+      loadSupplierData(); // Reload data
+    } catch (err) {
+      console.error('Error confirming order:', err);
+      alert('Failed to confirm order: ' + err.message);
+    }
+  };
+
+  // Handle order rejection
+  const handleRejectOrder = async (orderId) => {
+    const reason = prompt('Enter reason for rejection:');
+    if (!reason) return;
+
+    try {
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({
+          status: 'cancelled',
+          cancellation_reason: reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('po_number', orderId);
+
+      if (error) throw error;
+
+      alert('❌ Order rejected');
+      loadSupplierData(); // Reload data
+    } catch (err) {
+      console.error('Error rejecting order:', err);
+      alert('Failed to reject order: ' + err.message);
+    }
+  };
+
+  const renderOrders = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      {/* Pending Orders */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">📦 Orders from FAREDEAL Manager Portal</h3>
+          <button
+            onClick={loadSupplierData}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center space-x-2"
+          >
+            <FiRefreshCw className="h-4 w-4" />
+            <span>Refresh</span>
+          </button>
+        </div>
+        <div className="space-y-4">
+          {pendingOrders.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <FiPackage className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-600 font-semibold">No pending orders</p>
+              <p className="text-gray-500 text-sm">Orders from FAREDEAL will appear here</p>
+            </div>
+          ) : (
+            pendingOrders.map((order) => (
+              <div key={order.id} className="border-2 border-blue-200 rounded-lg p-6 hover:shadow-md transition-all duration-300 bg-gradient-to-r from-blue-50 to-white">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                      <FiPackage className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-lg text-gray-900">{order.id}</h4>
+                      <p className="text-sm text-gray-600">{order.items} items • Ordered: {order.date}</p>
+                      <p className="text-sm text-gray-500">Expected Delivery: {order.expectedDelivery}</p>
+                      <div className="flex items-center flex-wrap gap-2 mt-2">
+                        {order.priority && (
+                          <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                            order.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                            order.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {order.priority === 'urgent' && '🔥 '}
+                            {order.priority === 'high' && '⚠️ '}
+                            {order.priority?.toUpperCase()}
+                          </span>
+                        )}
+                        {/* Payment Status Badge */}
+                        <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full border-2 ${
+                          order.payment_status === 'paid' ? 'bg-green-100 text-green-800 border-green-300' :
+                          order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                          order.payment_status === 'unpaid' ? 'bg-red-100 text-red-800 border-red-300' :
+                          'bg-gray-100 text-gray-800 border-gray-300'
+                        }`}>
+                          {order.payment_status === 'paid' && '✅ PAID'}
+                          {order.payment_status === 'partially_paid' && '⚠️ HALF PAID'}
+                          {order.payment_status === 'unpaid' && '❌ UNPAID'}
+                          {!order.payment_status && '❌ UNPAID'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-xl text-green-600">{formatCurrency(order.amount)}</p>
+                    <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-2 ${
+                      order.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      order.status === 'received' ? 'bg-teal-100 text-teal-800' :
+                      order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {order.status?.toUpperCase()}
+                    </span>
+                    {/* Payment Details */}
+                    {order.payment_status === 'partially_paid' && (
+                      <div className="mt-2 text-sm">
+                        <p className="text-green-600 font-semibold">Paid: {formatCurrency(order.amount_paid)}</p>
+                        <p className="text-red-600 font-semibold">Due: {formatCurrency(order.balance_due)}</p>
+                      </div>
+                    )}
+                    {order.payment_status === 'unpaid' && (
+                      <p className="text-sm text-red-600 font-semibold mt-2">
+                        Due: {formatCurrency(order.balance_due)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Items */}
+                <div className="mb-4 p-3 bg-white rounded-lg border">
+                  <p className="text-sm font-semibold text-gray-700 mb-1">Products:</p>
+                  <p className="text-sm text-gray-600">{order.products}</p>
+                </div>
+
+                {/* Delivery Address */}
+                {order.deliveryAddress && (
+                  <div className="mb-4 p-3 bg-white rounded-lg border">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">📍 Delivery Address:</p>
+                    <p className="text-sm text-gray-600">{order.deliveryAddress}</p>
+                  </div>
+                )}
+
+                {/* Notes */}
+                {order.notes && (
+                  <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <p className="text-sm font-semibold text-yellow-800 mb-1">💬 Notes:</p>
+                    <p className="text-sm text-yellow-700">{order.notes}</p>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                {order.status === 'processing' && (
+                  <div className="flex items-center space-x-3 pt-4 border-t">
+                    <button
+                      onClick={() => handleConfirmOrder(order.id)}
+                      className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
+                    >
+                      <FiCheckCircle className="h-5 w-5" />
+                      <span>Confirm Order</span>
+                    </button>
+                    <button
+                      onClick={() => handleRejectOrder(order.id)}
+                      className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
+                    >
+                      <FiXCircle className="h-5 w-5" />
+                      <span>Reject Order</span>
+                    </button>
+                  </div>
+                )}
+
+                {order.status === 'confirmed' && (
+                  <div className="flex items-center space-x-2 pt-4 border-t text-green-600">
+                    <FiCheckCircle className="h-5 w-5" />
+                    <span className="font-semibold">Order Confirmed - Preparing for delivery</span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Order History */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">📚 Recent Order History</h3>
+        {orderHistory.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <FiPackage className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <p className="text-gray-600 font-semibold">No order history yet</p>
+            <p className="text-gray-500 text-sm">Completed orders will appear here</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance Due</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {orderHistory.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50 transition-all duration-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {order.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {order.date}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {order.items} items
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">
+                      {formatCurrency(order.amount)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        order.status === 'delivered' || order.status === 'received' ? 'bg-green-100 text-green-800' :
+                        order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {order.status?.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-bold rounded-full border-2 ${
+                        order.payment_status === 'paid' ? 'bg-green-100 text-green-800 border-green-300' :
+                        order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
+                        'bg-red-100 text-red-800 border-red-300'
+                      }`}>
+                        {order.payment_status === 'paid' && '✅ PAID'}
+                        {order.payment_status === 'partially_paid' && '⚠️ HALF PAID'}
+                        {(order.payment_status === 'unpaid' || !order.payment_status) && '❌ UNPAID'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {order.payment_status === 'paid' ? (
+                        <span className="text-green-600 font-semibold">-</span>
+                      ) : (
+                        <span className="text-red-600 font-semibold">{formatCurrency(order.balance_due)}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="bg-gray-100">
+                <tr>
+                  <td colSpan="3" className="px-6 py-4 text-sm font-bold text-gray-900">TOTALS:</td>
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900">
+                    {formatCurrency(orderHistory.reduce((sum, o) => sum + o.amount, 0))}
+                  </td>
+                  <td className="px-6 py-4"></td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className="text-green-600 font-semibold">
+                      {orderHistory.filter(o => o.payment_status === 'paid').length} Paid
+                    </span>
+                    {' / '}
+                    <span className="text-red-600 font-semibold">
+                      {orderHistory.filter(o => o.payment_status === 'unpaid' || !o.payment_status).length} Unpaid
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-bold text-red-600">
+                    {formatCurrency(orderHistory.reduce((sum, o) => sum + (o.balance_due || 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderProducts = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-gray-900">Product Catalog</h3>
+          <button className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-all duration-300 flex items-center space-x-2">
+            <FiPlus className="h-4 w-4" />
+            <span>Add Product</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {productCatalog.map((product) => (
+            <div key={product.id} className="border rounded-lg p-4 hover:shadow-md transition-all duration-300">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-gray-900">{product.name}</h4>
+                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  product.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                }`}>
+                  {product.status}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">Category: {product.category}</p>
+                <p className="text-sm text-gray-600">Price: {formatCurrency(product.price)}</p>
+                <p className="text-sm text-gray-600">Stock: {product.stock} units</p>
+              </div>
+              <div className="flex justify-end space-x-2 mt-4">
+                <button className="text-blue-600 hover:text-blue-800">
+                  <FiEdit className="h-4 w-4" />
+                </button>
+                <button className="text-green-600 hover:text-green-800">
+                  <FiEye className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPerformance = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      {/* Performance Insights */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">Performance Insights</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {performanceInsights.map((insight, index) => (
+            <div key={index} className="text-center p-4 border rounded-lg hover:shadow-md transition-all duration-300">
+              <div className="text-3xl mb-2">{insight.icon}</div>
+              <h4 className="font-semibold text-gray-900 mb-1">{insight.metric}</h4>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{insight.value}</div>
+              <p className="text-sm text-gray-600">Target: {insight.target}</p>
+              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-2 ${
+                insight.status === 'excellent' ? 'bg-green-100 text-green-800' :
+                insight.status === 'good' ? 'bg-blue-100 text-blue-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {insight.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Performance Chart */}
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">Monthly Performance</h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={revenueData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="name" />
+            <YAxis />
+            <Tooltip />
+            <Bar dataKey="revenue" fill="#8B5CF6" />
+            <Bar dataKey="orders" fill="#3B82F6" />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+
+  const renderNotifications = () => (
+    <div className="space-y-6 animate-fadeInUp">
+      <div className="bg-white rounded-xl p-6 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-900 mb-6">Notifications</h3>
+        <div className="space-y-4">
+          {notifications.map((notification) => (
+            <div key={notification.id} className={`border-l-4 p-4 rounded-lg ${
+              notification.type === 'order' ? 'border-blue-500 bg-blue-50' :
+              notification.type === 'payment' ? 'border-green-500 bg-green-50' :
+              notification.type === 'inventory' ? 'border-yellow-500 bg-yellow-50' :
+              'border-purple-500 bg-purple-50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-semibold text-gray-900">{notification.title}</h4>
+                  <p className="text-gray-600">{notification.message}</p>
+                  <p className="text-sm text-gray-500 mt-1">{notification.time}</p>
+                </div>
+                <button className="text-blue-600 hover:text-blue-800">
+                  <FiEye className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderPayments = () => {
+    const paymentStats = getPaymentStats();
+    return (
+      <div className="space-y-6 animate-fadeInUp">
+        {/* Payment Statistics Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600">Total Earned</p>
+                <p className="text-2xl font-bold text-green-700">{formatCurrency(paymentStats.paidAmount)}</p>
+                <p className="text-xs text-green-500 mt-1">{paymentStats.paid} payments</p>
+              </div>
+              <div className="text-3xl">💰</div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-600">Outstanding</p>
+                <p className="text-2xl font-bold text-red-700">{formatCurrency(paymentStats.outstandingAmount)}</p>
+                <p className="text-xs text-red-500 mt-1">{paymentStats.unpaid + paymentStats.partial} pending</p>
+              </div>
+              <div className="text-3xl">⏳</div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-yellow-600">Partial Payments</p>
+                <p className="text-2xl font-bold text-yellow-700">{paymentStats.partial}</p>
+                <p className="text-xs text-yellow-500 mt-1">In progress</p>
+              </div>
+              <div className="text-3xl">⚡</div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">Payment Rate</p>
+                <p className="text-2xl font-bold text-blue-700">{Math.round((paymentStats.paid / paymentStats.total) * 100)}%</p>
+                <p className="text-xs text-blue-500 mt-1">On-time rate</p>
+              </div>
+              <div className="text-3xl">📊</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Payment History */}
+        <div className="bg-white rounded-xl p-6 shadow-lg">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-gray-900">Payment History</h3>
+            <div className="flex items-center space-x-3">
+              {[
+                { value: 'all', label: 'All', icon: '📋' },
+                { value: 'paid', label: 'Paid', icon: '✅' },
+                { value: 'partial', label: 'Partial', icon: '⚡' },
+                { value: 'unpaid', label: 'Unpaid', icon: '❌' }
+              ].map(filter => (
+                <button
+                  key={filter.value}
+                  onClick={() => setPaymentFilter(filter.value)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    paymentFilter === filter.value
+                      ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  <span>{filter.icon}</span>
+                  <span>{filter.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {getFilteredPaymentHistory().map(payment => (
+              <div key={payment.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="text-2xl" title={`Status: ${payment.status}`}>
+                      {getPaymentStatusIcon(payment.status)}
+                    </div>
+                    <div>
+                      <div className="flex items-center space-x-3">
+                        <span className="font-bold text-gray-900">{payment.reference}</span>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(payment.status)}`}>
+                          {payment.status.toUpperCase()}
+                        </span>
+                        {payment.daysOverdue > 0 && (
+                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
+                            {payment.daysOverdue} days overdue
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                        <span>
+                          {getPaymentMethodIcon(payment.paymentMethod)} {payment.paymentMethod.replace('_', ' ').toUpperCase()}
+                        </span>
+                        <span>📅 {new Date(payment.date).toLocaleDateString('en-UG')}</span>
+                        <span>📦 Order: {payment.orderId}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-lg text-gray-900">
+                      {formatCurrency(payment.amount)}
+                    </div>
+                    {payment.status === 'partial' && payment.paidAmount && (
+                      <div className="text-sm text-gray-600">
+                        Paid: {formatCurrency(payment.paidAmount)}
+                        <div className="text-xs text-orange-600">
+                          Remaining: {formatCurrency(payment.amount - payment.paidAmount)}
+                        </div>
+                      </div>
+                    )}
+                    <div className="text-sm text-gray-500">
+                      Due: {new Date(payment.dueDate).toLocaleDateString('en-UG')}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Progress Bar for Partial Payments */}
+                {payment.status === 'partial' && payment.paidAmount && (
+                  <div className="mt-3">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Payment Progress</span>
+                      <span>{Math.round((payment.paidAmount / payment.amount) * 100)}% Complete</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${(payment.paidAmount / payment.amount) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {getFilteredPaymentHistory().length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">💸</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Payment Records</h3>
+              <p className="text-gray-600">
+                {paymentFilter === 'all' ? 'No payment history available.' : `No ${paymentFilter} payments found.`}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: FiBarChart },
+    { id: 'profile', label: 'My Profile', icon: FiUsers },
+    { id: 'orders', label: 'Orders', icon: FiPackage },
+    { id: 'products', label: 'Products', icon: FiShoppingCart },
+    { id: 'payments', label: 'Payments', icon: FiDollarSign },
+    { id: 'performance', label: 'Performance', icon: FiTrendingUp },
+    { id: 'notifications', label: 'Notifications', icon: FiBell }
+  ];
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes fadeInUp {
+            from {
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fadeInUp {
+            animation: fadeInUp 0.8s ease-out;
+          }
+        `
+      }} />
+      
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-700 shadow-2xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Header Content */}
+          <div className="flex justify-between items-center py-6">
+            <div className="flex items-center space-x-6">
+              {/* Animated Logo */}
+              <div className="relative">
+                <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-110 transition-all duration-300">
+                  <span className="text-4xl animate-bounce">🏢</span>
+                </div>
+                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+              </div>
+              
+              <div>
+                <h1 className="text-3xl font-bold text-white mb-1 flex items-center space-x-3">
+                  Supplier Portal
+                  <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
+                    PREMIUM
+                  </span>
+                </h1>
+                <p className="text-purple-100 text-lg">Partnership Management Hub</p>
+              </div>
+            </div>
+            
+            {/* Right Side - Profile & Actions */}
+            <div className="flex items-center space-x-4">
+              {/* Quick Stats Container */}
+              <div className="hidden lg:flex items-center space-x-4 mr-4">
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2 text-white">
+                    <FiTrendingUp className="h-5 w-5 text-green-300" />
+                    <div>
+                      <p className="text-xs text-purple-200">Monthly Growth</p>
+                      <p className="text-sm font-bold">+{performanceMetrics.monthlyGrowth}%</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2 text-white">
+                    <FiPackage className="h-5 w-5 text-yellow-300" />
+                    <div>
+                      <p className="text-xs text-purple-200">Pending Orders</p>
+                      <p className="text-sm font-bold">{performanceMetrics.pendingOrders}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Profile Container - Clickable */}
+              <button 
+                onClick={() => setActiveTab('profile')}
+                className="bg-white/10 backdrop-blur-sm hover:bg-white/20 rounded-xl px-4 py-3 border border-white/20 transition-all duration-300 group"
+              >
+                <div className="text-right">
+                  <p className="text-sm text-white font-semibold group-hover:text-yellow-300 transition-colors">
+                    {supplierProfile.name}
+                  </p>
+                  <p className="text-xs text-purple-200">{supplierProfile.contactPerson}</p>
+                </div>
+              </button>
+
+              {/* Action Buttons Container */}
+              <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-xl px-2 py-2 border border-white/20">
+                {/* Notifications with Badge */}
+                <button className="relative p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 group">
+                  <FiBell className="h-6 w-6 group-hover:animate-bounce" />
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center animate-pulse">
+                    {performanceMetrics.pendingOrders}
+                  </span>
+                </button>
+                
+                {/* Settings */}
+                <button 
+                  onClick={() => setActiveTab('profile')}
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 group"
+                  title="Settings & Profile"
+                >
+                  <FiSettings className="h-6 w-6 group-hover:rotate-90 transition-transform duration-300" />
+                </button>
+                
+                {/* Logout */}
+                <button className="p-2 text-white hover:bg-red-500/50 rounded-lg transition-all duration-300 group">
+                  <FiLogOut className="h-6 w-6 group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Bar with Live Stats */}
+          <div className="pb-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                {/* Total Revenue */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center">
+                    <FiDollarSign className="h-5 w-5 text-green-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">Total Revenue</p>
+                    <p className="text-sm font-bold text-white">
+                      UGX {(performanceMetrics.totalRevenue / 1000000).toFixed(1)}M
+                    </p>
+                  </div>
+                </div>
+
+                {/* Total Orders */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                    <FiShoppingCart className="h-5 w-5 text-blue-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">Total Orders</p>
+                    <p className="text-sm font-bold text-white">{performanceMetrics.totalOrders}</p>
+                  </div>
+                </div>
+
+                {/* Quality Rating */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                    <FiStar className="h-5 w-5 text-yellow-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">Quality Rating</p>
+                    <p className="text-sm font-bold text-white flex items-center">
+                      {supplierProfile.rating} 
+                      <FiStar className="h-3 w-3 text-yellow-300 ml-1 fill-current" />
+                    </p>
+                  </div>
+                </div>
+
+                {/* On-Time Delivery */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                    <FiTruck className="h-5 w-5 text-purple-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">On-Time</p>
+                    <p className="text-sm font-bold text-white">{performanceMetrics.onTimeDelivery}%</p>
+                  </div>
+                </div>
+
+                {/* Active Products */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-orange-500/20 rounded-lg flex items-center justify-center">
+                    <FiPackage className="h-5 w-5 text-orange-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">Products</p>
+                    <p className="text-sm font-bold text-white">{performanceMetrics.activeProducts}</p>
+                  </div>
+                </div>
+
+                {/* Partnership Years */}
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-pink-500/20 rounded-lg flex items-center justify-center">
+                    <FiAward className="h-5 w-5 text-pink-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-purple-200">Partnership</p>
+                    <p className="text-sm font-bold text-white">{supplierProfile.partnershipYears} Years</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <nav className="flex space-x-8">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
+                  activeTab === tab.id
+                    ? 'border-purple-500 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <tab.icon className="h-5 w-5" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {(loading && ['overview','orders','products','payments'].includes(activeTab)) ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <FiRefreshCw className="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <p className="text-gray-600">Loading supplier data from database...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'profile' && renderProfile()}
+            {activeTab === 'orders' && renderOrders()}
+            {activeTab === 'products' && renderProducts()}
+            {activeTab === 'payments' && renderPayments()}
+            {activeTab === 'performance' && renderPerformance()}
+            {activeTab === 'notifications' && renderNotifications()}
+          </>
+        )}
+      </div>
+
+      {/* Add Product Modal - Supplier Specific */}
+      <AddProductModal
+        isOpen={showAddProductModal}
+        onClose={() => setShowAddProductModal(false)}
+        onProductAdded={(newProduct) => {
+          console.log('✅ Supplier added new product:', newProduct);
+          alert(`🎉 Product "${newProduct.name}" added successfully!`);
+          setShowAddProductModal(false);
+        }}
+        prefilledData={{
+          // Supplier can have their supplier_id pre-filled if known
+          // brand: supplierProfile.name
+        }}
+      />
+
+      {/* Edit Profile Modal */}
+      {isEditingProfile && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <span>✏️</span> Edit Supplier Profile
+                  </h2>
+                  <p className="text-purple-100 mt-1">Update your business information</p>
+                </div>
+                <button
+                  onClick={cancelEditingProfile}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl">✕</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Business Name */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Business Name
+                </label>
+                <input
+                  type="text"
+                  value={editedProfile.name || supplierProfile.name}
+                  onChange={(e) => handleProfileFieldChange('name', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Enter your business name"
+                />
+              </div>
+
+              {/* Contact Person */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Contact Person Name
+                </label>
+                <input
+                  type="text"
+                  value={editedProfile.contactPerson || supplierProfile.contactPerson}
+                  onChange={(e) => handleProfileFieldChange('contactPerson', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Enter contact person name"
+                />
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  value={editedProfile.phone || supplierProfile.phone}
+                  onChange={(e) => handleProfileFieldChange('phone', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="+256 700 000 000"
+                />
+              </div>
+
+              {/* Business Address */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Business Address
+                </label>
+                <textarea
+                  value={editedProfile.address || supplierProfile.address}
+                  onChange={(e) => handleProfileFieldChange('address', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Enter business address"
+                  rows="3"
+                />
+              </div>
+
+              {/* Business Category */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Business Category
+                </label>
+                <select
+                  value={editedProfile.category || supplierProfile.category}
+                  onChange={(e) => handleProfileFieldChange('category', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                >
+                  <option value="Fresh Produce">Fresh Produce</option>
+                  <option value="Groceries & Staples">Groceries & Staples</option>
+                  <option value="Electronics">Electronics</option>
+                  <option value="Beverages">Beverages</option>
+                  <option value="Household Items">Household Items</option>
+                  <option value="Personal Care">Personal Care</option>
+                  <option value="Fashion & Apparel">Fashion & Apparel</option>
+                  <option value="Food & Snacks">Food & Snacks</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Languages */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Languages Spoken (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={(editedProfile.languages || supplierProfile.languages).join(', ')}
+                  onChange={(e) => handleProfileFieldChange('languages', e.target.value.split(',').map(l => l.trim()))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="English, Luganda, Swahili"
+                />
+              </div>
+
+              {/* Product Specialties */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Product Specialties (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={(editedProfile.specialties || supplierProfile.specialties).join(', ')}
+                  onChange={(e) => handleProfileFieldChange('specialties', e.target.value.split(',').map(s => s.trim()))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Fresh Vegetables, Organic Fruits, Dairy Products"
+                />
+              </div>
+
+              {/* Delivery Areas */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Delivery Areas (comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={(editedProfile.deliveryAreas || supplierProfile.deliveryAreas).join(', ')}
+                  onChange={(e) => handleProfileFieldChange('deliveryAreas', e.target.value.split(',').map(a => a.trim()))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
+                  placeholder="Kampala, Entebbe, Mukono, Wakiso"
+                />
+              </div>
+
+              {/* Read-only fields */}
+              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">Read-Only Information</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-500">Email:</span>
+                    <p className="font-medium text-gray-900">{supplierProfile.email}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Status:</span>
+                    <p className="font-medium text-gray-900">{supplierProfile.status}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Partnership Years:</span>
+                    <p className="font-medium text-gray-900">{supplierProfile.partnershipYears} Years</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Rating:</span>
+                    <p className="font-medium text-gray-900">{supplierProfile.rating} ⭐</p>
+                  </div>
+                  {supplierProfile.businessLicense && (
+                    <div>
+                      <span className="text-gray-500">Business License:</span>
+                      <p className="font-medium text-gray-900">{supplierProfile.businessLicense}</p>
+                    </div>
+                  )}
+                  {supplierProfile.taxID && (
+                    <div>
+                      <span className="text-gray-500">Tax ID:</span>
+                      <p className="font-medium text-gray-900">{supplierProfile.taxID}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={cancelEditingProfile}
+                disabled={isSavingProfile}
+                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveSupplierProfile}
+                disabled={isSavingProfile}
+                className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSavingProfile ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <span>💾</span> Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Financial Details Modal */}
+      {isEditingFinancial && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-green-600 to-blue-600 p-6 text-white rounded-t-2xl">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <span>💰</span> Edit Financial Details
+                  </h2>
+                  <p className="text-green-100 mt-1">Update payment terms and methods</p>
+                </div>
+                <button
+                  onClick={cancelEditingFinancial}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl">✕</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Payment Terms */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Payment Terms
+                </label>
+                <select
+                  value={editedFinancial.paymentTerms || supplierProfile.paymentTerms}
+                  onChange={(e) => handleFinancialFieldChange('paymentTerms', e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                >
+                  <option value="immediate">Immediate Payment</option>
+                  <option value="net_7">Net 7 Days</option>
+                  <option value="net_15">Net 15 Days</option>
+                  <option value="net_30">Net 30 Days</option>
+                  <option value="net_60">Net 60 Days</option>
+                  <option value="net_90">Net 90 Days</option>
+                </select>
+              </div>
+
+              {/* Credit Limit */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Credit Limit (UGX)
+                </label>
+                <input
+                  type="number"
+                  value={editedFinancial.creditLimit !== undefined ? editedFinancial.creditLimit : supplierProfile.creditLimit}
+                  onChange={(e) => handleFinancialFieldChange('creditLimit', parseFloat(e.target.value) || 0)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                  placeholder="Enter credit limit"
+                  step="100000"
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Current: UGX {((editedFinancial.creditLimit !== undefined ? editedFinancial.creditLimit : supplierProfile.creditLimit) / 1000000).toFixed(1)}M
+                </p>
+              </div>
+
+              {/* Payment Methods */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Accepted Payment Methods
+                </label>
+                <div className="space-y-3">
+                  {/* Mobile Money */}
+                  <div className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-green-300 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <FiSmartphone className="h-6 w-6 text-green-600" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Mobile Money</p>
+                        <p className="text-xs text-gray-500">MTN, Airtel Money</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editedFinancial.mobileMoneyEnabled !== undefined ? editedFinancial.mobileMoneyEnabled : true}
+                        onChange={(e) => handleFinancialFieldChange('mobileMoneyEnabled', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Bank Transfer */}
+                  <div className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <FiCreditCard className="h-6 w-6 text-blue-600" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Bank Transfer</p>
+                        <p className="text-xs text-gray-500">Direct bank payment</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editedFinancial.bankTransferEnabled !== undefined ? editedFinancial.bankTransferEnabled : true}
+                        onChange={(e) => handleFinancialFieldChange('bankTransferEnabled', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                  </div>
+
+                  {/* Cash */}
+                  <div className="flex items-center justify-between p-4 border-2 border-gray-200 rounded-lg hover:border-yellow-300 transition-colors">
+                    <div className="flex items-center space-x-3">
+                      <FiDollarSign className="h-6 w-6 text-yellow-600" />
+                      <div>
+                        <p className="font-semibold text-gray-900">Cash Payment</p>
+                        <p className="text-xs text-gray-500">Physical currency</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editedFinancial.cashEnabled !== undefined ? editedFinancial.cashEnabled : false}
+                        onChange={(e) => handleFinancialFieldChange('cashEnabled', e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-yellow-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Info Box */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-start space-x-3">
+                  <FiInfo className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Payment Terms Information</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      These settings determine how you'll be paid by the store. Select payment methods you accept and credit terms you're comfortable with.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 px-6 py-4 rounded-b-2xl flex justify-end gap-3">
+              <button
+                onClick={cancelEditingFinancial}
+                disabled={isSavingFinancial}
+                className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveFinancialDetails}
+                disabled={isSavingFinancial}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-blue-600 text-white rounded-lg hover:from-green-700 hover:to-blue-700 transition-all font-medium shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSavingFinancial ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <span>💾</span> Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SupplierPortal;
