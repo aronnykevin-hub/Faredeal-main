@@ -10,10 +10,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   FiTruck, FiCheckCircle, FiXCircle, FiSend, FiEdit, FiPlus,
   FiPackage, FiDollarSign, FiClock, FiAlertTriangle, FiSearch,
-  FiDownload, FiMail, FiPhone, FiMapPin, FiCalendar, FiUser
+  FiDownload, FiMail, FiPhone, FiMapPin, FiCalendar, FiUser, FiChevronDown
 } from 'react-icons/fi';
 import supplierOrdersService from '../services/supplierOrdersService';
 import { supabase } from '../services/supabase';
+import OrderPaymentTracker from './OrderPaymentTracker';
 
 const SupplierOrderManagement = () => {
   // State Management
@@ -40,6 +41,7 @@ const SupplierOrderManagement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
@@ -56,6 +58,7 @@ const SupplierOrderManagement = () => {
   // NEW: Approval form state
   const [approvalData, setApprovalData] = useState({
     initialPayment: 0,
+    cashPaidNow: 0, // NEW: Cash paid at approval time
     paymentMethod: 'cash',
     paymentDate: new Date().toISOString().split('T')[0], // Today's date
     nextPaymentDate: '',
@@ -98,7 +101,28 @@ const SupplierOrderManagement = () => {
       ]);
 
       if (ordersResponse.success) {
-        setOrders(ordersResponse.orders);
+        // Fetch unconfirmed payment counts for each order
+        const ordersWithUnconfirmed = await Promise.all(
+          ordersResponse.orders.map(async (order) => {
+            try {
+              const { data, error } = await supabase
+                .from('payment_transactions')
+                .select('id', { count: 'exact', head: false })
+                .eq('order_id', order.id)
+                .eq('confirmed_by_supplier', false);
+              
+              return {
+                ...order,
+                unconfirmedPaymentsCount: error ? 0 : (data?.length || 0)
+              };
+            } catch (err) {
+              console.error(`Error fetching unconfirmed payments for order ${order.id}:`, err);
+              return { ...order, unconfirmedPaymentsCount: 0 };
+            }
+          })
+        );
+        
+        setOrders(ordersWithUnconfirmed);
       } else {
         setError(ordersResponse.error);
       }
@@ -201,11 +225,40 @@ const SupplierOrderManagement = () => {
         return;
       }
 
+      // Step 3: Record cash payment with tracking if cash was paid now
+      let cashPaymentResult = null;
+      if (approvalData.cashPaidNow && parseFloat(approvalData.cashPaidNow) > 0) {
+        const { data: cashData, error: cashError } = await supabase.rpc('record_payment_with_tracking', {
+          p_order_id: approvalOrderId,
+          p_amount_paid: parseFloat(approvalData.cashPaidNow),
+          p_payment_method: 'cash',
+          p_payment_reference: `CASH-APPROVAL-${approvalOrderId.substring(0, 8)}`,
+          p_notes: `Cash payment made during order approval. ${approvalData.notes || ''}`,
+          p_paid_by: managerId
+        });
+
+        if (cashError) {
+          console.error('⚠️ Warning: Cash payment recorded but tracking failed:', cashError);
+          alert(`⚠️ Order approved but cash tracking issue: ${cashError.message}`);
+        } else {
+          cashPaymentResult = cashData;
+          console.log('💵 Cash payment recorded with tracking:', cashData);
+        }
+      }
+
       // Show success message with payment details
       let successMsg = '✅ Purchase order approved successfully!\n\n';
+      
+      // Show cash payment info if recorded
+      if (cashPaymentResult) {
+        successMsg += `💵 CASH PAID NOW: UGX ${parseFloat(approvalData.cashPaidNow).toLocaleString()}\n`;
+        successMsg += `🔖 Transaction #: ${cashPaymentResult.transaction_number}\n`;
+        successMsg += `⏳ Status: Awaiting supplier confirmation\n\n`;
+      }
+      
       if (data.balance_due > 0) {
-        successMsg += `💰 Payment: UGX ${approvalData.initialPayment.toLocaleString()}\n`;
-        successMsg += `📊 Balance: UGX ${data.balance_due.toLocaleString()}\n`;
+        successMsg += `💰 Initial Payment: UGX ${approvalData.initialPayment.toLocaleString()}\n`;
+        successMsg += `📊 Balance Remaining: UGX ${data.balance_due.toLocaleString()}\n`;
         if (approvalData.nextPaymentDate) {
           successMsg += `📅 Next Payment: ${approvalData.nextPaymentDate}`;
         }
@@ -217,6 +270,7 @@ const SupplierOrderManagement = () => {
       setShowApprovalModal(false);
       setApprovalData({
         initialPayment: 0,
+        cashPaidNow: 0,
         paymentMethod: 'cash',
         paymentDate: new Date().toISOString().split('T')[0],
         nextPaymentDate: '',
@@ -613,207 +667,234 @@ const SupplierOrderManagement = () => {
           filteredOrders.map((order) => (
             <div
               key={order.id}
-              className={`bg-white rounded-xl p-6 shadow-lg border-2 hover:shadow-xl transition-all duration-300 ${
+              className={`bg-white rounded-xl shadow-lg border-2 hover:shadow-xl transition-all duration-300 overflow-hidden ${
                 order.status === 'pending_approval' ? 'border-yellow-300' :
                 order.status === 'approved' ? 'border-green-300' :
                 order.status === 'cancelled' ? 'border-red-300' :
                 'border-gray-200'
               }`}
             >
-              {/* Order Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center flex-wrap gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-gray-900">{order.po_number}</h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(order.status)}`}>
-                      {order.status?.replace(/_/g, ' ').toUpperCase()}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
-                      {order.priority === 'urgent' && '🔥 '}
-                      {order.priority === 'high' && '⚠️ '}
-                      {order.priority === 'normal' && '📋 '}
-                      {order.priority === 'low' && '📝 '}
-                      {order.priority?.toUpperCase()}
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border-2 ${getPaymentStatusColor(order.payment_status)}`}>
-                      {getPaymentStatusLabel(order.payment_status)}
-                    </span>
+              {/* Collapsed View - Order Header */}
+              <div
+                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setExpandedOrderId(expandedOrderId === order.id ? null : order.id)}
+              >
+                <div className="flex items-center justify-between">
+                  {/* Left Section */}
+                  <div className="flex items-center space-x-4 flex-1">
+                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <FiPackage className="h-5 w-5 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-base text-gray-900">{order.po_number}</h3>
+                        {/* Status Badge */}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(order.status)}`}>
+                          {order.status?.replace(/_/g, ' ').toUpperCase()}
+                        </span>
+                        {/* Priority Badge */}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getPriorityColor(order.priority)}`}>
+                          {order.priority === 'urgent' && '🔥 '}
+                          {order.priority === 'high' && '⚠️ '}
+                          {order.priority?.toUpperCase()}
+                        </span>
+                        {/* Payment Status Badge */}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold border-2 ${getPaymentStatusColor(order.payment_status)}`}>
+                          {getPaymentStatusLabel(order.payment_status)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 mt-1">
+                        {order.supplierName} • {new Date(order.order_date).toLocaleDateString()}
+                      </p>
+                    </div>
                   </div>
-                  <h4 className="text-lg font-semibold text-blue-600 mb-3">{order.supplierName}</h4>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-green-600">{formatUGX(order.total_amount_ugx)}</p>
-                  <p className="text-sm text-gray-500">Total Amount</p>
-                  
-                  {/* Payment Status Visual */}
-                  {order.payment_status === 'paid' && (
-                    <div className="mt-2 bg-green-100 px-3 py-2 rounded-lg border border-green-300">
-                      <p className="text-sm font-bold text-green-800">✅ FULLY PAID</p>
-                      {order.last_payment_date && (
-                        <p className="text-xs text-green-600">
-                          {new Date(order.last_payment_date).toLocaleDateString()}
+
+                  {/* Right Section */}
+                  <div className="flex items-center gap-4 ml-4">
+                    <div className="text-right">
+                      <p className="font-bold text-lg text-green-600">{formatUGX(order.total_amount_ugx)}</p>
+                      {order.payment_status === 'partially_paid' && (
+                        <p className="text-xs text-gray-600">
+                          Paid: <span className="text-green-600 font-semibold">{formatUGX(order.amount_paid_ugx || 0)}</span>
                         </p>
                       )}
                     </div>
-                  )}
-                  
-                  {order.payment_status === 'partially_paid' && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex justify-between items-center bg-green-50 px-2 py-1 rounded border border-green-200">
-                        <span className="text-xs text-gray-600">Paid:</span>
-                        <span className="text-sm font-bold text-green-700">{formatUGX(order.amount_paid_ugx || 0)}</span>
-                      </div>
-                      <div className="flex justify-between items-center bg-red-50 px-2 py-1 rounded border border-red-200">
-                        <span className="text-xs text-gray-600">Balance:</span>
-                        <span className="text-sm font-bold text-red-700">{formatUGX(order.balance_due_ugx || 0)}</span>
-                      </div>
-                      {/* Progress bar */}
-                      <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                        <div 
-                          className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
-                          style={{width: `${((order.amount_paid_ugx || 0) / order.total_amount_ugx) * 100}%`}}
-                        ></div>
-                      </div>
-                      <p className="text-xs text-center text-gray-600 mt-1">
-                        {(((order.amount_paid_ugx || 0) / order.total_amount_ugx) * 100).toFixed(1)}% paid
-                      </p>
-                      {order.next_payment_date && (
-                        <div className="mt-1 bg-yellow-50 px-2 py-1 rounded border border-yellow-200">
-                          <p className="text-xs text-yellow-700">
-                            📅 Next: {new Date(order.next_payment_date).toLocaleDateString()}
-                          </p>
-                        </div>
+                    {/* Expand/Collapse Icon */}
+                    <div className={`transform transition-transform ${expandedOrderId === order.id ? 'rotate-180' : ''}`}>
+                      <FiChevronDown className="h-5 w-5 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expanded View - Order Details */}
+              {expandedOrderId === order.id && (
+                <div className="border-t-2 border-gray-200 p-6 bg-white animate-fadeInUp">
+                  {/* Supplier Info */}
+                  <div className="mb-4">
+                    <h4 className="text-lg font-semibold text-blue-600 mb-2 flex items-center gap-2">
+                      {order.supplierAvatar && (
+                        <img 
+                          src={order.supplierAvatar} 
+                          alt={order.supplierName}
+                          className="w-8 h-8 rounded-full border-2 border-blue-300"
+                        />
                       )}
-                    </div>
-                  )}
-                  
-                  {order.payment_status === 'unpaid' && (
-                    <div className="mt-2 bg-red-100 px-3 py-2 rounded-lg border border-red-300">
-                      <p className="text-sm font-bold text-red-800">❌ UNPAID</p>
-                      <p className="text-xs text-red-600">Due: {formatUGX(order.total_amount_ugx)}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Order Details Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <FiCalendar className="text-gray-500" />
-                  <div>
-                    <p className="text-xs text-gray-500">Order Date</p>
-                    <p className="font-semibold text-gray-900">{new Date(order.order_date).toLocaleDateString()}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FiClock className="text-gray-500" />
-                  <div>
-                    <p className="text-xs text-gray-500">Expected Delivery</p>
-                    <p className="font-semibold text-gray-900">
-                      {order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString() : 'TBD'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <FiUser className="text-gray-500" />
-                  <div>
-                    <p className="text-xs text-gray-500">Ordered By</p>
-                    <p className="font-semibold text-gray-900">{order.orderedBy}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Items Summary */}
-              {order.items && Array.isArray(order.items) && order.items.length > 0 && (
-                <div className="mb-4">
-                  <h5 className="text-sm font-semibold text-gray-700 mb-2">Order Items ({order.items.length})</h5>
-                  <div className="space-y-1">
-                    {order.items.slice(0, 3).map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700">
-                          {item.product_name || item.productName} × {item.quantity}
+                      <span>{order.supplierName}</span>
+                      {order.supplierCategory && (
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                          {order.supplierCategory}
                         </span>
-                        <span className="font-semibold text-gray-900">
-                          {formatUGX((item.unit_price || item.unitPrice) * item.quantity)}
-                        </span>
+                      )}
+                    </h4>
+                  </div>
+
+                  {/* Order Details Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <FiCalendar className="text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Order Date</p>
+                        <p className="font-semibold text-gray-900">{new Date(order.order_date).toLocaleDateString()}</p>
                       </div>
-                    ))}
-                    {order.items.length > 3 && (
-                      <p className="text-sm text-blue-600 font-semibold">
-                        +{order.items.length - 3} more items
-                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <FiClock className="text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Expected Delivery</p>
+                        <p className="font-semibold text-gray-900">
+                          {order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString() : 'TBD'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <FiUser className="text-gray-500" />
+                      <div>
+                        <p className="text-xs text-gray-500">Ordered By</p>
+                        <p className="font-semibold text-gray-900">{order.orderedBy}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 💰 PAYMENT TRACKER - Interactive Payment Management */}
+                  {(order.status === 'approved' || order.status === 'confirmed' || order.payment_status !== 'unpaid') && (
+                    <div className="mb-4">
+                      <OrderPaymentTracker
+                        order={order}
+                        onPaymentAdded={loadAllData}
+                        showAddPayment={true}
+                        userRole="manager"
+                      />
+                    </div>
+                  )}
+
+                  {/* Items Summary */}
+                  {order.items && Array.isArray(order.items) && order.items.length > 0 && (
+                    <div className="mb-4">
+                      <h5 className="text-sm font-semibold text-gray-700 mb-2">Order Items ({order.items.length})</h5>
+                      <div className="space-y-1">
+                        {order.items.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-700">
+                              {item.product_name || item.productName} × {item.quantity}
+                            </span>
+                            <span className="font-semibold text-gray-900">
+                              {formatUGX((item.unit_price || item.unitPrice) * item.quantity)}
+                            </span>
+                          </div>
+                        ))}
+                        {order.items.length > 3 && (
+                          <p className="text-sm text-blue-600 font-semibold">
+                            +{order.items.length - 3} more items
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {order.notes && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-gray-700"><strong>Notes:</strong> {order.notes}</p>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center flex-wrap gap-3 pt-4 border-t border-gray-200">
+                    {order.status === 'pending_approval' && (
+                      <>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveOrder(order.id);
+                          }}
+                          className="flex-1 min-w-[180px] bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
+                        >
+                          <FiCheckCircle className="h-5 w-5" />
+                          <span>Approve Order</span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRejectOrder(order.id);
+                          }}
+                          className="flex-1 min-w-[180px] bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
+                        >
+                          <FiXCircle className="h-5 w-5" />
+                          <span>Reject</span>
+                        </button>
+                      </>
                     )}
+                    
+                    {order.status === 'approved' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSendToSupplier(order.id);
+                        }}
+                        className="flex-1 min-w-[180px] bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
+                      >
+                        <FiSend className="h-5 w-5" />
+                        <span>Send to Supplier</span>
+                      </button>
+                    )}
+
+                    {/* Payment Button - Show if order is received/completed and not fully paid */}
+                    {(order.status === 'received' || order.status === 'completed') && order.payment_status !== 'paid' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedOrder(order);
+                          setShowPaymentModal(true);
+                        }}
+                        className="flex-1 min-w-[180px] bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
+                      >
+                        <FiDollarSign className="h-5 w-5" />
+                        <span>Record Payment</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedOrder(order);
+                      }}
+                      className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center space-x-2"
+                    >
+                      <FiEdit className="h-5 w-5" />
+                      <span>View Details</span>
+                    </button>
+
+                    <button
+                      onClick={(e) => e.stopPropagation()}
+                      className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-all duration-300 flex items-center space-x-2"
+                      title="Download PDF"
+                    >
+                      <FiDownload className="h-5 w-5" />
+                    </button>
                   </div>
                 </div>
               )}
-
-              {/* Notes */}
-              {order.notes && (
-                <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-gray-700"><strong>Notes:</strong> {order.notes}</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex items-center flex-wrap gap-3 pt-4 border-t border-gray-200">
-                {order.status === 'pending_approval' && (
-                  <>
-                    <button
-                      onClick={() => handleApproveOrder(order.id)}
-                      className="flex-1 min-w-[180px] bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
-                    >
-                      <FiCheckCircle className="h-5 w-5" />
-                      <span>Approve Order</span>
-                    </button>
-                    <button
-                      onClick={() => handleRejectOrder(order.id)}
-                      className="flex-1 min-w-[180px] bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
-                    >
-                      <FiXCircle className="h-5 w-5" />
-                      <span>Reject</span>
-                    </button>
-                  </>
-                )}
-                
-                {order.status === 'approved' && (
-                  <button
-                    onClick={() => handleSendToSupplier(order.id)}
-                    className="flex-1 min-w-[180px] bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center justify-center space-x-2 font-semibold shadow-lg"
-                  >
-                    <FiSend className="h-5 w-5" />
-                    <span>Send to Supplier</span>
-                  </button>
-                )}
-
-                {/* Payment Button - Show if order is received/completed and not fully paid */}
-                {(order.status === 'received' || order.status === 'completed') && order.payment_status !== 'paid' && (
-                  <button
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setShowPaymentModal(true);
-                    }}
-                    className="flex-1 min-w-[180px] bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
-                  >
-                    <FiDollarSign className="h-5 w-5" />
-                    <span>Record Payment</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setSelectedOrder(order)}
-                  className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-all duration-300 flex items-center space-x-2"
-                >
-                  <FiEdit className="h-5 w-5" />
-                  <span>View Details</span>
-                </button>
-
-                <button
-                  className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-all duration-300 flex items-center space-x-2"
-                  title="Download PDF"
-                >
-                  <FiDownload className="h-5 w-5" />
-                </button>
-              </div>
             </div>
           ))
         )}
@@ -951,6 +1032,12 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
   const [priority, setPriority] = useState('normal');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  
+  // NEW: Payment fields for cash paid at order creation
+  const [cashPaidNow, setCashPaidNow] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentReference, setPaymentReference] = useState('');
+  const [paymentNotes, setPaymentNotes] = useState('');
 
   const handleAddItem = () => {
     if (!newItem.productName || newItem.quantity <= 0 || newItem.unitPrice <= 0) {
@@ -1036,7 +1123,36 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
       const response = await supplierOrdersService.createPurchaseOrder(orderData);
 
       if (response.success) {
-        alert('✅ Purchase order created successfully!');
+        let successMsg = '✅ Purchase order created successfully!';
+        
+        // If cash was paid during order creation, record it with tracking
+        if (cashPaidNow && parseFloat(cashPaidNow) > 0 && response.order?.id) {
+          try {
+            const { data: paymentData, error: paymentError } = await supabase.rpc('record_payment_with_tracking', {
+              p_order_id: response.order.id,
+              p_amount_paid: parseFloat(cashPaidNow),
+              p_payment_method: paymentMethod,
+              p_payment_reference: paymentReference || `ORDER-CREATE-${response.order.id.substring(0, 8)}`,
+              p_notes: `Payment made at order creation. ${paymentNotes}`,
+              p_paid_by: managerId
+            });
+
+            if (paymentError) {
+              console.error('⚠️ Payment recording error:', paymentError);
+              successMsg += `\n\n⚠️ Warning: Order created but payment tracking failed: ${paymentError.message}`;
+            } else if (paymentData) {
+              successMsg += `\n\n💵 CASH PAID: ${formatUGX(cashPaidNow)}`;
+              successMsg += `\n🔖 Transaction #: ${paymentData.transaction_number}`;
+              successMsg += `\n⏳ Awaiting supplier confirmation`;
+              successMsg += `\n📊 Balance: ${formatUGX(paymentData.balance_due)}`;
+            }
+          } catch (paymentErr) {
+            console.error('⚠️ Payment recording error:', paymentErr);
+            successMsg += '\n\n⚠️ Order created but payment recording failed';
+          }
+        }
+        
+        alert(successMsg);
         onSuccess();
       } else {
         alert(`❌ Error: ${response.error}`);
@@ -1288,6 +1404,102 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
             />
           </div>
 
+          {/* Payment Section - NEW */}
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 border-2 border-green-300">
+            <h3 className="text-lg font-bold text-green-800 mb-4 flex items-center gap-2">
+              💵 Payment at Order Creation (Optional)
+              <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
+                Awaits Supplier Confirmation
+              </span>
+            </h3>
+            <p className="text-sm text-green-700 mb-4">
+              💡 If you're paying cash now, enter the amount here. It will be recorded with a transaction number and sent to the supplier for confirmation.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Cash Amount */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-bold text-green-800 mb-2">
+                  💵 Cash Paid Now (UGX)
+                </label>
+                <input
+                  type="number"
+                  value={cashPaidNow}
+                  onChange={(e) => setCashPaidNow(e.target.value)}
+                  min="0"
+                  max={totals.total}
+                  step="1000"
+                  placeholder="Enter cash amount (leave 0 if not paying now)"
+                  className="w-full px-4 py-3 border-2 border-green-500 rounded-lg focus:border-green-600 focus:outline-none text-lg font-semibold text-green-700 bg-white"
+                />
+                {cashPaidNow > 0 && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-sm text-green-700 flex justify-between">
+                      <span>Order Total:</span>
+                      <span className="font-bold">{formatUGX(totals.total)}</span>
+                    </p>
+                    <p className="text-sm text-green-700 flex justify-between">
+                      <span>Paying Now:</span>
+                      <span className="font-bold">{formatUGX(cashPaidNow)}</span>
+                    </p>
+                    <p className="text-sm font-bold text-orange-700 flex justify-between pt-2 border-t border-green-300">
+                      <span>Balance Due:</span>
+                      <span>{formatUGX(totals.total - parseFloat(cashPaidNow || 0))}</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Method */}
+              {cashPaidNow > 0 && (
+                <>
+                  <div>
+                    <label className="block text-sm font-bold text-green-800 mb-2">
+                      💳 Payment Method
+                    </label>
+                    <select
+                      value={paymentMethod}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="w-full px-4 py-3 border-2 border-green-400 rounded-lg focus:border-green-600 focus:outline-none bg-white"
+                    >
+                      <option value="cash">💵 Cash</option>
+                      <option value="mobile_money">📱 Mobile Money</option>
+                      <option value="bank_transfer">🏦 Bank Transfer</option>
+                      <option value="check">📝 Cheque</option>
+                      <option value="credit">💳 Credit</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-bold text-green-800 mb-2">
+                      🔖 Payment Reference (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={paymentReference}
+                      onChange={(e) => setPaymentReference(e.target.value)}
+                      placeholder="Transaction ID, receipt #, etc."
+                      className="w-full px-4 py-3 border-2 border-green-400 rounded-lg focus:border-green-600 focus:outline-none bg-white"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-green-800 mb-2">
+                      📝 Payment Notes (Optional)
+                    </label>
+                    <textarea
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Any notes about this payment..."
+                      rows="2"
+                      className="w-full px-4 py-3 border-2 border-green-400 rounded-lg focus:border-green-600 focus:outline-none bg-white"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex items-center justify-end space-x-4 pt-4 border-t-2 border-gray-200">
             <button
@@ -1350,35 +1562,51 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
       return;
     }
 
-    if (amount > parseFloat(order.balance_due)) {
-      alert(`Payment amount cannot exceed balance due: ${formatUGX(order.balance_due)}`);
+    if (amount > parseFloat(order.balance_due_ugx)) {
+      alert(`Payment amount cannot exceed balance due: ${formatUGX(order.balance_due_ugx)}`);
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const userId = localStorage.getItem('userId') || 'default-manager-id';
+      // Get manager ID
+      let managerId = localStorage.getItem('userId');
+      if (!managerId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          managerId = user.id;
+          localStorage.setItem('userId', user.id);
+        }
+      }
       
-      const paymentData = {
-        amountPaid: amount,
-        paymentMethod,
-        paymentReference,
-        paymentNotes,
-        paidBy: userId
-      };
+      // Record payment with tracking
+      const { data, error } = await supabase.rpc('record_payment_with_tracking', {
+        p_order_id: order.id,
+        p_amount_paid: amount,
+        p_payment_method: paymentMethod,
+        p_payment_reference: paymentReference || null,
+        p_payment_date: new Date().toISOString(),
+        p_notes: paymentNotes || null,
+        p_paid_by: managerId
+      });
 
-      const response = await supplierOrdersService.recordOrderPayment(order.id, paymentData);
+      if (error) throw error;
 
-      if (response.success) {
-        alert(`✅ ${response.message}\n\nAmount Paid: ${formatUGX(amount)}\nNew Balance: ${formatUGX(response.balanceDue)}`);
+      if (data && data.success) {
+        alert(`✅ Payment recorded successfully!\n\n` +
+              `Transaction: ${data.transaction_number}\n` +
+              `Amount Paid: ${formatUGX(amount)}\n` +
+              `New Balance: ${formatUGX(data.balance_due)}\n` +
+              `Payment: ${data.payment_percentage.toFixed(1)}% complete\n\n` +
+              `⏳ Awaiting supplier confirmation...`);
         onSuccess();
       } else {
-        alert(`❌ Error: ${response.error}`);
+        alert(`❌ Error: ${data?.error || 'Failed to record payment'}`);
       }
     } catch (err) {
       console.error('Error recording payment:', err);
-      alert('Failed to record payment');
+      alert(`Failed to record payment: ${err.message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1615,6 +1843,28 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
             {/* Payment Section */}
             <div className="bg-green-50 rounded-lg p-4 border-2 border-green-200">
               <h3 className="font-bold text-gray-800 mb-4">💰 Payment Details</h3>
+              
+              {/* Cash Paid Now - Prominent Field */}
+              <div className="mb-6 bg-gradient-to-r from-green-100 to-emerald-100 p-4 rounded-lg border-2 border-green-400">
+                <label className="block text-sm font-bold text-green-800 mb-2 flex items-center gap-2">
+                  💵 Cash Paid Now (UGX)
+                  <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">Awaits Supplier Confirmation</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={totalAmount}
+                  step="1000"
+                  value={approvalData.cashPaidNow}
+                  onChange={(e) => setApprovalData({...approvalData, cashPaidNow: e.target.value})}
+                  placeholder="Enter cash amount paid at this moment"
+                  className="w-full px-4 py-4 border-2 border-green-500 rounded-lg focus:border-green-600 focus:outline-none text-xl font-bold text-green-700 bg-white"
+                />
+                <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                  <FiAlertTriangle className="text-yellow-600" />
+                  This payment will be recorded and sent to supplier for confirmation
+                </p>
+              </div>
               
               {/* Initial Payment Amount */}
               <div className="mb-4">

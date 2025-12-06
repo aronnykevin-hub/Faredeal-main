@@ -25,7 +25,7 @@ import CustomerLanding from './pages/CustomerLanding';
 import CustomerDashboard from './pages/CustomerDashboard';
 import EmployeeDashboard from './pages/EmployeeDashboard';
 import ManagerPortal from './pages/ManagerPortal';
-import CashierPortal from './pages/EmployeePortal';
+import CashierPortal from './pages/cashier portal';
 import SupplierPortal from './pages/SupplierPortal';
 import PortalLanding from './pages/PortalLanding';
 import PortalTest from './pages/PortalTest';

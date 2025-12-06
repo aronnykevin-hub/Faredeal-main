@@ -175,47 +175,108 @@ export const getAllPurchaseOrders = async (filters = {}) => {
     if (error) throw error;
 
     // Fetch supplier details separately from users table
-    const supplierIds = [...new Set(orders.map(o => o.supplier_id))];
-    const { data: suppliers } = await supabase
-      .from('users')
-      .select('id, company_name, full_name, contact_person')
-      .eq('role', 'supplier')
-      .in('id', supplierIds);
+    const supplierIds = [...new Set(orders.map(o => o.supplier_id).filter(Boolean))];
+    
+    let suppliers = [];
+    if (supplierIds.length > 0) {
+      const { data: suppliersData, error: supplierError } = await supabase
+        .from('users')
+        .select('id, company_name, full_name, username, email, phone, avatar_url, category')
+        .eq('role', 'supplier')
+        .in('id', supplierIds);
+      
+      if (!supplierError) {
+        suppliers = suppliersData || [];
+      }
+    }
 
-    // Fetch invoice/payment details for each order
+    // Fetch payment metrics for each order
     const orderIds = orders.map(o => o.id);
-    const { data: invoices } = await supabase
-      .from('supplier_invoices')
-      .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
-      .in('purchase_order_id', orderIds);
+    let metrics = [];
+    if (orderIds.length > 0) {
+      const { data: metricsData } = await supabase
+        .from('payment_metrics')
+        .select('*')
+        .in('purchase_order_id', orderIds);
+      metrics = metricsData || [];
+    }
+
+    // Fetch payment installments
+    let installments = [];
+    if (orderIds.length > 0) {
+      const { data: installmentsData } = await supabase
+        .from('payment_installments')
+        .select('*')
+        .in('purchase_order_id', orderIds)
+        .order('installment_number');
+      installments = installmentsData || [];
+    }
 
     // Create lookups
     const supplierMap = {};
-    suppliers?.forEach(s => {
+    suppliers.forEach(s => {
       supplierMap[s.id] = {
-        ...s,
-        business_name: s.company_name || s.full_name || s.username,
-        contact_person_name: s.contact_person || s.full_name
+        id: s.id,
+        name: s.company_name || s.full_name || s.username || 'Unknown Supplier',
+        company_name: s.company_name,
+        full_name: s.full_name,
+        email: s.email,
+        phone: s.phone,
+        avatar_url: s.avatar_url,
+        category: s.category
       };
     });
 
-    const invoiceMap = {};
-    invoices?.forEach(inv => {
-      invoiceMap[inv.purchase_order_id] = inv;
+    const metricsMap = {};
+    metrics.forEach(m => {
+      metricsMap[m.purchase_order_id] = m;
     });
 
-    // Format the data with payment status
+    const installmentsMap = {};
+    installments.forEach(inst => {
+      if (!installmentsMap[inst.purchase_order_id]) {
+        installmentsMap[inst.purchase_order_id] = [];
+      }
+      installmentsMap[inst.purchase_order_id].push(inst);
+    });
+
+    // Format the data with payment status and metrics
     const formattedOrders = orders.map(order => {
-      const invoice = invoiceMap[order.id];
       const supplier = supplierMap[order.supplier_id];
+      const metric = metricsMap[order.id];
+      const orderInstallments = installmentsMap[order.id] || [];
+      
       return {
         ...order,
-        supplierName: supplier?.business_name || 'Unknown Supplier',
+        // Supplier info
+        supplierName: supplier?.name || 'Unknown Supplier',
+        supplierCompany: supplier?.company_name,
+        supplierEmail: supplier?.email,
+        supplierPhone: supplier?.phone,
+        supplierAvatar: supplier?.avatar_url,
+        supplierCategory: supplier?.category,
+        
+        // Payment metrics
+        paymentMetrics: metric ? {
+          paymentPercentage: metric.payment_percentage || 0,
+          totalInstallments: metric.total_installments || 1,
+          paidInstallments: metric.paid_installments || 0,
+          overdueInstallments: metric.overdue_installments || 0,
+          nextPaymentDue: metric.next_payment_due,
+          daysUntilNext: metric.days_until_next_payment,
+          daysOverdue: metric.days_overdue || 0,
+          paymentVelocity: metric.payment_velocity,
+          estimatedCompletion: metric.estimated_completion_date
+        } : null,
+        
+        // Installments
+        installments: orderInstallments,
+        
+        // Legacy fields for backward compatibility
         orderedBy: 'Manager',
         approvedBy: order.approved_by ? 'Approved' : null,
-        payment_status: invoice?.payment_status || 'unpaid',
-        amount_paid: invoice?.amount_paid_ugx || 0,
-        balance_due: invoice?.balance_due_ugx || order.total_amount_ugx
+        amount_paid: order.amount_paid_ugx || 0,
+        balance_due: order.balance_due_ugx || order.total_amount_ugx
       };
     });
 

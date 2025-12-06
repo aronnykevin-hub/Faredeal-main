@@ -22,6 +22,8 @@ import { supabase } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
 import PaymentService from '../services/paymentService';
 import AddProductModal from '../components/AddProductModal';
+import SupplierPaymentConfirmations from '../components/SupplierPaymentConfirmations';
+import OrderPaymentTracker from '../components/OrderPaymentTracker';
 
 const SupplierPortal = () => {
   const navigate = useNavigate();
@@ -29,6 +31,7 @@ const SupplierPortal = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [expandedOrderId, setExpandedOrderId] = useState(null);
   const [supplierProfile, setSupplierProfile] = useState({
     name: '',
     contactPerson: '',
@@ -143,7 +146,42 @@ const SupplierPortal = () => {
 
       console.log('🔍 Loading supplier profile for user:', user.email, 'auth_id:', user.id);
 
-      // Query users table by auth_id (OAuth connection)
+      // First check if user exists with any role
+      const { data: existingUser, error: checkError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking user:', checkError);
+        throw checkError;
+      }
+
+      // If user exists but has wrong role, show error and redirect
+      if (existingUser && existingUser.role !== 'supplier') {
+        console.error('❌ User exists but role is:', existingUser.role, 'not supplier');
+        
+        // Only enforce redirect if profile is completed (not in the middle of signup)
+        if (existingUser.profile_completed) {
+          notificationService.show(`⚠️ This account is registered as ${existingUser.role}. Please use the ${existingUser.role} portal.`, 'error', 8000);
+          
+          // Redirect to correct portal
+          const redirectPath = existingUser.role === 'manager' ? '/manager-portal' : 
+                              existingUser.role === 'admin' ? '/admin-portal' :
+                              existingUser.role === 'cashier' ? '/pos' :
+                              existingUser.role === 'employee' ? '/employee-portal' :
+                              `/${existingUser.role}-portal`;
+          
+          setTimeout(() => navigate(redirectPath), 2000);
+          return;
+        } else {
+          // Profile not completed, let them continue with supplier signup
+          console.log('⚠️ User has different role but profile not completed - allowing supplier signup');
+        }
+      }
+
+      // Query users table by auth_id (OAuth connection) with role supplier
       const { data: supplier, error: suppError } = await supabase
         .from('users')
         .select('*')
@@ -175,10 +213,8 @@ const SupplierPortal = () => {
         const deliveryAreas = ['Kampala', 'Entebbe', 'Mukono', 'Wakiso', 'Jinja'];
         const languages = ['English', 'Luganda', 'Swahili'];
 
-        // Get profile picture from database first, fallback to localStorage
-        const storageKey = `supplier_profile_pic_${supplier.id}`;
-        const localProfilePic = localStorage.getItem(storageKey);
-        const profilePicture = supplier.profile_picture || localProfilePic || null;
+        // Get profile picture from database (avatar_url column)
+        const profilePicture = supplier.avatar_url || null;
 
         setSupplierProfile({
           id: supplier.id,
@@ -204,16 +240,54 @@ const SupplierPortal = () => {
           deliveryAreas: deliveryAreas
         });
         
-        // Set profile pic URL state - prioritize database over localStorage
+        // Set profile pic URL state from avatar_url
         if (profilePicture) {
           setProfilePicUrl(profilePicture);
-          console.log('Loaded profile picture from:', supplier.profile_picture ? 'database' : 'localStorage');
+          console.log('✅ Loaded profile picture from database (avatar_url)');
         }
       } else {
-        // No supplier profile found - show error but don't redirect
+        // No supplier profile found - try to create one automatically for OAuth users
         console.log('⚠️ No supplier profile found for auth_id:', user.id);
-        notificationService.show('⚠️ Unable to load profile. Please contact support if this persists.', 'error', 5000);
-        // Don't redirect - let user see the portal
+        console.log('🔧 Attempting to auto-create supplier profile...');
+        
+        try {
+          // Create a new supplier record
+          const newSupplierData = {
+            auth_id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Supplier',
+            company_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Your Company',
+            role: 'supplier',
+            is_active: false, // Requires admin approval
+            profile_completed: false,
+            created_at: new Date().toISOString()
+          };
+
+          const { data: newSupplier, error: createError } = await supabase
+            .from('users')
+            .insert([newSupplierData])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('❌ Failed to auto-create supplier profile:', createError);
+            notificationService.show('⚠️ Profile not found. Please complete your supplier profile from the sign-in page.', 'error', 5000);
+            // Redirect to supplier auth to complete profile
+            setTimeout(() => navigate('/supplier-auth'), 2000);
+            return;
+          }
+
+          console.log('✅ Auto-created supplier profile:', newSupplier);
+          notificationService.show('📝 Please complete your supplier profile to continue.', 'info', 5000);
+          
+          // Redirect to supplier auth page to complete profile
+          setTimeout(() => navigate('/supplier-auth'), 2000);
+          return;
+          
+        } catch (autoCreateError) {
+          console.error('❌ Error auto-creating supplier profile:', autoCreateError);
+          notificationService.show('⚠️ Unable to create profile. Please contact support if this persists.', 'error', 5000);
+        }
       }
     } catch (error) {
       console.error('Error loading supplier profile:', error);
@@ -266,11 +340,19 @@ const SupplierPortal = () => {
 
       console.log('✅ User found:', existingUser);
 
-      // Update in Supabase users table by auth_id
+      // Ensure we're updating a supplier record only
+      if (existingUser.role !== 'supplier') {
+        console.error('❌ Existing user role is not supplier:', existingUser.role);
+        alert('Failed to save: Authenticated account is not registered as a supplier.');
+        return;
+      }
+
+      // Update in Supabase users table by auth_id AND role='supplier' to avoid accidentally updating other roles
       const { data: updatedUsers, error } = await supabase
         .from('users')
         .update(updateData)
         .eq('auth_id', user.id)
+        .eq('role', 'supplier')
         .select();
 
       if (error) {
@@ -461,32 +543,44 @@ const SupplierPortal = () => {
         const base64String = reader.result;
         
         try {
-          // Store in localStorage with supplier ID as key (for quick loading)
-          const storageKey = `supplier_profile_pic_${supplierId}`;
-          localStorage.setItem(storageKey, base64String);
-          
-          console.log('Profile picture saved to localStorage:', storageKey);
-          
-          // Save to database (users table)
+          // Save to database (users table) using avatar_url column
           const { error } = await supabase
             .from('users')
             .update({ 
-              profile_picture: base64String,
+              avatar_url: base64String,
               updated_at: new Date().toISOString()
             })
-            .eq('id', supplierId)
+            .eq('auth_id', user.id)
             .eq('role', 'supplier');
 
           if (error) {
-            console.error('Error saving to database:', error);
-            alert('⚠️ Profile picture saved locally but failed to save to database');
+            console.error('❌ Error saving to database:', error);
+            notificationService.error('Failed to upload profile picture');
+            return;
+          }
+          
+          console.log('✅ Avatar uploaded to database successfully');
+          
+          // Verify the update by fetching the data
+          const { data: updatedData, error: fetchError } = await supabase
+            .from('users')
+            .select('avatar_url')
+            .eq('auth_id', user.id)
+            .eq('role', 'supplier')
+            .single();
+          
+          if (fetchError) {
+            console.error('Error verifying upload:', fetchError);
           } else {
-            console.log('Profile picture saved to database successfully');
-            alert('✅ Profile picture updated successfully!');
+            console.log('Verified avatar_url in database:', updatedData?.avatar_url ? 'Image exists' : 'No image');
           }
           
           // Update local state immediately
           setProfilePicUrl(base64String);
+          setSupplierProfile(prev => ({ ...prev, profile_image_url: base64String }));
+          
+          console.log('✅ Local state updated');
+          notificationService.success('✅ Profile picture updated successfully!');
           
           // Also update the supplier profile state
           setSupplierProfile(prev => ({
@@ -859,21 +953,7 @@ const SupplierPortal = () => {
         return;
       }
 
-      // Get payment/invoice info for these orders
-      const orderIds = orders?.map(o => o.id) || [];
-      const { data: invoices } = await supabase
-        .from('supplier_invoices')
-        .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
-        .in('purchase_order_id', orderIds);
-
-      // Create invoice lookup map
-      const invoiceMap = {};
-      invoices?.forEach(inv => {
-        invoiceMap[inv.purchase_order_id] = inv;
-      });
-
       const formatted = orders?.map(order => {
-        const invoice = invoiceMap[order.id];
         return {
           id: order.po_number || order.id,
           orderId: order.id,
@@ -890,9 +970,13 @@ const SupplierPortal = () => {
           priority: order.priority || 'normal',
           deliveryAddress: order.delivery_address,
           notes: order.notes,
-          payment_status: invoice?.payment_status || 'unpaid',
-          amount_paid: invoice?.amount_paid_ugx || 0,
-          balance_due: invoice?.balance_due_ugx || order.total_amount_ugx,
+          // Get payment data directly from purchase_orders table
+          payment_status: order.payment_status || 'unpaid',
+          amount_paid: parseFloat(order.amount_paid_ugx) || 0,
+          balance_due: parseFloat(order.balance_due_ugx) || parseFloat(order.total_amount_ugx) || 0,
+          amount_paid_ugx: parseFloat(order.amount_paid_ugx) || 0,
+          balance_due_ugx: parseFloat(order.balance_due_ugx) || parseFloat(order.total_amount_ugx) || 0,
+          total_amount_ugx: parseFloat(order.total_amount_ugx) || 0,
           fullOrder: order
         };
       }) || [];
@@ -941,10 +1025,52 @@ const SupplierPortal = () => {
       setCurrentTime(new Date());
     }, 1000);
 
-    // Load supplier data from database
-    loadSupplierData();
-    // Load payment data from database
-    loadPaymentData();
+    // Verify user role before loading data
+    const checkAuthAndLoad = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No authenticated user - redirecting to supplier auth');
+        navigate('/supplier-auth');
+        return;
+      }
+
+      // Check user role
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('role, profile_completed')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+      // If user doesn't exist yet, they're in the middle of signup - redirect to auth
+      if (!existingUser) {
+        console.log('No user record found - redirecting to complete profile');
+        navigate('/supplier-auth');
+        return;
+      }
+
+      // Only enforce role check if profile is completed
+      // This allows users to complete their supplier profile even if they have another role
+      if (existingUser.profile_completed && existingUser.role !== 'supplier') {
+        console.error('❌ Wrong portal! User is:', existingUser.role);
+        notificationService.show(`⚠️ This account is registered as ${existingUser.role}. Redirecting...`, 'warning', 3000);
+        
+        const redirectPath = existingUser.role === 'manager' ? '/manager-portal' : 
+                            existingUser.role === 'admin' ? '/admin-portal' :
+                            existingUser.role === 'cashier' ? '/pos' :
+                            existingUser.role === 'employee' ? '/employee-portal' :
+                            `/${existingUser.role}-portal`;
+        
+        setTimeout(() => navigate(redirectPath), 2000);
+        return;
+      }
+
+      // If user is supplier or profile not completed, proceed with loading data
+      loadSupplierData();
+      loadPaymentData();
+    };
+
+    checkAuthAndLoad();
 
     return () => clearInterval(timer);
   }, []);
@@ -1690,7 +1816,7 @@ const SupplierPortal = () => {
             <span>Refresh</span>
           </button>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-3">
           {pendingOrders.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg">
               <FiPackage className="h-16 w-16 text-gray-300 mx-auto mb-4" />
@@ -1699,115 +1825,148 @@ const SupplierPortal = () => {
             </div>
           ) : (
             pendingOrders.map((order) => (
-              <div key={order.id} className="border-2 border-blue-200 rounded-lg p-6 hover:shadow-md transition-all duration-300 bg-gradient-to-r from-blue-50 to-white">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                      <FiPackage className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-lg text-gray-900">{order.id}</h4>
-                      <p className="text-sm text-gray-600">{order.items} items • Ordered: {order.date}</p>
-                      <p className="text-sm text-gray-500">Expected Delivery: {order.expectedDelivery}</p>
-                      <div className="flex items-center flex-wrap gap-2 mt-2">
-                        {order.priority && (
-                          <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
-                            order.priority === 'urgent' ? 'bg-red-100 text-red-800' :
-                            order.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                            'bg-gray-100 text-gray-800'
+              <div key={order.id} className="border-2 border-blue-200 rounded-lg overflow-hidden bg-gradient-to-r from-blue-50 to-white hover:shadow-md transition-all duration-300">
+                {/* Collapsed View - Order Header */}
+                <div 
+                  className="p-4 cursor-pointer hover:bg-blue-50 transition-colors"
+                  onClick={() => setExpandedOrderId(expandedOrderId === order.orderId ? null : order.orderId)}
+                >
+                  <div className="flex items-center justify-between">
+                    {/* Left Section */}
+                    <div className="flex items-center space-x-4 flex-1">
+                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <FiPackage className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-base text-gray-900">{order.id}</h4>
+                          {/* Status Badge */}
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
+                            order.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                            order.status === 'received' ? 'bg-teal-100 text-teal-800' :
+                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-blue-100 text-blue-800'
                           }`}>
-                            {order.priority === 'urgent' && '🔥 '}
-                            {order.priority === 'high' && '⚠️ '}
-                            {order.priority?.toUpperCase()}
+                            {order.status?.toUpperCase()}
                           </span>
+                          {/* Payment Status Badge */}
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded-full ${
+                            order.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                            order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {order.payment_status === 'paid' && '✅ PAID'}
+                            {order.payment_status === 'partially_paid' && '⚠️ PARTIAL'}
+                            {order.payment_status === 'unpaid' && '❌ UNPAID'}
+                            {!order.payment_status && '❌ UNPAID'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">{order.items} items • {order.date}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Right Section */}
+                    <div className="flex items-center gap-4 ml-4">
+                      <div className="text-right">
+                        <p className="font-bold text-lg text-green-600">{formatCurrency(order.amount)}</p>
+                        {order.payment_status === 'partially_paid' && (
+                          <p className="text-xs text-gray-600">
+                            Paid: <span className="text-green-600 font-semibold">{formatCurrency(order.amount_paid)}</span>
+                          </p>
                         )}
-                        {/* Payment Status Badge */}
-                        <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full border-2 ${
-                          order.payment_status === 'paid' ? 'bg-green-100 text-green-800 border-green-300' :
-                          order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800 border-yellow-300' :
-                          order.payment_status === 'unpaid' ? 'bg-red-100 text-red-800 border-red-300' :
-                          'bg-gray-100 text-gray-800 border-gray-300'
+                      </div>
+                      {/* Expand/Collapse Icon */}
+                      <div className={`transform transition-transform ${expandedOrderId === order.orderId ? 'rotate-180' : ''}`}>
+                        <FiChevronDown className="h-5 w-5 text-gray-500" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Expanded View - Order Details */}
+                {expandedOrderId === order.orderId && (
+                  <div className="border-t-2 border-blue-200 p-4 bg-white animate-fadeInUp">
+                    {/* Order Items */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">Products:</p>
+                      <p className="text-sm text-gray-600">{order.products}</p>
+                    </div>
+
+                    {/* Expected Delivery */}
+                    <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                      <p className="text-sm font-semibold text-gray-700 mb-1">📅 Expected Delivery:</p>
+                      <p className="text-sm text-gray-600">{order.expectedDelivery}</p>
+                    </div>
+
+                    {/* Delivery Address */}
+                    {order.deliveryAddress && (
+                      <div className="mb-4 p-3 bg-gray-50 rounded-lg border">
+                        <p className="text-sm font-semibold text-gray-700 mb-1">📍 Delivery Address:</p>
+                        <p className="text-sm text-gray-600">{order.deliveryAddress}</p>
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    {order.notes && (
+                      <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p className="text-sm font-semibold text-yellow-800 mb-1">💬 Notes:</p>
+                        <p className="text-sm text-yellow-700">{order.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Priority Badge */}
+                    {order.priority && order.priority !== 'normal' && (
+                      <div className="mb-4">
+                        <span className={`inline-block px-3 py-1 text-xs font-semibold rounded ${
+                          order.priority === 'urgent' ? 'bg-red-100 text-red-800' :
+                          order.priority === 'high' ? 'bg-orange-100 text-orange-800' :
+                          'bg-gray-100 text-gray-800'
                         }`}>
-                          {order.payment_status === 'paid' && '✅ PAID'}
-                          {order.payment_status === 'partially_paid' && '⚠️ HALF PAID'}
-                          {order.payment_status === 'unpaid' && '❌ UNPAID'}
-                          {!order.payment_status && '❌ UNPAID'}
+                          {order.priority === 'urgent' && '🔥 '}
+                          {order.priority === 'high' && '⚠️ '}
+                          {order.priority?.toUpperCase()}
                         </span>
                       </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-xl text-green-600">{formatCurrency(order.amount)}</p>
-                    <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full mt-2 ${
-                      order.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      order.status === 'received' ? 'bg-teal-100 text-teal-800' :
-                      order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {order.status?.toUpperCase()}
-                    </span>
-                    {/* Payment Details */}
-                    {order.payment_status === 'partially_paid' && (
-                      <div className="mt-2 text-sm">
-                        <p className="text-green-600 font-semibold">Paid: {formatCurrency(order.amount_paid)}</p>
-                        <p className="text-red-600 font-semibold">Due: {formatCurrency(order.balance_due)}</p>
+                    )}
+
+                    {/* 💰 PAYMENT TRACKER - Supplier View */}
+                    {(order.status === 'confirmed' || order.payment_status !== 'unpaid' || order.amount_paid > 0) && (
+                      <div className="mb-4">
+                        <OrderPaymentTracker
+                          order={order}
+                          showAddPayment={false}
+                          userRole="supplier"
+                        />
                       </div>
                     )}
-                    {order.payment_status === 'unpaid' && (
-                      <p className="text-sm text-red-600 font-semibold mt-2">
-                        Due: {formatCurrency(order.balance_due)}
-                      </p>
+
+                    {/* Action Buttons */}
+                    {order.status === 'processing' && (
+                      <div className="flex items-center space-x-3 pt-4 border-t">
+                        <button
+                          onClick={() => handleConfirmOrder(order.orderId)}
+                          className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
+                        >
+                          <FiCheckCircle className="h-5 w-5" />
+                          <span>Confirm Order</span>
+                        </button>
+                        <button
+                          onClick={() => handleRejectOrder(order.orderId)}
+                          className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
+                        >
+                          <FiXCircle className="h-5 w-5" />
+                          <span>Reject Order</span>
+                        </button>
+                      </div>
                     )}
-                  </div>
-                </div>
 
-                {/* Order Items */}
-                <div className="mb-4 p-3 bg-white rounded-lg border">
-                  <p className="text-sm font-semibold text-gray-700 mb-1">Products:</p>
-                  <p className="text-sm text-gray-600">{order.products}</p>
-                </div>
-
-                {/* Delivery Address */}
-                {order.deliveryAddress && (
-                  <div className="mb-4 p-3 bg-white rounded-lg border">
-                    <p className="text-sm font-semibold text-gray-700 mb-1">📍 Delivery Address:</p>
-                    <p className="text-sm text-gray-600">{order.deliveryAddress}</p>
-                  </div>
-                )}
-
-                {/* Notes */}
-                {order.notes && (
-                  <div className="mb-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <p className="text-sm font-semibold text-yellow-800 mb-1">💬 Notes:</p>
-                    <p className="text-sm text-yellow-700">{order.notes}</p>
-                  </div>
-                )}
-
-                {/* Action Buttons */}
-                {order.status === 'processing' && (
-                  <div className="flex items-center space-x-3 pt-4 border-t">
-                    <button
-                      onClick={() => handleConfirmOrder(order.id)}
-                      className="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
-                    >
-                      <FiCheckCircle className="h-5 w-5" />
-                      <span>Confirm Order</span>
-                    </button>
-                    <button
-                      onClick={() => handleRejectOrder(order.id)}
-                      className="flex-1 bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition-all duration-300 font-semibold flex items-center justify-center space-x-2"
-                    >
-                      <FiXCircle className="h-5 w-5" />
-                      <span>Reject Order</span>
-                    </button>
-                  </div>
-                )}
-
-                {order.status === 'confirmed' && (
-                  <div className="flex items-center space-x-2 pt-4 border-t text-green-600">
-                    <FiCheckCircle className="h-5 w-5" />
-                    <span className="font-semibold">Order Confirmed - Preparing for delivery</span>
+                    {order.status === 'confirmed' && (
+                      <div className="flex items-center space-x-2 pt-4 border-t text-green-600">
+                        <FiCheckCircle className="h-5 w-5" />
+                        <span className="font-semibold">Order Confirmed - Preparing for delivery</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -2024,153 +2183,155 @@ const SupplierPortal = () => {
   );
 
   const renderPayments = () => {
-    const paymentStats = getPaymentStats();
+    // Get real payment data from purchase orders
+    const ordersWithPayment = pendingOrders.filter(order => 
+      order.payment_status && order.payment_status !== 'unpaid'
+    );
+    
+    // Calculate real payment stats
+    const totalPaid = ordersWithPayment.reduce((sum, order) => 
+      sum + (order.amount_paid_ugx || 0), 0
+    );
+    const totalDue = ordersWithPayment.reduce((sum, order) => 
+      sum + (order.balance_due_ugx || 0), 0
+    );
+    const paidOrders = ordersWithPayment.filter(o => o.payment_status === 'paid').length;
+    const partialOrders = ordersWithPayment.filter(o => o.payment_status === 'partially_paid').length;
+    const totalOrders = ordersWithPayment.length;
+
     return (
       <div className="space-y-6 animate-fadeInUp">
         {/* Payment Statistics Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6">
+          <div className="bg-gradient-to-r from-green-50 to-green-100 rounded-xl p-6 shadow-md border-2 border-green-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600">Total Earned</p>
-                <p className="text-2xl font-bold text-green-700">{formatCurrency(paymentStats.paidAmount)}</p>
-                <p className="text-xs text-green-500 mt-1">{paymentStats.paid} payments</p>
+                <p className="text-sm font-bold text-green-600 uppercase tracking-wide">Total Received</p>
+                <p className="text-3xl font-extrabold text-green-700">{formatCurrency(totalPaid)}</p>
+                <p className="text-xs text-green-600 mt-1 font-semibold">{paidOrders} completed orders</p>
               </div>
-              <div className="text-3xl">💰</div>
+              <div className="text-4xl">💰</div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6">
+          
+          <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-6 shadow-md border-2 border-red-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-red-600">Outstanding</p>
-                <p className="text-2xl font-bold text-red-700">{formatCurrency(paymentStats.outstandingAmount)}</p>
-                <p className="text-xs text-red-500 mt-1">{paymentStats.unpaid + paymentStats.partial} pending</p>
+                <p className="text-sm font-bold text-red-600 uppercase tracking-wide">Outstanding</p>
+                <p className="text-3xl font-extrabold text-red-700">{formatCurrency(totalDue)}</p>
+                <p className="text-xs text-red-600 mt-1 font-semibold">{partialOrders + (pendingOrders.filter(o => !o.payment_status || o.payment_status === 'unpaid').length)} pending</p>
               </div>
-              <div className="text-3xl">⏳</div>
+              <div className="text-4xl">⏳</div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl p-6">
+          
+          <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-xl p-6 shadow-md border-2 border-yellow-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-yellow-600">Partial Payments</p>
-                <p className="text-2xl font-bold text-yellow-700">{paymentStats.partial}</p>
-                <p className="text-xs text-yellow-500 mt-1">In progress</p>
+                <p className="text-sm font-bold text-yellow-600 uppercase tracking-wide">Partial Payments</p>
+                <p className="text-3xl font-extrabold text-yellow-700">{partialOrders}</p>
+                <p className="text-xs text-yellow-600 mt-1 font-semibold">In progress</p>
               </div>
-              <div className="text-3xl">⚡</div>
+              <div className="text-4xl">⚡</div>
             </div>
           </div>
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6">
+          
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-6 shadow-md border-2 border-blue-200">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-600">Payment Rate</p>
-                <p className="text-2xl font-bold text-blue-700">{Math.round((paymentStats.paid / paymentStats.total) * 100)}%</p>
-                <p className="text-xs text-blue-500 mt-1">On-time rate</p>
+                <p className="text-sm font-bold text-blue-600 uppercase tracking-wide">Payment Rate</p>
+                <p className="text-3xl font-extrabold text-blue-700">
+                  {totalOrders > 0 ? Math.round((paidOrders / totalOrders) * 100) : 0}%
+                </p>
+                <p className="text-xs text-blue-600 mt-1 font-semibold">Completion rate</p>
               </div>
-              <div className="text-3xl">📊</div>
+              <div className="text-4xl">📊</div>
             </div>
           </div>
         </div>
 
-        {/* Payment History */}
+        {/* Orders with Payment Details */}
         <div className="bg-white rounded-xl p-6 shadow-lg">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900">Payment History</h3>
-            <div className="flex items-center space-x-3">
-              {[
-                { value: 'all', label: 'All', icon: '📋' },
-                { value: 'paid', label: 'Paid', icon: '✅' },
-                { value: 'partial', label: 'Partial', icon: '⚡' },
-                { value: 'unpaid', label: 'Unpaid', icon: '❌' }
-              ].map(filter => (
-                <button
-                  key={filter.value}
-                  onClick={() => setPaymentFilter(filter.value)}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    paymentFilter === filter.value
-                      ? 'bg-purple-100 text-purple-700 ring-2 ring-purple-500'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  <span>{filter.icon}</span>
-                  <span>{filter.label}</span>
-                </button>
-              ))}
-            </div>
+            <h3 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <FiDollarSign className="text-green-600" />
+              Payment Details by Order
+            </h3>
+            <button
+              onClick={loadSupplierData}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-300 flex items-center space-x-2"
+            >
+              <FiRefreshCw className="h-4 w-4" />
+              <span>Refresh</span>
+            </button>
           </div>
 
-          <div className="space-y-4">
-            {getFilteredPaymentHistory().map(payment => (
-              <div key={payment.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="text-2xl" title={`Status: ${payment.status}`}>
-                      {getPaymentStatusIcon(payment.status)}
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-3">
-                        <span className="font-bold text-gray-900">{payment.reference}</span>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(payment.status)}`}>
-                          {payment.status.toUpperCase()}
-                        </span>
-                        {payment.daysOverdue > 0 && (
-                          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full">
-                            {payment.daysOverdue} days overdue
+          <div className="space-y-6">
+            {pendingOrders.length === 0 ? (
+              <div className="text-center py-12 bg-gray-50 rounded-lg">
+                <div className="text-6xl mb-4">💸</div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Orders Yet</h3>
+                <p className="text-gray-600">Payment information will appear here when you receive orders</p>
+              </div>
+            ) : (
+              pendingOrders
+                .filter(order => paymentFilter === 'all' || 
+                  (paymentFilter === 'paid' && order.payment_status === 'paid') ||
+                  (paymentFilter === 'partial' && order.payment_status === 'partially_paid') ||
+                  (paymentFilter === 'unpaid' && (!order.payment_status || order.payment_status === 'unpaid'))
+                )
+                .map((order) => (
+                  <div key={order.id} className="border-2 border-blue-200 rounded-xl p-6 bg-gradient-to-r from-blue-50 to-white shadow-md hover:shadow-lg transition-all">
+                    {/* Order Header */}
+                    <div className="flex items-start justify-between mb-4 pb-4 border-b-2 border-gray-200">
+                      <div>
+                        <h4 className="font-bold text-xl text-gray-900 mb-1">{order.id}</h4>
+                        <p className="text-sm text-gray-600">Ordered: {order.date}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full border-2 ${
+                            order.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-300' :
+                            order.status === 'processing' ? 'bg-blue-100 text-blue-800 border-blue-300' :
+                            'bg-gray-100 text-gray-800 border-gray-300'
+                          }`}>
+                            {order.status?.toUpperCase()}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
-                        <span>
-                          {getPaymentMethodIcon(payment.paymentMethod)} {payment.paymentMethod.replace('_', ' ').toUpperCase()}
-                        </span>
-                        <span>📅 {new Date(payment.date).toLocaleDateString('en-UG')}</span>
-                        <span>📦 Order: {payment.orderId}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="font-bold text-lg text-gray-900">
-                      {formatCurrency(payment.amount)}
-                    </div>
-                    {payment.status === 'partial' && payment.paidAmount && (
-                      <div className="text-sm text-gray-600">
-                        Paid: {formatCurrency(payment.paidAmount)}
-                        <div className="text-xs text-orange-600">
-                          Remaining: {formatCurrency(payment.amount - payment.paidAmount)}
                         </div>
                       </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-500 mb-1">Total Amount</p>
+                        <p className="font-bold text-2xl text-blue-600">{formatCurrency(order.amount)}</p>
+                      </div>
+                    </div>
+
+                    {/* Payment Tracker Component */}
+                    {(order.status === 'confirmed' || order.payment_status) && (
+                      <OrderPaymentTracker
+                        order={order}
+                        showAddPayment={false}
+                        userRole="supplier"
+                      />
                     )}
-                    <div className="text-sm text-gray-500">
-                      Due: {new Date(payment.dueDate).toLocaleDateString('en-UG')}
+
+                    {/* Order Items Summary */}
+                    <div className="mt-4 p-4 bg-white rounded-lg border">
+                      <p className="text-sm font-semibold text-gray-700 mb-2">📦 Products:</p>
+                      <p className="text-sm text-gray-600">{order.products}</p>
                     </div>
                   </div>
-                </div>
-                
-                {/* Progress Bar for Partial Payments */}
-                {payment.status === 'partial' && payment.paidAmount && (
-                  <div className="mt-3">
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Payment Progress</span>
-                      <span>{Math.round((payment.paidAmount / payment.amount) * 100)}% Complete</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${(payment.paidAmount / payment.amount) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
+                ))
+            )}
           </div>
 
-          {getFilteredPaymentHistory().length === 0 && (
+          {pendingOrders.filter(order => 
+            paymentFilter === 'all' || 
+            (paymentFilter === 'paid' && order.payment_status === 'paid') ||
+            (paymentFilter === 'partial' && order.payment_status === 'partially_paid') ||
+            (paymentFilter === 'unpaid' && (!order.payment_status || order.payment_status === 'unpaid'))
+          ).length === 0 && pendingOrders.length > 0 && (
             <div className="text-center py-12">
-              <div className="text-6xl mb-4">💸</div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Payment Records</h3>
-              <p className="text-gray-600">
-                {paymentFilter === 'all' ? 'No payment history available.' : `No ${paymentFilter} payments found.`}
-              </p>
+              <div className="text-6xl mb-4">🔍</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">No {paymentFilter} Orders</h3>
+              <p className="text-gray-600">Try a different filter</p>
             </div>
           )}
         </div>
@@ -2184,6 +2345,7 @@ const SupplierPortal = () => {
     { id: 'orders', label: 'Orders', icon: FiPackage },
     { id: 'products', label: 'Products', icon: FiShoppingCart },
     { id: 'payments', label: 'Payments', icon: FiDollarSign },
+    { id: 'confirmations', label: 'Payment Confirmations', icon: FiCheckCircle },
     { id: 'performance', label: 'Performance', icon: FiTrendingUp },
     { id: 'notifications', label: 'Notifications', icon: FiBell }
   ];
@@ -2416,6 +2578,7 @@ const SupplierPortal = () => {
             {activeTab === 'orders' && renderOrders()}
             {activeTab === 'products' && renderProducts()}
             {activeTab === 'payments' && renderPayments()}
+            {activeTab === 'confirmations' && <SupplierPaymentConfirmations />}
             {activeTab === 'performance' && renderPerformance()}
             {activeTab === 'notifications' && renderNotifications()}
           </>

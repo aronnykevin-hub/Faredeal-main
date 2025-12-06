@@ -36,132 +36,104 @@ const SupplierAuth = () => {
   // Check authentication status ONLY after OAuth redirect
   // =============================================
   useEffect(() => {
-    const checkAfterOAuth = async () => {
-      // Check if returning from OAuth
+    const initAuth = async () => {
+      // Check if we're returning from OAuth
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
       
       if (hasOAuthCallback) {
-        // Wait a moment for Supabase to process the session
-        await new Promise(resolve => setTimeout(resolve, 500));
-        checkAuthStatus();
-      } else {
-        // First visit - just show the login page
-        setChecking(false);
+        console.log('🔄 OAuth callback detected, waiting for session...');
+        // Wait for Supabase to process the OAuth callback
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
+      
+      checkAuthStatus();
     };
     
-    checkAfterOAuth();
+    initAuth();
   }, []);
 
   const checkAuthStatus = async () => {
     try {
-      setChecking(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔍 Checking supplier authentication...');
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!session) {
-        // Not authenticated, show login page
-        setChecking(false);
-        return;
-      }
+      if (user) {
+        console.log('✅ User authenticated:', user.email);
+        
+        // Check if user exists in database
+        let { data: userData, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', user.id)
+          .eq('role', 'supplier')
+          .single();
 
-      // User is authenticated, check their profile status
-      const { data: user, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', session.user.id)
-        .single();
+        console.log('👤 User data from database:', userData);
 
-      if (error) {
-        console.error('Error fetching user:', error);
-        // If user doesn't exist, create them
-        if (error.code === 'PGRST116') {
-          console.log('📝 User not found in database, creating...');
-          const created = await createGoogleUser(session.user);
-          if (created) {
-            // Wait a moment for the database to update
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            setProfileData(prev => ({
-              ...prev,
-              fullName: session.user.user_metadata.full_name || session.user.email.split('@')[0],
-            }));
-            setShowProfileForm(true);
+        // If user doesn't exist (OAuth first-time sign-in), create them
+        if (fetchError || !userData) {
+          console.log('📝 Creating new supplier user in database...');
+          const { data: newUser, error: createError } = await supabase
+            .from('users')
+            .insert([{
+              auth_id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+              role: 'supplier',
+              is_active: false,
+              profile_completed: false,
+              created_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+
+          if (createError) {
+            console.error('❌ Error creating user:', createError);
+            throw createError;
           }
-          setChecking(false);
-        } else {
-          setChecking(false);
-        }
-        return;
-      }
 
-      if (!user) {
-        // Create user if not found
-        const created = await createGoogleUser(session.user);
-        if (created) {
+          console.log('✅ User created:', newUser);
+          userData = newUser;
+          notificationService.show('Welcome! Please complete your supplier profile.', 'info');
+        }
+
+        // Priority flow: approved → profile incomplete → pending
+        console.log('� Checking user status - Active:', userData.is_active, 'Profile Complete:', userData.profile_completed);
+        
+        if (userData.is_active && userData.profile_completed) {
+          // Approved and profile complete → Go to Supplier Portal
+          console.log('✅ User approved and profile complete - Redirecting to Supplier Portal');
+          notificationService.show('✅ Welcome back!', 'success');
+          navigate('/supplier-portal');
+        } else if (!userData.profile_completed) {
+          // Profile not completed → Show profile form
+          console.log('📋 Profile not complete - Showing profile form');
+          setShowProfileForm(true);
           setProfileData(prev => ({
             ...prev,
-            fullName: session.user.user_metadata.full_name || session.user.email.split('@')[0],
+            fullName: userData.full_name || '',
+            phone: userData.phone || '',
+            companyName: userData.company_name || '',
+            address: userData.address || ''
           }));
-          setShowProfileForm(true);
+        } else {
+          // Profile complete but not active → Pending approval
+          console.log('⏳ Profile complete but not approved - Pending approval');
+          notificationService.show(
+            '⏳ Your supplier application is pending admin approval.',
+            'warning',
+            5000
+          );
+          await supabase.auth.signOut();
         }
-        setChecking(false);
-        return;
+      } else {
+        console.log('❌ No authenticated user found');
       }
-
-      if (!user.profile_completed) {
-        // Show profile completion form
-        setProfileData(prev => ({
-          ...prev,
-          fullName: user.full_name || session.user.user_metadata.full_name || '',
-        }));
-        setShowProfileForm(true);
-        setChecking(false);
-        return;
-      }
-
-      // Profile is completed, go to portal
-      navigate('/supplier-portal', { replace: true });
-
-    } catch (error) {
-      console.error('Auth check error:', error);
       setChecking(false);
-    }
-  };
-
-  // =============================================
-  // Create user record after Google sign-in
-  // =============================================
-  const createGoogleUser = async (authUser) => {
-    try {
-      console.log('🔧 Creating Google user with auth_id:', authUser.id);
-      
-      const { data, error } = await supabase.rpc('create_google_user', {
-        p_auth_id: authUser.id,
-        p_email: authUser.email,
-        p_full_name: authUser.user_metadata.full_name || authUser.email.split('@')[0],
-        p_avatar_url: authUser.user_metadata.avatar_url || null
-      });
-
-      console.log('📥 create_google_user response:', { data, error });
-
-      if (error) {
-        console.error('❌ Error creating Google user:', error);
-        notificationService.error('Failed to create user account: ' + error.message);
-        return false;
-      }
-
-      if (data && !data.success) {
-        console.error('❌ User creation failed:', data.error);
-        notificationService.error(data.error || 'Failed to create user account');
-        return false;
-      }
-
-      console.log('✅ User created successfully:', data);
-      return true;
     } catch (error) {
-      console.error('❌ Error in createGoogleUser:', error);
-      notificationService.error('An error occurred while creating user');
-      return false;
+      console.error('❌ Auth check error:', error);
+      setChecking(false);
     }
   };
 
@@ -205,125 +177,53 @@ const SupplierAuth = () => {
     // Validation
     if (!profileData.companyName || !profileData.phone || !profileData.address || 
         !profileData.businessLicense || !profileData.category) {
-      notificationService.error('Please fill in all required fields');
+      notificationService.show('Please fill in all required fields', 'error');
       return;
     }
 
     try {
       setLoading(true);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        notificationService.error('Session expired. Please sign in again.');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        notificationService.show('Session expired. Please sign in again.', 'error');
         setShowProfileForm(false);
         return;
       }
 
-      // Complete profile using RPC function
-      console.log('📝 Completing profile with data:', {
-        p_auth_id: session.user.id,
-        p_company_name: profileData.companyName,
-        p_phone: profileData.phone,
-        p_address: profileData.address,
-        p_business_license: profileData.businessLicense,
-        p_category: profileData.category,
-        p_full_name: profileData.fullName || session.user.user_metadata.full_name
-      });
+      console.log('📝 Completing supplier profile...');
 
-      const { data, error } = await supabase.rpc('complete_google_profile', {
-        p_auth_id: session.user.id,
-        p_company_name: profileData.companyName,
-        p_phone: profileData.phone,
-        p_address: profileData.address,
-        p_business_license: profileData.businessLicense,
-        p_category: profileData.category,
-        p_full_name: profileData.fullName || session.user.user_metadata.full_name
-      });
-
-      console.log('📥 RPC response:', { data, error });
-
-      if (error) {
-        console.error('❌ Profile completion error:', error);
-        notificationService.error('Failed to complete profile: ' + error.message);
+      // Update user profile directly
+      const { data: updateResult, error: updateError } = await supabase
+        .from('users')
+        .update({
+          full_name: profileData.fullName,
+          company_name: profileData.companyName,
+          phone: profileData.phone,
+          address: profileData.address,
+          business_license: profileData.businessLicense,
+          category: profileData.category,
+          profile_completed: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .select();
+      
+      if (updateError) {
+        console.error('❌ Profile update error:', updateError);
+        notificationService.show('Failed to save profile. Please try again.', 'error');
         setLoading(false);
         return;
       }
 
-      if (data && !data.success) {
-        console.error('❌ Profile completion failed:', data.error);
-        
-        // If user not found, try to create them first
-        if (data.error && data.error.includes('user not found')) {
-          console.log('🔧 User not found, creating user first...');
-          notificationService.info('Setting up your account...');
-          
-          const created = await createGoogleUser(session.user);
-          if (!created) {
-            notificationService.error('Failed to create user account');
-            setLoading(false);
-            return;
-          }
-          
-          // Wait for database to update
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // Try completing profile again
-          console.log('🔄 Retrying profile completion...');
-          const { data: retryData, error: retryError } = await supabase.rpc('complete_google_profile', {
-            p_auth_id: session.user.id,
-            p_company_name: profileData.companyName,
-            p_phone: profileData.phone,
-            p_address: profileData.address,
-            p_business_license: profileData.businessLicense,
-            p_category: profileData.category,
-            p_full_name: profileData.fullName || session.user.user_metadata.full_name
-          });
-          
-          if (retryError || (retryData && !retryData.success)) {
-            console.error('❌ Retry failed:', retryError || retryData.error);
-            
-            // Last resort: Direct database update
-            console.log('🔧 Last resort: Updating database directly...');
-            const { data: updateResult, error: updateError } = await supabase
-              .from('users')
-              .update({
-                company_name: profileData.companyName,
-                phone: profileData.phone,
-                address: profileData.address,
-                business_license: profileData.businessLicense,
-                category: profileData.category,
-                full_name: profileData.fullName || session.user.user_metadata.full_name,
-                profile_completed: true,
-                role: 'supplier', // Make sure role is set
-                updated_at: new Date().toISOString()
-              })
-              .eq('auth_id', session.user.id)
-              .select();
-            
-            if (updateError) {
-              console.error('❌ Direct update failed:', updateError);
-              notificationService.error('Failed to save profile. Please contact support.');
-              setLoading(false);
-              return;
-            }
-            
-            console.log('✅ Profile updated directly:', updateResult);
-            notificationService.success('🎉 Profile completed successfully!');
-          } else {
-            console.log('✅ Profile completed on retry!');
-          }
-        } else {
-          notificationService.error(data.error || 'Failed to complete profile');
-          setLoading(false);
-          return;
-        }
-      }
-
-      console.log('✅ Profile completed successfully!');
-      notificationService.success('🎉 Profile completed! Redirecting to portal...');
+      console.log('✅ Profile completed successfully:', updateResult);
+      notificationService.show('🎉 Profile completed! Waiting for admin approval...', 'success');
       
-      // Go to portal
-      navigate('/supplier-portal', { replace: true });
+      // Sign out and show pending message
+      await supabase.auth.signOut();
+      setShowProfileForm(false);
+      notificationService.show('⏳ Your supplier application is pending admin approval.', 'warning', 5000);
 
     } catch (error) {
       console.error('Error completing profile:', error);

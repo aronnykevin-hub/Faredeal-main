@@ -69,15 +69,31 @@ const ManagerAuth = () => {
     }
   };
 
-  // Check if already logged in
   useEffect(() => {
-    checkAuth();
+    const initAuth = async () => {
+      // Check if we're returning from OAuth
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
+      
+      if (hasOAuthCallback) {
+        console.log('🔄 OAuth callback detected, waiting for session...');
+        // Wait for Supabase to process the OAuth callback
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      checkAuth();
+    };
+    
+    initAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
+      console.log('🔍 Checking manager authentication...');
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (user) {
+        console.log('✅ User authenticated:', user.email);
         setCurrentUser(user);
         
         // Check if user exists in database
@@ -88,8 +104,11 @@ const ManagerAuth = () => {
           .eq('role', 'manager')
           .single();
 
+        console.log('👤 User data from database:', userData);
+
         // If user doesn't exist (OAuth first-time sign-in), create them
         if (fetchError || !userData) {
+          console.log('📝 Creating new manager user in database...');
           const { data: newUser, error: createError } = await supabase
             .from('users')
             .insert([{
@@ -105,30 +124,36 @@ const ManagerAuth = () => {
             .single();
 
           if (createError) {
-            console.error('Error creating user:', createError);
+            console.error('❌ Error creating user:', createError);
             throw createError;
           }
 
+          console.log('✅ User created:', newUser);
           userData = newUser;
           notificationService.show('Welcome! Please complete your manager profile.', 'info');
         }
 
         // Priority flow: approved → profile incomplete → pending
+        console.log('🔀 Checking user status - Active:', userData.is_active, 'Profile Complete:', userData.profile_completed);
+        
         if (userData.is_active && userData.profile_completed) {
-          // Approved and profile complete → Go to portal
-          navigate('/manager-portal');
+          // Approved and profile complete → Go to Manager Portal
+          console.log('✅ User approved and profile complete - Redirecting to Manager Portal');
+          notificationService.show('✅ Welcome back!', 'success');
+          navigate('/manager');
         } else if (!userData.profile_completed) {
           // Profile not completed → Show profile form
+          console.log('📋 Profile not complete - Showing profile form');
           setShowProfileCompletion(true);
           setFormData(prev => ({
             ...prev,
             fullName: userData.full_name || '',
             phone: userData.phone || '',
-            department: userData.department || '',
-            city: userData.city || ''
+            department: userData.department || ''
           }));
         } else {
           // Profile complete but not active → Pending approval
+          console.log('⏳ Profile complete but not approved - Pending approval');
           notificationService.show(
             '⏳ Your manager application is pending admin approval.',
             'warning',
@@ -136,9 +161,11 @@ const ManagerAuth = () => {
           );
           await supabase.auth.signOut();
         }
+      } else {
+        console.log('❌ No authenticated user found');
       }
     } catch (error) {
-      console.log('Auth check error:', error);
+      console.error('❌ Auth check error:', error);
     }
   };
 

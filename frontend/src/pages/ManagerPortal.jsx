@@ -5060,8 +5060,16 @@ _Automated Business Report System_`)}`;
   // Make update function globally available
   useEffect(() => {
     window.updateManagerProfile = updateManagerProfile;
+    window.supabase = supabase;
+    window.setManagerProfile = setManagerProfile;
+    window.setProfilePicUrl = setProfilePicUrl;
+    window.loadManagerProfile = loadManagerProfile;
     return () => {
       delete window.updateManagerProfile;
+      delete window.supabase;
+      delete window.setManagerProfile;
+      delete window.setProfilePicUrl;
+      delete window.loadManagerProfile;
     };
   }, []);
 
@@ -5850,15 +5858,152 @@ _Automated Business Report System_`)}`;
     };
 
     window.editAvatar = () => {
-      const avatars = ['👩‍💼', '👨‍💼', '👩‍🔬', '👨‍🔬', '👩‍💻', '👨‍💻', '👩‍🏫', '👨‍🏫'];
-      const avatarChoice = prompt(`Select avatar:\\n${avatars.map((a, i) => `${i+1}. ${a}`).join('\\n')}\\n\\nEnter number:`);
-      const avatarIndex = parseInt(avatarChoice) - 1;
-      if (avatarIndex >= 0 && avatarIndex < avatars.length) {
-        window.updateManagerProfile?.('avatar', avatars[avatarIndex]);
+      // Create modal for avatar selection with upload option
+      const avatarModal = document.createElement('div');
+      avatarModal.className = 'fixed inset-0 bg-black bg-opacity-60 z-60 flex items-center justify-center p-4';
+      avatarModal.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div class="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 rounded-t-2xl">
+            <h3 class="text-xl font-bold">👤 Update Profile Picture</h3>
+            <p class="text-purple-200">Choose an emoji or upload your photo</p>
+          </div>
+          <div class="p-6">
+            <!-- Upload Section -->
+            <div class="mb-6">
+              <label class="block text-sm font-medium text-gray-700 mb-2">📸 Upload Photo</label>
+              <div class="flex items-center space-x-3">
+                <input 
+                  type="file" 
+                  id="avatarFileInput" 
+                  accept="image/*" 
+                  class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+                <button 
+                  type="button"
+                  onclick="uploadAvatarImage()"
+                  class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                >
+                  Upload
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Max 2MB • JPG, PNG, GIF</p>
+            </div>
+            
+            <div class="border-t pt-4">
+              <p class="text-sm font-medium text-gray-700 mb-3">Or choose an emoji:</p>
+              <div class="grid grid-cols-5 gap-3">
+                ${['👨‍💼', '👩‍💼', '🧑‍💼', '👨‍🏫', '👩‍🏫', '🧑‍�', '👨‍⚕️', '👩‍⚕️', '🧑‍💻', '👨‍🍳', '👩‍🍳', '🧑‍�', '👨‍💻', '👩‍💻', '🧑‍🔬'].map(emoji => `
+                  <button 
+                    type="button"
+                    onclick="selectEmojiAvatar('${emoji}')"
+                    class="text-3xl hover:scale-125 transition-transform p-2 rounded-lg hover:bg-purple-100"
+                  >
+                    ${emoji}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end space-x-3">
+              <button 
+                type="button"
+                onclick="this.closest('.fixed').remove()"
+                class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(avatarModal);
+      
+      // Upload image function
+      window.uploadAvatarImage = async () => {
+        const fileInput = document.getElementById('avatarFileInput');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+          window.toast?.error?.('Please select an image file');
+          return;
+        }
+        
+        if (file.size > 2 * 1024 * 1024) {
+          window.toast?.error?.('Image size must be less than 2MB');
+          return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const base64String = e.target.result;
+          
+          try {
+            // Save to Supabase
+            const { data: { user } } = await window.supabase.auth.getUser();
+            if (!user) {
+              window.toast?.error?.('Not authenticated');
+              return;
+            }
+            
+            const { error } = await window.supabase
+              .from('users')
+              .update({ avatar_url: base64String })
+              .eq('auth_id', user.id)
+              .eq('role', 'manager');
+            
+            if (error) {
+              console.error('Error uploading avatar:', error);
+              window.toast?.error?.('Failed to upload avatar');
+              return;
+            }
+            
+            console.log('✅ Avatar uploaded to database successfully');
+            
+            // Verify the update by fetching the data
+            const { data: updatedData, error: fetchError } = await window.supabase
+              .from('users')
+              .select('avatar_url')
+              .eq('auth_id', user.id)
+              .eq('role', 'manager')
+              .single();
+            
+            if (fetchError) {
+              console.error('Error verifying upload:', fetchError);
+            } else {
+              console.log('Verified avatar_url in database:', updatedData?.avatar_url ? 'Image exists' : 'No image');
+            }
+            
+            // Update local state immediately
+            window.setManagerProfile?.(prev => ({ ...prev, avatar_url: base64String }));
+            window.setProfilePicUrl?.(base64String);
+            
+            console.log('✅ Local state updated');
+            
+            window.toast?.success?.('✅ Profile picture uploaded successfully!');
+            avatarModal.remove();
+            profileModal?.remove?.();
+            
+            // Reload profile to ensure everything is in sync
+            console.log('🔄 Reloading profile...');
+            await window.loadManagerProfile?.();
+            console.log('✅ Profile reloaded');
+            
+          } catch (error) {
+            console.error('Error:', error);
+            window.toast?.error?.('Failed to upload avatar');
+          }
+        };
+        reader.readAsDataURL(file);
+      };
+      
+      // Select emoji function
+      window.selectEmojiAvatar = (emoji) => {
+        window.updateManagerProfile?.('avatar', emoji);
         window.toast?.success?.('✅ Avatar updated!');
-        profileModal.remove();
-        handleProfileClick();
-      }
+        avatarModal.remove();
+        profileModal?.remove?.();
+        handleProfileClick?.();
+      };
     };
 
     window.editLanguages = () => {
@@ -7936,9 +8081,12 @@ _Automated Business Report System_`)}`;
                 </button>
 
                 <button 
-                  onClick={handleSettingsClick}
+                  onClick={() => {
+                    startEditingProfile();
+                    toast.info('💼 Edit your profile details below');
+                  }}
                   className="w-full bg-white bg-opacity-20 px-4 py-2 rounded-lg hover:bg-opacity-30 transition-all duration-300 flex items-center justify-center space-x-2 group"
-                  title="Advanced Settings"
+                  title="Edit Profile"
                 >
                   <FiSettings className="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" />
                   <span>Settings</span>
@@ -10724,9 +10872,12 @@ FAREDEAL Uganda Management Team
 
             {/* Diamond-shaped Settings Container */}
             <button
-              onClick={handleSettingsClick}
+              onClick={() => {
+                startEditingProfile();
+                toast.info('💼 Edit your profile details');
+              }}
               className="relative group"
-              title="Advanced Settings"
+              title="Edit Profile"
             >
               <div className="relative p-3 bg-white/15 backdrop-blur-sm transform rotate-45 rounded-lg border-2 border-white/20 hover:bg-white/25 transition-all duration-500 group-hover:scale-110 shadow-lg">
                 {/* Inner diamond content */}

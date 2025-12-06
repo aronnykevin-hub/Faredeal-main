@@ -2036,8 +2036,7 @@ const CashierPortal = () => {
 
   const renderProfile = () => {
     console.log('🎨 Rendering profile header - profilePicUrl:', profilePicUrl ? 'exists' : 'null', 'cashierProfile.avatar_url:', cashierProfile.avatar_url ? 'exists' : 'null');
-    return (
-    <div className="space-y-6 animate-fadeInUp">
+    return (<div className="space-y-6 animate-fadeInUp">
       {/* Profile Header Card */}
       <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-8">
@@ -2046,12 +2045,17 @@ const CashierPortal = () => {
               {/* Profile Avatar with Upload */}
               <div className="relative group">
                 <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-xl overflow-hidden">
-                  {profilePicUrl || cashierProfile.avatar_url ? (
+                  {(profilePicUrl || cashierProfile.avatar_url) ? (
                     <img 
-                      key={profilePicUrl || cashierProfile.avatar_url}
+                      key={`${profilePicUrl || cashierProfile.avatar_url}-${Date.now()}`}
                       src={profilePicUrl || cashierProfile.avatar_url} 
                       alt="Profile" 
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error('❌ Image failed to load');
+                        e.target.style.display = 'none';
+                      }}
+                      onLoad={() => console.log('✅ Image loaded successfully')}
                     />
                   ) : (
                     <span className="text-6xl">{cashierProfile.avatar}</span>
@@ -2332,7 +2336,8 @@ const CashierPortal = () => {
         </div>
       </div>
     </div>
-  );
+    );
+  }
 
   const renderPerformance = () => (
     <div className="space-y-6 animate-slideInRight container-neon rounded-2xl p-8">
@@ -2428,8 +2433,7 @@ const CashierPortal = () => {
         </div>
       </div>
     </div>
-    );
-  };
+  );
 
   const renderInventory = () => (
     <div className="space-y-6 animate-zoomIn">

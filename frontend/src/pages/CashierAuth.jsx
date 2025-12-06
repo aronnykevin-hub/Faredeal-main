@@ -66,13 +66,30 @@ const CashierAuth = () => {
   };
 
   useEffect(() => {
-    checkAuth();
+    const initAuth = async () => {
+      // Check if we're returning from OAuth
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
+      
+      if (hasOAuthCallback) {
+        console.log('🔄 OAuth callback detected, waiting for session...');
+        // Wait for Supabase to process the OAuth callback
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      checkAuth();
+    };
+    
+    initAuth();
   }, []);
 
   const checkAuth = async () => {
     try {
+      console.log('🔍 Checking cashier authentication...');
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (user) {
+        console.log('✅ User authenticated:', user.email);
         setCurrentUser(user);
         
         // Check if user exists in database
@@ -83,8 +100,11 @@ const CashierAuth = () => {
           .eq('role', 'cashier')
           .single();
 
+        console.log('👤 User data from database:', userData);
+
         // If user doesn't exist (OAuth first-time sign-in), create them
         if (fetchError || !userData) {
+          console.log('📝 Creating new cashier user in database...');
           const { data: newUser, error: createError } = await supabase
             .from('users')
             .insert([{
@@ -100,20 +120,26 @@ const CashierAuth = () => {
             .single();
 
           if (createError) {
-            console.error('Error creating user:', createError);
+            console.error('❌ Error creating user:', createError);
             throw createError;
           }
 
+          console.log('✅ User created:', newUser);
           userData = newUser;
           notificationService.show('Welcome! Please complete your cashier profile.', 'info');
         }
 
         // Priority flow: approved → profile incomplete → pending
+        console.log('🔀 Checking user status - Active:', userData.is_active, 'Profile Complete:', userData.profile_completed);
+        
         if (userData.is_active && userData.profile_completed) {
-          // Approved and profile complete → Go to portal
+          // Approved and profile complete → Go to Employee Portal (Cashier Portal with all features)
+          console.log('✅ User approved and profile complete - Redirecting to Cashier Portal');
+          notificationService.show('✅ Welcome back!', 'success');
           navigate('/employee-portal');
         } else if (!userData.profile_completed) {
           // Profile not completed → Show profile form
+          console.log('📋 Profile not complete - Showing profile form');
           setShowProfileCompletion(true);
           setFormData(prev => ({
             ...prev,
@@ -123,6 +149,7 @@ const CashierAuth = () => {
           }));
         } else {
           // Profile complete but not active → Pending approval
+          console.log('⏳ Profile complete but not approved - Pending approval');
           notificationService.show(
             '⏳ Your cashier application is pending admin approval.',
             'warning',
@@ -130,9 +157,11 @@ const CashierAuth = () => {
           );
           await supabase.auth.signOut();
         }
+      } else {
+        console.log('❌ No authenticated user found');
       }
     } catch (error) {
-      console.log('Auth check error:', error);
+      console.error('❌ Auth check error:', error);
     }
   };
 
@@ -404,6 +433,210 @@ const CashierAuth = () => {
       setLoading(false);
     }
   };
+
+  // =============================================
+  // RENDER: Profile Completion Form
+  // =============================================
+  if (showProfileCompletion) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-cyan-600 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <FiUser className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Complete Your Cashier Profile</h1>
+            <p className="text-gray-600">Fill in your details to continue</p>
+          </div>
+
+          <form onSubmit={handleCompleteProfile} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Full Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name *
+                </label>
+                <input
+                  type="text"
+                  name="fullName"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone Number *
+                </label>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* Date of Birth */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date of Birth *
+                </label>
+                <input
+                  type="date"
+                  name="dateOfBirth"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Gender *
+                </label>
+                <select
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                >
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Address *
+                </label>
+                <input
+                  type="text"
+                  name="address"
+                  value={formData.address}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* City */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  City *
+                </label>
+                <input
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* ID Number */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ID Number *
+                </label>
+                <input
+                  type="text"
+                  name="idNumber"
+                  value={formData.idNumber}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* Shift */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Preferred Shift *
+                </label>
+                <select
+                  name="shift"
+                  value={formData.shift}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                >
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                  <option value="evening">Evening</option>
+                  <option value="night">Night</option>
+                </select>
+              </div>
+
+              {/* Till Experience */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Till Experience (months)
+                </label>
+                <input
+                  type="number"
+                  name="tillExperience"
+                  value={formData.tillExperience}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  min="0"
+                />
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Emergency Contact Name *
+                </label>
+                <input
+                  type="text"
+                  name="emergencyContact"
+                  value={formData.emergencyContact}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+
+              {/* Emergency Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Emergency Contact Phone *
+                </label>
+                <input
+                  type="tel"
+                  name="emergencyPhone"
+                  value={formData.emergencyPhone}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 bg-gradient-to-r from-green-600 to-cyan-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-cyan-700 transition-all disabled:opacity-50"
+            >
+              {loading ? 'Submitting...' : 'Complete Profile'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-cyan-600 flex items-center justify-center p-4 relative overflow-hidden">

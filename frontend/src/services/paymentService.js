@@ -1,4 +1,4 @@
-import supabase from '../assets/configsupabase';
+import { supabase } from './supabase';
 
 /**
  * Payment Service for handling payment-related operations
@@ -14,38 +14,31 @@ export class PaymentService {
    */
   static async getSupplierPaymentHistory(supplierId, status = null) {
     try {
+      // Query payment_transactions joined with purchase_orders
       let query = supabase
-        .from('payments')
+        .from('payment_transactions')
         .select(`
           id,
-          amount,
-          currency,
+          transaction_number,
+          amount_paid,
           payment_method,
-          status,
-          transaction_id,
-          reference_number,
-          mobile_number,
-          network,
-          processed_at,
+          payment_date,
+          payment_reference,
+          payment_notes,
+          confirmed_by_supplier,
+          confirmation_date,
+          confirmation_notes,
           created_at,
-          notes,
-          orders (
+          purchase_orders!inner (
             id,
-            order_number,
-            total_amount,
+            po_number,
+            total_amount_ugx,
             order_date,
-            suppliers (
-              id,
-              name
-            )
+            supplier_id
           )
         `)
-        .eq('orders.supplier_id', supplierId)
-        .order('created_at', { ascending: false });
-
-      if (status && status !== 'all') {
-        query = query.eq('status', status);
-      }
+        .eq('purchase_orders.supplier_id', supplierId)
+        .order('payment_date', { ascending: false });
 
       const { data, error } = await query;
 
@@ -56,19 +49,19 @@ export class PaymentService {
 
       // Transform the data to match the frontend format
       return data.map(payment => ({
-        id: payment.reference_number || payment.id,
-        date: payment.created_at,
-        amount: parseFloat(payment.amount),
-        status: payment.status,
-        dueDate: this.calculateDueDate(payment.created_at, 30), // 30 days payment terms
+        id: payment.transaction_number || payment.id,
+        date: payment.payment_date || payment.created_at,
+        amount: parseFloat(payment.amount_paid || 0),
+        status: payment.confirmed_by_supplier ? 'confirmed' : 'pending',
         paymentMethod: payment.payment_method,
-        reference: payment.reference_number || payment.transaction_id || payment.id,
-        orderId: payment.orders?.order_number || payment.orders?.id,
-        daysOverdue: this.calculateDaysOverdue(payment.created_at, payment.status),
-        paidAmount: payment.status === 'partial' ? parseFloat(payment.amount) * 0.5 : null, // Simplified for demo
-        network: payment.network,
-        mobileNumber: payment.mobile_number,
-        currency: payment.currency || 'UGX'
+        reference: payment.payment_reference || payment.transaction_number,
+        orderId: payment.purchase_orders?.po_number || payment.purchase_orders?.id,
+        orderAmount: parseFloat(payment.purchase_orders?.total_amount_ugx || 0),
+        orderDate: payment.purchase_orders?.order_date,
+        confirmed: payment.confirmed_by_supplier,
+        confirmationDate: payment.confirmation_date,
+        notes: payment.payment_notes,
+        currency: 'UGX'
       }));
 
     } catch (error) {
@@ -84,31 +77,32 @@ export class PaymentService {
    */
   static async getSupplierPaymentStats(supplierId) {
     try {
+      // Get all payment transactions for this supplier
       const { data, error } = await supabase
-        .from('payments')
+        .from('payment_transactions')
         .select(`
-          status,
-          amount,
-          orders!inner (
-            supplier_id
+          amount_paid,
+          confirmed_by_supplier,
+          purchase_orders!inner (
+            supplier_id,
+            total_amount_ugx,
+            payment_status
           )
         `)
-        .eq('orders.supplier_id', supplierId);
+        .eq('purchase_orders.supplier_id', supplierId);
 
       if (error) throw error;
 
+      const confirmed = data.filter(p => p.confirmed_by_supplier);
+      const pending = data.filter(p => !p.confirmed_by_supplier);
+
       const stats = {
         total: data.length,
-        paid: data.filter(p => p.status === 'completed').length,
-        unpaid: data.filter(p => p.status === 'pending' || p.status === 'failed').length,
-        partial: data.filter(p => p.status === 'partial').length,
-        totalAmount: data.reduce((sum, p) => sum + parseFloat(p.amount), 0),
-        paidAmount: data
-          .filter(p => p.status === 'completed')
-          .reduce((sum, p) => sum + parseFloat(p.amount), 0),
-        outstandingAmount: data
-          .filter(p => p.status !== 'completed')
-          .reduce((sum, p) => sum + parseFloat(p.amount), 0)
+        confirmed: confirmed.length,
+        pending: pending.length,
+        totalAmount: data.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0),
+        confirmedAmount: confirmed.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0),
+        pendingAmount: pending.reduce((sum, p) => sum + parseFloat(p.amount_paid || 0), 0)
       };
 
       return stats;
@@ -126,34 +120,33 @@ export class PaymentService {
   static async getAllPaymentHistory(filters = {}) {
     try {
       let query = supabase
-        .from('payments')
+        .from('payment_transactions')
         .select(`
           id,
-          amount,
-          currency,
+          transaction_number,
+          amount_paid,
           payment_method,
-          status,
-          transaction_id,
-          reference_number,
-          mobile_number,
-          network,
-          processed_at,
+          payment_date,
+          payment_reference,
+          payment_notes,
+          confirmed_by_supplier,
+          confirmation_date,
           created_at,
-          notes,
-          orders (
+          purchase_orders!inner (
             id,
-            order_number,
-            total_amount,
+            po_number,
+            total_amount_ugx,
             order_date,
-            suppliers (
+            supplier_id,
+            users!purchase_orders_supplier_id_fkey (
               id,
-              name,
-              contact_person,
-              email
+              full_name,
+              email,
+              phone_number
             )
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('payment_date', { ascending: false });
 
       // Apply filters
       if (filters.supplierId) {

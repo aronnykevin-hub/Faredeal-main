@@ -16,7 +16,8 @@ import CashierAuth from '@/pages/CashierAuth';
 import EmployeeAuth from '@/pages/EmployeeAuth';
 import SupplierAuth from '@/pages/SupplierAuth';
 import ManagerPortal from '@/pages/ManagerPortal';
-import EmployeePortal from '@/pages/EmployeePortal';
+import CashierPortal from '@/pages/CashierPortal';
+import EmployeePortal from '@/pages/cashier portal';
 import SupplierPortal from '@/pages/SupplierPortal';
 import PortalLanding from '@/pages/PortalLanding';
 import PaymentDashboard from '@/components/PaymentDashboard';
@@ -155,9 +156,11 @@ function App() {
               <Route path="/manager-portal" element={<ManagerPortal />} />
               <Route path="/manager" element={<ManagerPortal />} />
               
+              <Route path="/cashier-portal" element={<CashierPortal />} />
+              <Route path="/cashier" element={<CashierPortal />} />
+              
               <Route path="/employee-portal" element={<EmployeePortal />} />
               <Route path="/employee" element={<EmployeePortal />} />
-              <Route path="/cashier" element={<EmployeePortal />} />
               
               <Route path="/supplier-portal" element={<SupplierPortal />} />
               <Route path="/supplier" element={<SupplierPortal />} />
