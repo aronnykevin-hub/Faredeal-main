@@ -21,20 +21,45 @@ const SupplierPaymentConfirmations = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   /**
-   * Get current supplier ID from localStorage or Supabase auth
+   * Get current supplier ID from users table (internal ID, not auth_id)
    */
   const getSupplierId = async () => {
-    let supplierId = localStorage.getItem('userId');
-    
-    if (!supplierId) {
+    try {
+      // Get authenticated user
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        supplierId = user.id;
-        localStorage.setItem('userId', user.id);
+      
+      if (!user) {
+        console.error('❌ No authenticated user');
+        return null;
       }
+
+      console.log('🔍 Looking up supplier with auth_id:', user.id);
+
+      // Get internal user ID from users table
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('id, role, email, full_name')
+        .eq('auth_id', user.id)
+        .eq('role', 'supplier')
+        .single();
+
+      if (error) {
+        console.error('❌ Error fetching supplier user ID:', error);
+        console.log('Error code:', error.code, 'Details:', error.details);
+        return null;
+      }
+
+      if (!userData) {
+        console.error('❌ No supplier user found for auth_id:', user.id);
+        return null;
+      }
+
+      console.log('✅ Found supplier:', userData.email, 'Internal ID:', userData.id);
+      return userData?.id;
+    } catch (err) {
+      console.error('❌ Error in getSupplierId:', err);
+      return null;
     }
-    
-    return supplierId;
   };
 
   /**
@@ -45,13 +70,17 @@ const SupplierPaymentConfirmations = () => {
     setError(null);
     
     try {
+      console.log('📋 Loading pending payments...');
       const supplierId = await getSupplierId();
       
       if (!supplierId) {
-        setError('Unable to identify supplier. Please log in again.');
+        console.error('❌ Could not get supplier ID');
+        setError('Unable to identify supplier. Please ensure you are logged in as a supplier.');
         setLoading(false);
         return;
       }
+
+      console.log('🔍 Fetching pending payments for supplier ID:', supplierId);
 
       // Call the RPC function to get pending confirmations
       const { data, error: rpcError } = await supabase.rpc(
@@ -60,13 +89,14 @@ const SupplierPaymentConfirmations = () => {
       );
 
       if (rpcError) {
-        console.error('Error fetching pending payments:', rpcError);
+        console.error('❌ Error fetching pending payments:', rpcError);
         setError(rpcError.message);
       } else {
+        console.log('✅ Loaded', data?.length || 0, 'pending payments');
         setPendingPayments(data || []);
       }
     } catch (err) {
-      console.error('Error loading pending payments:', err);
+      console.error('❌ Error loading pending payments:', err);
       setError(err.message);
     } finally {
       setLoading(false);

@@ -14,7 +14,8 @@ import {
   FiDollarSign, FiPieChart, FiCalendar, FiBell, FiCheckCircle,
   FiXCircle, FiUserPlus, FiSearch, FiFilter, FiDownload,
   FiUpload, FiTrash2, FiEdit, FiEye, FiRotateCw, FiX,
-  FiMoreVertical, FiMail, FiPhone, FiBriefcase, FiFileText
+  FiMoreVertical, FiMail, FiPhone, FiBriefcase, FiFileText,
+  FiChevronDown
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -241,6 +242,60 @@ const AdminPortal = () => {
     }
   }, []);
 
+  // Load order statistics from Supabase
+  const loadOrderStats = useCallback(async () => {
+    try {
+      // Get total orders count
+      const { count: totalCount } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true });
+
+      // Get today's orders
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const { data: todayOrders, count: todayCount } = await supabase
+        .from('transactions')
+        .select('*, total_amount', { count: 'exact' })
+        .gte('created_at', today.toISOString());
+
+      // Get pending orders (from purchase_orders table)
+      const { count: pendingCount } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['pending_approval', 'sent_to_supplier']);
+
+      // Get completed orders
+      const { count: completedCount } = await supabase
+        .from('transactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed');
+
+      // Calculate today's revenue
+      const todayRevenue = todayOrders?.reduce((sum, order) => 
+        sum + (parseFloat(order.total_amount) || 0), 0) || 0;
+
+      setOrderStats({
+        total: totalCount || 0,
+        today: todayCount || 0,
+        pending: pendingCount || 0,
+        completed: completedCount || 0,
+        revenue: todayRevenue,
+        loading: false
+      });
+
+      console.log('✅ Loaded order statistics:', {
+        total: totalCount,
+        today: todayCount,
+        pending: pendingCount,
+        completed: completedCount,
+        revenue: todayRevenue
+      });
+    } catch (error) {
+      console.error('Error loading order statistics:', error);
+      setOrderStats(prev => ({ ...prev, loading: false }));
+    }
+  }, []);
+
   // Load users when accessing user management or approvals
   useEffect(() => {
     if (activeSection === 'users') {
@@ -251,8 +306,10 @@ const AdminPortal = () => {
       }
     } else if (activeSection === 'approvals') {
       loadPendingUsers();
+    } else if (activeSection === 'orders') {
+      loadOrderStats();
     }
-  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers]);
+  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers, loadOrderStats]);
 
   // Real-time subscription for new user registrations
   useEffect(() => {
@@ -3793,47 +3850,169 @@ const AdminPortal = () => {
     </div>
   );
 
-  const renderOrderManagement = () => (
-    <div className="space-y-8">
-      {/* Order Management Header */}
-      <div className="bg-gradient-to-r from-orange-500 via-red-600 to-pink-700 rounded-2xl p-8 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold mb-3 flex items-center">
-              <span className="mr-4 text-4xl">📋</span>
-              Complete Order Management
-            </h2>
-            <p className="text-orange-100 text-lg">Full administrative control over all order operations and workflows</p>
-          </div>
-          <div className="text-right">
-            <div className="text-5xl font-bold">2,847</div>
-            <div className="text-orange-200 text-lg">Total Orders</div>
-          </div>
-        </div>
-      </div>
+  // Add state for order stats and collapsible sections
+  const [orderStats, setOrderStats] = useState({
+    total: 0,
+    today: 0,
+    pending: 0,
+    completed: 0,
+    revenue: 0,
+    loading: true
+  });
+  const [expandedCard, setExpandedCard] = useState(null);
 
-      {/* Order Analytics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { title: 'Today Orders', value: '142', icon: '📦', color: 'blue', trend: '+15%' },
-          { title: 'Pending Orders', value: '23', icon: '⏳', color: 'yellow', trend: '-5%' },
-          { title: 'Completed Orders', value: '2,689', icon: '✅', color: 'green', trend: '+8%' },
-          { title: 'Revenue Today', value: '$12.4K', icon: '💰', color: 'purple', trend: '+22%' }
-        ].map((stat, index) => (
-          <div key={index} className={`bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 rounded-2xl p-6 shadow-lg transform hover:scale-105 transition-all duration-300`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 bg-${stat.color}-200 rounded-xl`}>
-                <span className="text-2xl">{stat.icon}</span>
-              </div>
-              <span className={`px-2 py-1 rounded-full text-xs font-medium ${stat.trend.startsWith('+') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                {stat.trend}
-              </span>
+  const renderOrderManagement = () => {
+    const orderCards = [
+      { 
+        id: 'total',
+        title: 'Total Orders', 
+        value: orderStats.total,
+        icon: '📋', 
+        color: 'orange',
+        description: 'All orders in the system',
+        details: 'Complete order history across all portals and time periods'
+      },
+      { 
+        id: 'today',
+        title: 'Today Orders', 
+        value: orderStats.today,
+        icon: '📦', 
+        color: 'blue',
+        description: 'Orders placed today',
+        details: `Active orders from ${new Date().toLocaleDateString()}`
+      },
+      { 
+        id: 'pending',
+        title: 'Pending Orders', 
+        value: orderStats.pending,
+        icon: '⏳', 
+        color: 'yellow',
+        description: 'Awaiting approval or processing',
+        details: 'Purchase orders pending approval or supplier confirmation'
+      },
+      { 
+        id: 'completed',
+        title: 'Completed Orders', 
+        value: orderStats.completed,
+        icon: '✅', 
+        color: 'green',
+        description: 'Successfully completed',
+        details: 'All successfully processed and delivered orders'
+      },
+      { 
+        id: 'revenue',
+        title: 'Revenue Today', 
+        value: `UGX ${orderStats.revenue.toLocaleString()}`,
+        icon: '💰', 
+        color: 'purple',
+        description: 'Today\'s earnings',
+        details: 'Total revenue generated from today\'s transactions'
+      }
+    ];
+
+    return (
+      <div className="space-y-6">
+        {/* Order Management Header - Collapsible */}
+        <div className="bg-gradient-to-r from-orange-500 via-red-600 to-pink-700 rounded-xl p-6 text-white shadow-xl cursor-pointer hover:shadow-2xl transition-all duration-300"
+             onClick={() => setExpandedCard(expandedCard === 'header' ? null : 'header')}>
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <h2 className="text-2xl font-bold mb-2 flex items-center">
+                <span className="mr-3 text-3xl">📋</span>
+                Complete Order Management
+                <FiChevronDown className={`ml-3 transition-transform duration-300 ${expandedCard === 'header' ? 'rotate-180' : ''}`} />
+              </h2>
+              <p className="text-orange-100">Full administrative control over all order operations and workflows</p>
             </div>
-            <h3 className={`text-${stat.color}-900 font-medium text-sm mb-1`}>{stat.title}</h3>
-            <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
+            <div className="text-right ml-4">
+              <div className="text-4xl font-bold">{orderStats.loading ? '...' : orderStats.total.toLocaleString()}</div>
+              <div className="text-orange-200">Total Orders</div>
+            </div>
           </div>
-        ))}
-      </div>
+          
+          {expandedCard === 'header' && (
+            <div className="mt-6 pt-6 border-t border-white/20 animate-fadeIn">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="bg-white/10 rounded-lg p-3">
+                  <div className="text-orange-200">System Status</div>
+                  <div className="font-bold mt-1">🟢 Active</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-3">
+                  <div className="text-orange-200">Last Updated</div>
+                  <div className="font-bold mt-1">{new Date().toLocaleTimeString()}</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-3">
+                  <div className="text-orange-200">Data Source</div>
+                  <div className="font-bold mt-1">Supabase</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-3">
+                  <div className="text-orange-200">Auto Refresh</div>
+                  <div className="font-bold mt-1">Every 5min</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Order Stats - List Format with Collapsible Cards */}
+        <div className="space-y-4">
+          {orderCards.map((card) => (
+            <div 
+              key={card.id}
+              className={`bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-l-4 border-${card.color}-500`}
+              onClick={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
+            >
+              <div className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center flex-1">
+                    <div className={`p-3 bg-${card.color}-100 rounded-xl mr-4`}>
+                      <span className="text-2xl">{card.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-gray-900">{card.title}</h3>
+                      <p className="text-sm text-gray-600">{card.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-right">
+                      <div className="text-3xl font-bold text-gray-900">
+                        {orderStats.loading ? '...' : card.value}
+                      </div>
+                    </div>
+                    <FiChevronDown className={`text-gray-400 transition-transform duration-300 ${expandedCard === card.id ? 'rotate-180' : ''}`} />
+                  </div>
+                </div>
+
+                {/* Expanded Content */}
+                {expandedCard === card.id && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 animate-fadeIn">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm text-gray-600 mb-1">Details</div>
+                        <div className="font-medium text-gray-900">{card.details}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-sm text-gray-600 mb-1">Last Updated</div>
+                        <div className="font-medium text-gray-900 flex items-center">
+                          <FiRefreshCw className="mr-2 text-green-500" />
+                          {new Date().toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex justify-end space-x-2">
+                      <button className={`px-4 py-2 bg-${card.color}-600 text-white rounded-lg hover:bg-${card.color}-700 transition-colors flex items-center`}>
+                        <FiEye className="mr-2" /> View Details
+                      </button>
+                      <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
+                        <FiDownload className="mr-2" /> Export
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
 
       {/* Order Control Panel */}
       <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -3861,7 +4040,8 @@ const AdminPortal = () => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderPaymentControl = () => (
     <div className="space-y-8">

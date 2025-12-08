@@ -4364,6 +4364,44 @@ _Automated Business Report System_`)}`;
     }
   };
 
+  // Load Purchase Order Statistics from Supabase
+  const loadPurchaseOrderStats = async () => {
+    try {
+      // Get active orders (not completed, delivered, or cancelled)
+      const { count: activeCount, error: activeError } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true })
+        .not('status', 'in', '(completed,delivered,cancelled)');
+
+      // Get orders with payment issues (unpaid or partially_paid)
+      const { count: paymentCount, error: paymentError } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true })
+        .in('payment_status', ['unpaid', 'partially_paid'])
+        .gt('balance_due_ugx', 0);
+
+      // Get total orders
+      const { count: totalCount, error: totalError } = await supabase
+        .from('purchase_orders')
+        .select('*', { count: 'exact', head: true });
+
+      if (!activeError && !paymentError && !totalError) {
+        setPurchaseOrderStats({
+          activeOrders: activeCount || 0,
+          paymentIssues: paymentCount || 0,
+          totalOrders: totalCount || 0
+        });
+        console.log('✅ Loaded purchase order stats from Supabase', {
+          activeOrders: activeCount,
+          paymentIssues: paymentCount,
+          totalOrders: totalCount
+        });
+      }
+    } catch (error) {
+      console.error('Error loading purchase order stats:', error);
+    }
+  };
+
   // Load Revenue Data (Weekly) from Supabase
   const loadRevenueData = async () => {
     try {
@@ -5055,6 +5093,7 @@ _Automated Business Report System_`)}`;
     loadInventoryInsights();
     loadRealTimeDataForReports();
     loadReportAccessRequests();
+    loadPurchaseOrderStats();
   };
 
   // Make update function globally available
@@ -5294,6 +5333,13 @@ _Automated Business Report System_`)}`;
     fastMoving: 0,
     slowMoving: 0,
     totalProducts: 0
+  });
+
+  // Real purchase order statistics
+  const [purchaseOrderStats, setPurchaseOrderStats] = useState({
+    activeOrders: 0,
+    paymentIssues: 0,
+    totalOrders: 0
   });
 
   // Supplier performance data (for future use)
@@ -5754,12 +5800,7 @@ _Automated Business Report System_`)}`;
         
         <div class="p-4 bg-gray-50 rounded-b-xl">
           <button 
-            onclick="
-              if(confirm('Are you sure you want to logout?')) {
-                window.toast?.success?.('👋 Logging out...');
-                this.closest('.fixed').remove();
-              }
-            "
+            onclick="handleManagerLogout()"
             class="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
           >
             <span>🚪</span>
@@ -5768,6 +5809,30 @@ _Automated Business Report System_`)}`;
         </div>
       </div>
     `;
+
+    // Global logout function for manager
+    window.handleManagerLogout = async () => {
+      if(confirm('Are you sure you want to logout?')) {
+        try {
+          // Sign out from Supabase
+          await supabase.auth.signOut();
+          
+          // Clear local storage
+          localStorage.clear();
+          
+          // Show success message
+          toast.success('👋 Logged out successfully');
+          
+          // Redirect to manager auth page
+          setTimeout(() => {
+            window.location.href = '/manager-auth';
+          }, 500);
+        } catch (error) {
+          console.error('Logout error:', error);
+          toast.error('Failed to logout');
+        }
+      }
+    };
 
     // Add global editing functions
     window.editName = () => {
@@ -9208,7 +9273,7 @@ _Automated Business Report System_`)}`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-600">Active Orders</p>
-                <p className="text-2xl font-bold text-blue-700">42</p>
+                <p className="text-2xl font-bold text-blue-700">{purchaseOrderStats.activeOrders}</p>
               </div>
               <div className="text-2xl">📦</div>
             </div>
@@ -9217,7 +9282,7 @@ _Automated Business Report System_`)}`;
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-600">Payment Issues</p>
-                <p className="text-2xl font-bold text-purple-700">5</p>
+                <p className="text-2xl font-bold text-purple-700">{purchaseOrderStats.paymentIssues}</p>
               </div>
               <div className="text-2xl">💰</div>
             </div>

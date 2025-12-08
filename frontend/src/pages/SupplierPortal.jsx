@@ -747,51 +747,64 @@ const SupplierPortal = () => {
         .eq('role', 'supplier')
         .maybeSingle();
 
-      if (!supplier?.id) return;
+      if (!supplier?.id) {
+        console.log('No supplier profile found for order history');
+        return;
+      }
 
-      // Get completed/received orders
-      const { data: orders } = await supabase
+      console.log('📚 Loading order history for supplier:', supplier.id);
+
+      // Get completed/received/cancelled orders from database
+      const { data: orders, error: ordersError } = await supabase
         .from('purchase_orders')
         .select('*')
         .eq('supplier_id', supplier.id)
         .in('status', ['received', 'completed', 'cancelled'])
         .order('order_date', { ascending: false })
-        .limit(10);
+        .limit(20);
 
-      // Get payment/invoice info for these orders
-      const orderIds = orders?.map(o => o.id) || [];
-      const { data: invoices } = await supabase
-        .from('supplier_invoices')
-        .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
-        .in('purchase_order_id', orderIds);
+      if (ordersError) {
+        console.error('Error loading orders:', ordersError);
+        return;
+      }
 
-      // Create invoice lookup map
-      const invoiceMap = {};
-      invoices?.forEach(inv => {
-        invoiceMap[inv.purchase_order_id] = inv;
-      });
+      if (!orders || orders.length === 0) {
+        console.log('No order history found in database');
+        setOrderHistory([]);
+        return;
+      }
 
-      const formatted = orders?.map(order => {
-        const invoice = invoiceMap[order.id];
+      console.log(`Found ${orders.length} orders in history`);
+
+      // Format orders with payment data from purchase_orders table
+      // (payment data is now tracked directly in purchase_orders)
+      const formatted = orders.map(order => {
         return {
-          id: order.po_number,
+          id: order.po_number || order.id,
           orderId: order.id,
-          date: new Date(order.order_date).toLocaleDateString(),
+          date: new Date(order.order_date).toLocaleDateString('en-UG', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          }),
           items: order.items?.length || 0,
           amount: parseFloat(order.total_amount_ugx) || 0,
           status: order.status === 'completed' ? 'delivered' : 
                   order.status === 'received' ? 'received' : 'cancelled',
           rating: 5,
-          products: order.items?.map(item => item.product_name).join(', ') || 'N/A',
-          payment_status: invoice?.payment_status || 'unpaid',
-          amount_paid: invoice?.amount_paid_ugx || 0,
-          balance_due: invoice?.balance_due_ugx || order.total_amount_ugx
+          products: order.items?.map(item => item.product_name || item.name || 'Item').join(', ') || 'N/A',
+          // Use payment data directly from purchase_orders table
+          payment_status: order.payment_status || 'unpaid',
+          amount_paid: parseFloat(order.amount_paid_ugx) || 0,
+          balance_due: parseFloat(order.balance_due_ugx) || parseFloat(order.total_amount_ugx) || 0
         };
-      }) || [];
+      });
 
+      console.log('✅ Order history loaded:', formatted.length, 'orders');
       setOrderHistory(formatted);
     } catch (error) {
-      console.error('Error loading order history:', error);
+      console.error('❌ Error loading order history:', error);
+      setOrderHistory([]);
     }
   };
 
@@ -1078,22 +1091,15 @@ const SupplierPortal = () => {
   // Function to load payment data from database
   const loadPaymentData = async () => {
     try {
-      // In a real app, you'd get the supplier ID from authentication context
-      const supplierId = supplierProfile.id || 'demo-supplier-id';
+      // Payment history is now handled by SupplierPaymentConfirmations component
+      // which uses payment_transactions table with supplier confirmation flow
+      console.log('✅ Payment data will be loaded by SupplierPaymentConfirmations component');
       
-      // Attempt to load from database, fallback to mock data on error
-      const dbPayments = await PaymentService.getSupplierPaymentHistory(supplierId);
+      // Old payment service disabled - using new confirmation-based system
+      // const dbPayments = await PaymentService.getSupplierPaymentHistory(supplierId);
       
-      if (dbPayments && dbPayments.length > 0) {
-        setPaymentHistory(dbPayments);
-        toast.success('Payment data loaded from database');
-      } else {
-        // Use existing mock data if no database records
-        console.log('Using mock payment data - no database records found');
-      }
     } catch (error) {
-      console.log('Database not available, using mock data:', error.message);
-      // Mock data is already set in useState, so no action needed
+      console.log('Payment data loading skipped:', error.message);
     }
   };
 
@@ -1759,16 +1765,24 @@ const SupplierPortal = () => {
     if (!confirm('Confirm this order? This will notify FAREDEAL that you accept the order.')) return;
 
     try {
-      const { error } = await supabase
+      console.log('🔵 Confirming order with ID:', orderId);
+      
+      const { data, error } = await supabase
         .from('purchase_orders')
         .update({
           status: 'confirmed',
           updated_at: new Date().toISOString()
         })
-        .eq('po_number', orderId);
+        .eq('id', orderId)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error confirming order:', error);
+        throw error;
+      }
 
+      console.log('✅ Order confirmed successfully:', data);
       alert('✅ Order confirmed successfully!');
       loadSupplierData(); // Reload data
     } catch (err) {
@@ -1783,17 +1797,25 @@ const SupplierPortal = () => {
     if (!reason) return;
 
     try {
-      const { error } = await supabase
+      console.log('🔴 Rejecting order with ID:', orderId);
+      
+      const { data, error } = await supabase
         .from('purchase_orders')
         .update({
           status: 'cancelled',
           cancellation_reason: reason,
           updated_at: new Date().toISOString()
         })
-        .eq('po_number', orderId);
+        .eq('id', orderId)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error rejecting order:', error);
+        throw error;
+      }
 
+      console.log('✅ Order rejected:', data);
       alert('❌ Order rejected');
       loadSupplierData(); // Reload data
     } catch (err) {

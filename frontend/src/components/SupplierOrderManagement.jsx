@@ -6,7 +6,7 @@
 // Real-time Supabase integration - NO MOCK DATA
 // =====================================================================
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FiTruck, FiCheckCircle, FiXCircle, FiSend, FiEdit, FiPlus,
   FiPackage, FiDollarSign, FiClock, FiAlertTriangle, FiSearch,
@@ -54,6 +54,7 @@ const SupplierOrderManagement = () => {
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [viewMode, setViewMode] = useState('active'); // 'active' or 'history'
+  const [activeTab, setActiveTab] = useState('details'); // 'details' or 'payment'
   
   // NEW: Approval form state
   const [approvalData, setApprovalData] = useState({
@@ -108,7 +109,7 @@ const SupplierOrderManagement = () => {
               const { data, error } = await supabase
                 .from('payment_transactions')
                 .select('id', { count: 'exact', head: false })
-                .eq('order_id', order.id)
+                .eq('purchase_order_id', order.id)
                 .eq('confirmed_by_supplier', false);
               
               return {
@@ -341,6 +342,109 @@ const SupplierOrderManagement = () => {
   };
 
   /**
+   * Handle mark order as received/delivered - Updates inventory automatically
+   */
+  const handleMarkAsReceived = async (orderId) => {
+    if (!confirm('Mark this order as RECEIVED and update inventory?\n\n✅ This will automatically:\n• Add received quantities to inventory\n• Update stock levels\n• Log inventory movements')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Step 1: Update order status to 'received'
+      const { error: statusError } = await supabase
+        .from('purchase_orders')
+        .update({ 
+          status: 'received',
+          actual_delivery_date: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (statusError) {
+        console.error('❌ Error updating order status:', statusError);
+        alert(`❌ Error: ${statusError.message}`);
+        return;
+      }
+
+      // Step 2: Call inventory update function (trigger will auto-run, but we'll call manually for confirmation)
+      const { data: inventoryResult, error: inventoryError } = await supabase
+        .rpc('update_inventory_on_delivery', {
+          p_order_id: orderId
+        });
+
+      if (inventoryError) {
+        console.error('❌ Error updating inventory:', inventoryError);
+        alert(`⚠️ Order marked as received, but inventory update failed:\n${inventoryError.message}\n\nPlease contact IT support.`);
+        loadAllData();
+        return;
+      }
+
+      if (inventoryResult && inventoryResult.length > 0) {
+        const result = inventoryResult[0];
+        if (result.success) {
+          // Build success message with product details
+          let successMsg = `✅ ORDER RECEIVED & INVENTORY UPDATED!\n\n`;
+          successMsg += `${result.message}\n\n`;
+          successMsg += `📦 Products Updated:\n`;
+          
+          const products = result.updated_products;
+          if (Array.isArray(products)) {
+            products.forEach(product => {
+              successMsg += `\n• ${product.product_name} (${product.sku})\n`;
+              successMsg += `  Received: ${product.quantity_received} units\n`;
+              successMsg += `  Stock: ${product.previous_stock} → ${product.new_stock}\n`;
+            });
+          }
+
+          alert(successMsg);
+        } else {
+          alert(`⚠️ ${result.message}`);
+        }
+      } else {
+        alert('✅ Order marked as received!\n\nInventory will be updated automatically by the system.');
+      }
+
+      loadAllData();
+    } catch (err) {
+      console.error('Error marking order as received:', err);
+      alert('Failed to mark order as received');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle mark order as completed
+   */
+  const handleMarkAsCompleted = async (orderId) => {
+    if (!confirm('Mark this order as COMPLETED?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('purchase_orders')
+        .update({ 
+          status: 'completed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('❌ Error completing order:', error);
+        alert(`❌ Error: ${error.message}`);
+        return;
+      }
+
+      alert('✅ Order marked as completed!');
+      loadAllData();
+    } catch (err) {
+      console.error('Error completing order:', err);
+      alert('Failed to complete order');
+    }
+  };
+
+  /**
    * Format currency to UGX
    */
   const formatUGX = (amount) => {
@@ -422,6 +526,63 @@ const SupplierOrderManagement = () => {
       order.orderedBy?.toLowerCase().includes(searchLower)
     );
   });
+
+  /**
+   * Calculate real-time statistics from current orders
+   */
+  const realTimeStats = useMemo(() => {
+    const allOrders = orders; // Use all orders, not just filtered ones
+    
+    const totalOrders = allOrders.length;
+    const totalValue = allOrders.reduce((sum, order) => sum + (parseFloat(order.total_amount_ugx) || 0), 0);
+    
+    // Count by status
+    const pendingOrders = allOrders.filter(o => 
+      o.status === 'pending_approval' || o.status === 'pending'
+    ).length;
+    
+    const completedOrders = allOrders.filter(o => 
+      o.status === 'completed' || o.status === 'received'
+    ).length;
+    
+    // Count and calculate by payment status
+    const paidOrders = allOrders.filter(o => o.payment_status === 'paid').length;
+    const partiallyPaidOrders = allOrders.filter(o => o.payment_status === 'partially_paid').length;
+    const unpaidOrders = allOrders.filter(o => 
+      o.payment_status === 'unpaid' || !o.payment_status
+    ).length;
+    
+    // Calculate payment amounts
+    const totalPaidAmount = allOrders.reduce((sum, order) => {
+      if (order.payment_status === 'paid') {
+        return sum + (parseFloat(order.total_amount_ugx) || 0);
+      } else if (order.payment_status === 'partially_paid') {
+        return sum + (parseFloat(order.amount_paid_ugx) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    const totalOutstanding = allOrders.reduce((sum, order) => {
+      if (order.payment_status === 'unpaid' || !order.payment_status) {
+        return sum + (parseFloat(order.total_amount_ugx) || 0);
+      } else if (order.payment_status === 'partially_paid') {
+        return sum + (parseFloat(order.balance_due_ugx) || 0);
+      }
+      return sum;
+    }, 0);
+    
+    return {
+      totalOrders,
+      totalValue,
+      pendingOrders,
+      completedOrders,
+      paidOrders,
+      partiallyPaidOrders,
+      unpaidOrders,
+      totalPaidAmount,
+      totalOutstanding
+    };
+  }, [orders]);
 
   if (loading) {
     return (
@@ -510,8 +671,8 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-blue-600">Total Orders</h3>
             <FiPackage className="h-5 w-5 text-blue-600" />
           </div>
-          <p className="text-2xl font-bold text-blue-800">{stats.totalOrders || 0}</p>
-          <p className="text-xs text-blue-600 mt-1">{formatUGX(stats.totalValue)}</p>
+          <p className="text-2xl font-bold text-blue-800">{realTimeStats.totalOrders || 0}</p>
+          <p className="text-xs text-blue-600 mt-1">{formatUGX(realTimeStats.totalValue)}</p>
         </div>
 
         {/* Pending Approval */}
@@ -520,7 +681,7 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-yellow-600">Pending</h3>
             <FiClock className="h-5 w-5 text-yellow-600" />
           </div>
-          <p className="text-2xl font-bold text-yellow-800">{stats.pendingOrders || 0}</p>
+          <p className="text-2xl font-bold text-yellow-800">{realTimeStats.pendingOrders || 0}</p>
           <p className="text-xs text-yellow-600 mt-1">Awaiting action</p>
         </div>
 
@@ -530,7 +691,7 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-green-600">Completed</h3>
             <FiCheckCircle className="h-5 w-5 text-green-600" />
           </div>
-          <p className="text-2xl font-bold text-green-800">{stats.completedOrders || 0}</p>
+          <p className="text-2xl font-bold text-green-800">{realTimeStats.completedOrders || 0}</p>
           <p className="text-xs text-green-600 mt-1">Delivered</p>
         </div>
 
@@ -540,8 +701,8 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-emerald-600">✅ Paid</h3>
             <FiDollarSign className="h-5 w-5 text-emerald-600" />
           </div>
-          <p className="text-2xl font-bold text-emerald-800">{stats.paidOrders || 0}</p>
-          <p className="text-xs text-emerald-600 mt-1">{formatUGX(stats.totalPaidAmount)}</p>
+          <p className="text-2xl font-bold text-emerald-800">{realTimeStats.paidOrders || 0}</p>
+          <p className="text-xs text-emerald-600 mt-1">{formatUGX(realTimeStats.totalPaidAmount)}</p>
         </div>
 
         {/* Half Paid Orders */}
@@ -550,7 +711,7 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-orange-600">⚠️ Half Paid</h3>
             <FiDollarSign className="h-5 w-5 text-orange-600" />
           </div>
-          <p className="text-2xl font-bold text-orange-800">{stats.partiallyPaidOrders || 0}</p>
+          <p className="text-2xl font-bold text-orange-800">{realTimeStats.partiallyPaidOrders || 0}</p>
           <p className="text-xs text-orange-600 mt-1">Partial payments</p>
         </div>
 
@@ -560,8 +721,8 @@ const SupplierOrderManagement = () => {
             <h3 className="text-xs font-semibold text-red-600">❌ Unpaid</h3>
             <FiAlertTriangle className="h-5 w-5 text-red-600" />
           </div>
-          <p className="text-2xl font-bold text-red-800">{stats.unpaidOrders || 0}</p>
-          <p className="text-xs text-red-600 mt-1">{formatUGX(stats.totalOutstanding)}</p>
+          <p className="text-2xl font-bold text-red-800">{realTimeStats.unpaidOrders || 0}</p>
+          <p className="text-xs text-red-600 mt-1">{formatUGX(realTimeStats.totalOutstanding)}</p>
         </div>
       </div>
 
@@ -777,7 +938,12 @@ const SupplierOrderManagement = () => {
                   </div>
 
                   {/* 💰 PAYMENT TRACKER - Interactive Payment Management */}
-                  {(order.status === 'approved' || order.status === 'confirmed' || order.payment_status !== 'unpaid') && (
+                  {/* Show payment tracker for all orders that are approved or beyond, allowing managers to add payments anytime */}
+                  {(order.status === 'approved' || 
+                    order.status === 'sent_to_supplier' || 
+                    order.status === 'confirmed' || 
+                    order.status === 'received' || 
+                    order.status === 'completed') && (
                     <div className="mb-4">
                       <OrderPaymentTracker
                         order={order}
@@ -859,18 +1025,51 @@ const SupplierOrderManagement = () => {
                       </button>
                     )}
 
-                    {/* Payment Button - Show if order is received/completed and not fully paid */}
-                    {(order.status === 'received' || order.status === 'completed') && order.payment_status !== 'paid' && (
+                    {/* Mark as Received Button - Shows for sent_to_supplier or confirmed orders */}
+                    {(order.status === 'sent_to_supplier' || order.status === 'confirmed') && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkAsReceived(order.id);
+                        }}
+                        className="flex-1 min-w-[180px] bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-4 py-3 rounded-lg hover:from-teal-700 hover:to-cyan-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
+                      >
+                        <FiTruck className="h-5 w-5" />
+                        <span>📦 Mark as Received & Update Inventory</span>
+                      </button>
+                    )}
+
+                    {/* Mark as Completed Button - Shows for received orders */}
+                    {order.status === 'received' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkAsCompleted(order.id);
+                        }}
+                        className="flex-1 min-w-[180px] bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
+                      >
+                        <FiCheckCircle className="h-5 w-5" />
+                        <span>✅ Mark as Completed</span>
+                      </button>
+                    )}
+
+                    {/* Add Payment Button - Show for approved orders and beyond (not fully paid) */}
+                    {(order.status === 'approved' || 
+                      order.status === 'sent_to_supplier' || 
+                      order.status === 'confirmed' || 
+                      order.status === 'received' || 
+                      order.status === 'completed') && 
+                      order.payment_status !== 'paid' && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedOrder(order);
                           setShowPaymentModal(true);
                         }}
-                        className="flex-1 min-w-[180px] bg-gradient-to-r from-green-600 to-emerald-600 text-white px-4 py-3 rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
+                        className="flex-1 min-w-[180px] bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-3 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg"
                       >
                         <FiDollarSign className="h-5 w-5" />
-                        <span>Record Payment</span>
+                        <span>💰 Add Payment</span>
                       </button>
                     )}
 
@@ -920,76 +1119,123 @@ const SupplierOrderManagement = () => {
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-bold">Purchase Order Details</h2>
                 <button
-                  onClick={() => setSelectedOrder(null)}
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    setActiveTab('details');
+                  }}
                   className="text-white hover:text-gray-200 text-2xl font-bold"
                 >
                   ×
                 </button>
               </div>
+              
+              {/* Tabs */}
+              <div className="flex gap-4 mt-4 border-b border-white/20">
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`pb-2 px-4 font-semibold transition-all ${
+                    activeTab === 'details'
+                      ? 'border-b-2 border-white text-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  📋 Order Details
+                </button>
+                <button
+                  onClick={() => setActiveTab('payment')}
+                  className={`pb-2 px-4 font-semibold transition-all ${
+                    activeTab === 'payment'
+                      ? 'border-b-2 border-white text-white'
+                      : 'text-white/70 hover:text-white'
+                  }`}
+                >
+                  💰 Payment Progress
+                </button>
+              </div>
             </div>
             
             <div className="p-6 space-y-6">
-              {/* Complete order details would go here */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-500">PO Number</p>
-                  <p className="font-bold text-lg">{selectedOrder.po_number}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Total Amount</p>
-                  <p className="font-bold text-lg text-green-600">{formatUGX(selectedOrder.total_amount_ugx)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Supplier</p>
-                  <p className="font-semibold">{selectedOrder.supplierName}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedOrder.status)}`}>
-                    {selectedOrder.status?.replace(/_/g, ' ').toUpperCase()}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Payment Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold border-2 ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
-                    {getPaymentStatusLabel(selectedOrder.payment_status)}
-                  </span>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500">Balance Due</p>
-                  <p className="font-bold text-lg text-red-600">{formatUGX(selectedOrder.balance_due)}</p>
-                </div>
-              </div>
-
-              {/* Items Table */}
-              {selectedOrder.items && Array.isArray(selectedOrder.items) && (
-                <div>
-                  <h3 className="font-bold text-lg mb-3">Order Items</h3>
-                  <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-sm font-semibold">Product</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold">Quantity</th>
-                          <th className="px-4 py-3 text-right text-sm font-semibold">Unit Price</th>
-                          <th className="px-4 py-3 text-right text-sm font-semibold">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedOrder.items.map((item, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="px-4 py-3">{item.product_name || item.productName}</td>
-                            <td className="px-4 py-3 text-center">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right">{formatUGX(item.unit_price || item.unitPrice)}</td>
-                            <td className="px-4 py-3 text-right font-semibold">
-                              {formatUGX((item.unit_price || item.unitPrice) * item.quantity)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+              {/* Order Details Tab */}
+              {activeTab === 'details' && (
+                <>
+                  {/* Complete order details would go here */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">PO Number</p>
+                      <p className="font-bold text-lg">{selectedOrder.po_number}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Total Amount</p>
+                      <p className="font-bold text-lg text-green-600">{formatUGX(selectedOrder.total_amount_ugx)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Supplier</p>
+                      <p className="font-semibold">{selectedOrder.supplierName}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Status</p>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(selectedOrder.status)}`}>
+                        {selectedOrder.status?.replace(/_/g, ' ').toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Payment Status</p>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold border-2 ${getPaymentStatusColor(selectedOrder.payment_status)}`}>
+                        {getPaymentStatusLabel(selectedOrder.payment_status)}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Balance Due</p>
+                      <p className="font-bold text-lg text-red-600">{formatUGX(selectedOrder.balance_due)}</p>
+                    </div>
                   </div>
-                </div>
+
+                  {/* Items Table */}
+                  {selectedOrder.items && Array.isArray(selectedOrder.items) && (
+                    <div>
+                      <h3 className="font-bold text-lg mb-3">Order Items</h3>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-semibold">Product</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold">Quantity</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold">Unit Price</th>
+                              <th className="px-4 py-3 text-right text-sm font-semibold">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedOrder.items.map((item, idx) => (
+                              <tr key={idx} className="border-t">
+                                <td className="px-4 py-3">{item.product_name || item.productName}</td>
+                                <td className="px-4 py-3 text-center">{item.quantity}</td>
+                                <td className="px-4 py-3 text-right">{formatUGX(item.unit_price || item.unitPrice)}</td>
+                                <td className="px-4 py-3 text-right font-semibold">
+                                  {formatUGX((item.unit_price || item.unitPrice) * item.quantity)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Payment Progress Tab */}
+              {activeTab === 'payment' && (
+                <OrderPaymentTracker 
+                  order={selectedOrder}
+                  onPaymentAdded={() => {
+                    loadAllData();
+                    // Refresh selected order data
+                    const updatedOrder = orders.find(o => o.id === selectedOrder.id);
+                    if (updatedOrder) setSelectedOrder(updatedOrder);
+                  }}
+                  showAddPayment={true}
+                  userRole="manager"
+                />
               )}
             </div>
           </div>
@@ -1091,23 +1337,30 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
     setSubmitting(true);
 
     try {
-      // Get manager ID from localStorage or Supabase auth
-      let managerId = localStorage.getItem('userId');
+      // Get authenticated user
+      const { data: { user } } = await supabase.auth.getUser();
       
-      // If no userId in localStorage, try to get from Supabase auth
-      if (!managerId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          managerId = user.id;
-          localStorage.setItem('userId', user.id);
-        }
-      }
-      
-      // If still no manager ID, show error
-      if (!managerId) {
+      if (!user) {
         alert('❌ Error: User not authenticated. Please log in again.');
         return;
       }
+
+      // Get internal user ID from users table (NOT auth_id)
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'manager')
+        .single();
+
+      if (userError || !userData?.id) {
+        console.error('❌ Error fetching manager user ID:', userError);
+        alert('❌ Error: Manager profile not found. Please contact admin.');
+        return;
+      }
+
+      const managerId = userData.id;
+      console.log('👤 Manager ID for order:', managerId);
       
       const orderData = {
         supplierId: selectedSupplier,
@@ -1117,7 +1370,7 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
         deliveryInstructions,
         priority,
         notes,
-        orderedBy: managerId
+        orderedBy: managerId // Use internal user ID, not auth_id
       };
 
       const response = await supplierOrdersService.createPurchaseOrder(orderData);

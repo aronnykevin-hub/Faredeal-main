@@ -64,15 +64,15 @@ const SupplierAuth = () => {
         // Check if user exists in database
         let { data: userData, error: fetchError } = await supabase
           .from('users')
-          .select('*')
+          .select('auth_id, email, full_name, role, is_active, profile_completed, company_name, phone, address, business_license, category')
           .eq('auth_id', user.id)
           .eq('role', 'supplier')
-          .single();
+          .maybeSingle();
 
         console.log('👤 User data from database:', userData);
 
         // If user doesn't exist (OAuth first-time sign-in), create them
-        if (fetchError || !userData) {
+        if (!userData) {
           console.log('📝 Creating new supplier user in database...');
           const { data: newUser, error: createError } = await supabase
             .from('users')
@@ -85,17 +85,29 @@ const SupplierAuth = () => {
               profile_completed: false,
               created_at: new Date().toISOString()
             }])
-            .select()
+            .select('auth_id, email, full_name, role, is_active, profile_completed, company_name, phone, address, business_license, category')
             .single();
 
           if (createError) {
             console.error('❌ Error creating user:', createError);
-            throw createError;
+            // If user already exists (409 conflict), try fetching again
+            if (createError.code === '23505') {
+              console.log('🔄 User already exists, fetching data...');
+              const { data: existingUser } = await supabase
+                .from('users')
+                .select('auth_id, email, full_name, role, is_active, profile_completed, company_name, phone, address, business_license, category')
+                .eq('auth_id', user.id)
+                .eq('role', 'supplier')
+                .single();
+              userData = existingUser;
+            } else {
+              throw createError;
+            }
+          } else {
+            console.log('✅ User created:', newUser);
+            userData = newUser;
+            notificationService.show('Welcome! Please complete your supplier profile.', 'info');
           }
-
-          console.log('✅ User created:', newUser);
-          userData = newUser;
-          notificationService.show('Welcome! Please complete your supplier profile.', 'info');
         }
 
         // Priority flow: approved → profile incomplete → pending

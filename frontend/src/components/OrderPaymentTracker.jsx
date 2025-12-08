@@ -93,6 +93,18 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get the internal user ID from users table (not auth_id)
+      let internalUserId = null;
+      if (user?.id) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_id', user.id)
+          .single();
+        
+        internalUserId = userData?.id;
+      }
+      
       // Call the record_payment_with_tracking function
       const { data, error } = await supabase.rpc('record_payment_with_tracking', {
         p_order_id: order.id,
@@ -101,16 +113,18 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
         p_payment_reference: paymentData.reference || null,
         p_payment_date: new Date().toISOString(),
         p_notes: paymentData.notes || null,
-        p_paid_by: user?.id
+        p_paid_by: internalUserId
       });
 
       if (error) throw error;
 
       alert(
-        `✅ Payment Recorded Successfully!\n\n` +
+        `✅ Payment Submitted for Supplier Confirmation!\n\n` +
         `Transaction Number: ${data}\n` +
         `Amount: ${formatUGX(amount)}\n` +
-        `Method: ${paymentData.method.toUpperCase()}`
+        `Method: ${paymentData.method.toUpperCase()}\n\n` +
+        `⏳ This payment is PENDING supplier confirmation.\n` +
+        `The order balance will update once the supplier confirms receipt.`
       );
 
       // Reset form

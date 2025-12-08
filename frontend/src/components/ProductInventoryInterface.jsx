@@ -103,7 +103,7 @@ const ProductInventoryInterface = () => {
 
   const handleReorder = (product) => {
     setSelectedProduct(product);
-    const suggestedQuantity = product.maxStock - product.stock;
+    const suggestedQuantity = product.reorderQuantity || (product.maxStock - product.stock);
     setReorderQuantity(suggestedQuantity);
     setShowReorderModal(true);
   };
@@ -115,67 +115,156 @@ const ProductInventoryInterface = () => {
     setShowAdjustModal(true);
   };
 
+  /**
+   * Process reorder - Create a real purchase order through the system
+   */
   const processReorder = async () => {
-    if (selectedProduct && reorderQuantity > 0) {
-      try {
-        toast.info(
-          <div>
-            <div className="font-bold">🔄 Processing Reorder...</div>
-            <div className="text-sm mt-1">
-              <div>{selectedProduct.name}</div>
-              <div>Quantity: {reorderQuantity} units</div>
-              <div>Estimated Cost: {formatCurrency(selectedProduct.price * reorderQuantity)}</div>
-              <div>Supplier: {selectedProduct.supplier}</div>
-            </div>
-          </div>,
-          { autoClose: 2000 }
-        );
+    if (!selectedProduct || reorderQuantity <= 0) {
+      toast.error('Invalid reorder quantity');
+      return;
+    }
 
-        const newStock = selectedProduct.stock + reorderQuantity;
-        
-        // Update inventory in Supabase
-        const { error: updateError } = await supabase
-          .from('inventory')
-          .update({
-            current_stock: newStock,
-            last_restocked_at: new Date().toISOString(),
-            status: calculateStatus(newStock, selectedProduct.minStock).toLowerCase().replace(' ', '_')
-          })
-          .eq('product_id', selectedProduct.productId);
+    try {
+      setLoading(true);
+      
+      toast.info(
+        <div>
+          <div className="font-bold">🔄 Creating Purchase Order...</div>
+          <div className="text-sm mt-1">
+            <div>{selectedProduct.name}</div>
+            <div>Quantity: {reorderQuantity} units</div>
+            <div>Estimated Cost: {formatCurrency(selectedProduct.price * reorderQuantity)}</div>
+            <div>Supplier: {selectedProduct.supplier || 'Default Supplier'}</div>
+          </div>
+        </div>,
+        { autoClose: 2000 }
+      );
 
-        if (updateError) {
-          throw updateError;
-        }
-
-        // Update local state
-        setProducts(prev => prev.map(p => {
-          if (p.id === selectedProduct.id) {
-            return {
-              ...p,
-              stock: newStock,
-              status: calculateStatus(newStock, p.minStock)
-            };
-          }
-          return p;
-        }));
-
-        toast.success(
-          <div>
-            <div className="font-bold">✅ Reorder Completed!</div>
-            <div className="text-sm mt-1">
-              <div>{selectedProduct.name}</div>
-              <div>Added: {reorderQuantity} units</div>
-              <div>New Stock Level: {newStock}</div>
-            </div>
-          </div>,
-          { autoClose: 3000 }
-        );
-
-        setShowReorderModal(false);
-      } catch (error) {
-        console.error('Error processing reorder:', error);
-        toast.error('Failed to update inventory in database');
+      // Get current user (manager)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
       }
+
+      // Get manager's user ID from users table
+      const { data: managerData, error: managerError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .eq('role', 'manager')
+        .single();
+
+      if (managerError || !managerData) {
+        throw new Error('Manager profile not found');
+      }
+
+      // Get supplier ID (use the product's supplier_id or find a default supplier)
+      let supplierId = selectedProduct.supplierId;
+      
+      if (!supplierId) {
+        // Try to find any active supplier
+        const { data: supplierData, error: supplierError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('role', 'supplier')
+          .eq('is_active', true)
+          .limit(1)
+          .single();
+
+        if (supplierData) {
+          supplierId = supplierData.id;
+        } else {
+          toast.warning('No supplier found. Creating order without supplier assignment.');
+        }
+      }
+
+      // Generate PO number
+      const poNumber = `PO-${Date.now()}`;
+
+      // Calculate total amount
+      const unitPrice = selectedProduct.price || 0;
+      const totalAmount = unitPrice * reorderQuantity;
+
+      // Create purchase order
+      const { data: purchaseOrder, error: poError } = await supabase
+        .from('purchase_orders')
+        .insert({
+          po_number: poNumber,
+          supplier_id: supplierId,
+          ordered_by: managerData.id, // Use ordered_by instead of manager_id
+          order_date: new Date().toISOString(),
+          expected_delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+          status: 'pending_approval',
+          priority: selectedProduct.stock === 0 ? 'urgent' : 'normal',
+          total_amount_ugx: totalAmount,
+          amount_paid_ugx: 0,
+          balance_due_ugx: totalAmount,
+          payment_status: 'unpaid',
+          notes: `Auto-generated reorder from inventory management for low stock product: ${selectedProduct.name}`,
+          items: [{
+            product_id: selectedProduct.productId,
+            product_name: selectedProduct.name,
+            quantity: reorderQuantity,
+            unit_price: unitPrice,
+            total_price: totalAmount
+          }]
+        })
+        .select()
+        .single();
+
+      if (poError) {
+        throw poError;
+      }
+
+      // Create purchase order items entry
+      const { error: itemsError } = await supabase
+        .from('purchase_order_items')
+        .insert({
+          purchase_order_id: purchaseOrder.id,
+          product_id: selectedProduct.productId,
+          quantity: reorderQuantity,
+          unit_price: unitPrice,
+          total_price: totalAmount,
+          notes: 'Inventory reorder'
+        });
+
+      if (itemsError) {
+        console.error('Error creating PO items:', itemsError);
+        // Don't throw - PO is already created
+      }
+
+      toast.success(
+        <div>
+          <div className="font-bold">✅ Purchase Order Created!</div>
+          <div className="text-sm mt-1">
+            <div>PO #: {poNumber}</div>
+            <div>{selectedProduct.name}</div>
+            <div>Quantity: {reorderQuantity} units</div>
+            <div>Total: {formatCurrency(totalAmount)}</div>
+            <div className="mt-2 text-yellow-600">📋 Order pending approval in Supplier Order Management</div>
+          </div>
+        </div>,
+        { autoClose: 5000 }
+      );
+
+      setShowReorderModal(false);
+      setSelectedProduct(null);
+      setReorderQuantity(0);
+      
+      // Optionally reload products to update any related data
+      await loadProducts();
+
+    } catch (error) {
+      console.error('Error creating purchase order:', error);
+      toast.error(
+        <div>
+          <div className="font-bold">❌ Failed to Create Purchase Order</div>
+          <div className="text-sm mt-1">{error.message}</div>
+        </div>,
+        { autoClose: 5000 }
+      );
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -8,6 +8,46 @@
 import { supabase } from './supabase';
 
 // =====================================================================
+// HELPER FUNCTIONS
+// =====================================================================
+
+/**
+ * Notify supplier about order events
+ */
+const notifySupplier = async (supplierId, notification) => {
+  try {
+    // Check if notifications table exists
+    const { data: notificationData, error } = await supabase
+      .from('notifications')
+      .insert({
+        user_id: supplierId,
+        type: notification.type || 'order_update',
+        title: notification.title,
+        message: notification.message,
+        data: {
+          order_id: notification.orderId,
+          po_number: notification.poNumber
+        },
+        is_read: false,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.warn('⚠️ Notification table may not exist, skipping:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    console.log('✅ Supplier notified successfully');
+    return { success: true, data: notificationData };
+  } catch (error) {
+    console.warn('⚠️ Failed to notify supplier:', error.message);
+    return { success: false, error: error.message };
+  }
+};
+
+// =====================================================================
 // SUPPLIER MANAGEMENT
 // =====================================================================
 
@@ -151,13 +191,49 @@ export const updateSupplierStatus = async (supplierId, status, notes = '') => {
  */
 export const getAllPurchaseOrders = async (filters = {}) => {
   try {
+    // Get current user to filter by manager
+    const { data: { user } } = await supabase.auth.getUser();
+    let shouldFilterByManager = false;
+    let currentAuthId = null;
+    
+    if (user) {
+      currentAuthId = user.id;
+      // Check user's role
+      const { data: managerData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('auth_id', user.id)
+        .single();
+      
+      // Only filter by created_by if user is a manager (not admin)
+      if (managerData && managerData.role === 'manager') {
+        shouldFilterByManager = true;
+      }
+    }
+    
     let query = supabase
       .from('purchase_orders')
       .select('*')
       .order('order_date', { ascending: false });
 
+    // Filter by current manager's internal user ID if they're a manager (not admin)
+    if (shouldFilterByManager && user) {
+      // Get internal user ID from users table
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single();
+      
+      if (userData?.id) {
+        console.log('🔍 Filtering orders by manager ID:', userData.id);
+        query = query.eq('ordered_by', userData.id);
+      }
+    }
+
     // Apply filters
     if (filters.status) {
+      console.log('🔍 Filtering by status:', filters.status);
       query = query.eq('status', filters.status);
     }
     if (filters.priority) {
@@ -174,8 +250,12 @@ export const getAllPurchaseOrders = async (filters = {}) => {
 
     if (error) throw error;
 
+    console.log(`📦 Fetched ${orders?.length || 0} purchase orders`);
+
     // Fetch supplier details separately from users table
     const supplierIds = [...new Set(orders.map(o => o.supplier_id).filter(Boolean))];
+    
+    console.log(`🔍 Looking up ${supplierIds.length} unique suppliers:`, supplierIds);
     
     let suppliers = [];
     if (supplierIds.length > 0) {
@@ -185,8 +265,19 @@ export const getAllPurchaseOrders = async (filters = {}) => {
         .eq('role', 'supplier')
         .in('id', supplierIds);
       
-      if (!supplierError) {
+      if (supplierError) {
+        console.error('❌ Error fetching suppliers:', supplierError);
+      } else {
         suppliers = suppliersData || [];
+        console.log(`✅ Found ${suppliers.length} suppliers in users table`);
+        
+        // Log any missing suppliers
+        const foundIds = suppliers.map(s => s.id);
+        const missingIds = supplierIds.filter(id => !foundIds.includes(id));
+        if (missingIds.length > 0) {
+          console.warn(`⚠️ Missing supplier data for IDs:`, missingIds);
+          console.warn('These orders will show "Unknown Supplier"');
+        }
       }
     }
 
@@ -217,7 +308,7 @@ export const getAllPurchaseOrders = async (filters = {}) => {
     suppliers.forEach(s => {
       supplierMap[s.id] = {
         id: s.id,
-        name: s.company_name || s.full_name || s.username || 'Unknown Supplier',
+        name: s.company_name || s.full_name || s.username || `Supplier ${s.id.slice(0, 8)}`,
         company_name: s.company_name,
         full_name: s.full_name,
         email: s.email,
@@ -226,6 +317,8 @@ export const getAllPurchaseOrders = async (filters = {}) => {
         category: s.category
       };
     });
+    
+    console.log(`📋 Created supplier map with ${Object.keys(supplierMap).length} entries`);
 
     const metricsMap = {};
     metrics.forEach(m => {
@@ -244,15 +337,20 @@ export const getAllPurchaseOrders = async (filters = {}) => {
     const formattedOrders = orders.map(order => {
       const supplier = supplierMap[order.supplier_id];
       const metric = metricsMap[order.id];
-      const orderInstallments = installmentsMap[order.id] || [];
+      // Log if supplier is missing
+      if (!supplier && order.supplier_id) {
+        console.warn(`⚠️ Order ${order.po_number} references missing supplier:`, order.supplier_id);
+      }
       
       return {
         ...order,
         // Supplier info
-        supplierName: supplier?.name || 'Unknown Supplier',
+        supplierName: supplier?.name || (order.supplier_id ? `Supplier ${order.supplier_id.slice(0, 8)}...` : 'No Supplier'),
         supplierCompany: supplier?.company_name,
         supplierEmail: supplier?.email,
         supplierPhone: supplier?.phone,
+        supplierAvatar: supplier?.avatar_url,
+        supplierCategory: supplier?.category,
         supplierAvatar: supplier?.avatar_url,
         supplierCategory: supplier?.category,
         
@@ -269,8 +367,8 @@ export const getAllPurchaseOrders = async (filters = {}) => {
           estimatedCompletion: metric.estimated_completion_date
         } : null,
         
-        // Installments
-        installments: orderInstallments,
+        // Installments for this specific order
+        installments: installmentsMap[order.id] || [],
         
         // Legacy fields for backward compatibility
         orderedBy: 'Manager',
@@ -397,7 +495,9 @@ export const createPurchaseOrder = async (orderData) => {
     const taxAmount = (subtotal * taxRate) / 100;
     const totalAmount = subtotal + taxAmount;
 
-    console.log('Order Totals:', { subtotal, taxAmount, totalAmount, items });
+    console.log('📦 Creating Order - Totals:', { subtotal, taxAmount, totalAmount, items });
+    console.log('📝 Order Data:', { poNumber, supplierId, orderedBy, priority, status: 'pending_approval' });
+    console.log('🔍 Creating order with supplier_id:', supplierId, 'ordered_by:', orderedBy);
 
     const { data, error } = await supabase
       .from('purchase_orders')
@@ -412,6 +512,10 @@ export const createPurchaseOrder = async (orderData) => {
         tax_ugx: taxAmount,
         tax_rate: taxRate,
         total_amount_ugx: totalAmount,
+        // Initialize payment fields for new order
+        amount_paid_ugx: 0,
+        balance_due_ugx: totalAmount,
+        payment_status: 'unpaid',
         delivery_address: deliveryAddress,
         delivery_instructions: deliveryInstructions,
         priority: priority || 'normal',
@@ -421,7 +525,34 @@ export const createPurchaseOrder = async (orderData) => {
       .select('*')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating purchase order:', error);
+      throw error;
+    }
+
+    console.log('✅ Purchase order created successfully:', data.po_number);
+    console.log('📊 Created order details:', {
+      id: data.id,
+      po_number: data.po_number,
+      supplier_id: data.supplier_id,
+      ordered_by: data.ordered_by,
+      status: data.status,
+      total: data.total_amount_ugx
+    });
+
+    // Notify the supplier about new order (don't block on this)
+    try {
+      await notifySupplier(supplierId, {
+        type: 'new_order',
+        title: '📦 New Purchase Order',
+        message: `You have a new purchase order ${data.po_number} pending approval`,
+        orderId: data.id,
+        poNumber: data.po_number
+      });
+    } catch (notifyError) {
+      console.warn('⚠️ Failed to notify supplier:', notifyError);
+      // Don't fail the order creation if notification fails
+    }
 
     return {
       success: true,
@@ -455,6 +586,21 @@ export const approvePurchaseOrder = async (orderId, approvedBy) => {
       .single();
 
     if (error) throw error;
+
+    console.log('✅ Purchase order approved:', data.po_number);
+
+    // Notify the supplier about approval
+    try {
+      await notifySupplier(data.supplier_id, {
+        type: 'order_approved',
+        title: '✅ Order Approved',
+        message: `Purchase order ${data.po_number} has been approved`,
+        orderId: data.id,
+        poNumber: data.po_number
+      });
+    } catch (notifyError) {
+      console.warn('⚠️ Failed to notify supplier about approval:', notifyError);
+    }
 
     return {
       success: true,
@@ -905,54 +1051,84 @@ export const getOrderHistory = async (filters = {}) => {
  */
 export const getOrdersByPaymentStatus = async (paymentStatus) => {
   try {
-    // First get invoices by payment status
-    const { data: invoices, error: invError } = await supabase
-      .from('supplier_invoices')
-      .select('purchase_order_id, payment_status, balance_due_ugx, amount_paid_ugx')
-      .eq('payment_status', paymentStatus);
-
-    if (invError) throw invError;
-
-    if (!invoices || invoices.length === 0) {
-      return { success: true, orders: [] };
+    // Get current user to filter by manager
+    const { data: { user } } = await supabase.auth.getUser();
+    let shouldFilterByManager = false;
+    let currentAuthId = null;
+    
+    if (user) {
+      currentAuthId = user.id;
+      // Check user's role
+      const { data: managerData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('auth_id', user.id)
+        .single();
+      
+      // Only filter by created_by if user is a manager (not admin)
+      if (managerData && managerData.role === 'manager') {
+        shouldFilterByManager = true;
+      }
     }
-
-    // Get the corresponding purchase orders
-    const orderIds = invoices.map(inv => inv.purchase_order_id);
-    const { data: orders, error: ordersError } = await supabase
+    
+    // Query purchase_orders directly with payment_status
+    let query = supabase
       .from('purchase_orders')
       .select('*')
-      .in('id', orderIds);
+      .eq('payment_status', paymentStatus)
+      .order('order_date', { ascending: false });
+    
+    // Filter by current manager's internal user ID if they're a manager (not admin)
+    if (shouldFilterByManager && user) {
+      // Get internal user ID from users table
+      const { data: userData } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_id', user.id)
+        .single();
+      
+      if (userData?.id) {
+        query = query.eq('ordered_by', userData.id);
+      }
+    }
+
+    const { data: orders, error: ordersError } = await query;
 
     if (ordersError) throw ordersError;
 
+    if (!orders || orders.length === 0) {
+      return { success: true, orders: [] };
+    }
+
     // Get supplier details
-    const supplierIds = [...new Set(orders.map(o => o.supplier_id))];
-    const { data: suppliers } = await supabase
-      .from('supplier_profiles')
-      .select('id, business_name')
-      .in('id', supplierIds);
+    const supplierIds = [...new Set(orders.map(o => o.supplier_id).filter(Boolean))];
+    let suppliers = [];
+    
+    if (supplierIds.length > 0) {
+      const { data: suppliersData } = await supabase
+        .from('users')
+        .select('id, company_name, full_name, username')
+        .eq('role', 'supplier')
+        .in('id', supplierIds);
+      suppliers = suppliersData || [];
+    }
 
     // Create lookups
     const supplierMap = {};
-    suppliers?.forEach(s => {
-      supplierMap[s.id] = s;
-    });
-
-    const invoiceMap = {};
-    invoices?.forEach(inv => {
-      invoiceMap[inv.purchase_order_id] = inv;
+    suppliers.forEach(s => {
+      supplierMap[s.id] = {
+        name: s.company_name || s.full_name || s.username || 'Unknown Supplier'
+      };
     });
 
     // Format the data
     const formattedOrders = orders.map(order => {
-      const invoice = invoiceMap[order.id];
       return {
         ...order,
-        supplierName: supplierMap[order.supplier_id]?.business_name || 'Unknown Supplier',
-        payment_status: invoice?.payment_status || 'unpaid',
-        amount_paid: invoice?.amount_paid_ugx || 0,
-        balance_due: invoice?.balance_due_ugx || order.total_amount_ugx
+        supplierName: supplierMap[order.supplier_id]?.name || 'Unknown Supplier',
+        payment_status: order.payment_status || 'unpaid',
+        amount_paid: order.amount_paid_ugx || 0,
+        balance_due: order.balance_due_ugx || order.total_amount_ugx
       };
     });
 
