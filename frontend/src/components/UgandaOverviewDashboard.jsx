@@ -50,9 +50,9 @@ const UgandaOverviewDashboard = ({
   ];
 
   return (
-    <div className="space-y-8 animate-fadeIn">
+    <div className="space-y-4 sm:space-y-8 animate-fadeIn">
       {/* Enhanced Welcome Section with Uganda Cultural Elements */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-yellow-400 via-green-500 to-red-600 rounded-3xl p-8 text-white shadow-2xl">
+      <div className="relative overflow-hidden bg-gradient-to-br from-yellow-400 via-green-500 to-red-600 rounded-2xl sm:rounded-3xl p-4 sm:p-8 text-white shadow-2xl">
         {/* Uganda Flag Pattern Background */}
         <div className="absolute inset-0 opacity-10">
           <div className="h-1/3 bg-black"></div>
@@ -61,26 +61,26 @@ const UgandaOverviewDashboard = ({
         </div>
         
         {/* Animated Elements */}
-        <div className="absolute top-4 right-8 text-6xl opacity-30 animate-bounce">
+        <div className="absolute top-2 right-4 sm:top-4 sm:right-8 text-4xl sm:text-6xl opacity-30 animate-bounce">
           🦩 {/* Crested Crane - Uganda's national bird */}
         </div>
-        <div className="absolute bottom-4 left-8 text-4xl opacity-20 animate-pulse">
+        <div className="absolute bottom-2 left-4 sm:bottom-4 sm:left-8 text-2xl sm:text-4xl opacity-20 animate-pulse">
           🏔️ {/* Mountains of the Moon */}
         </div>
         
         <div className="relative z-10">
           <div className="flex flex-col lg:flex-row items-start justify-between space-y-6 lg:space-y-0">
-            <div className="flex-1">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="text-6xl animate-wave">{getTimeOfDayEmoji()}</div>
+            <div className="flex-1 w-full">
+              <div className="flex items-center space-x-2 sm:space-x-4 mb-4">
+                <div className="text-4xl sm:text-6xl animate-wave">{getTimeOfDayEmoji()}</div>
                 <div>
-                  <h1 className="text-4xl lg:text-5xl font-bold mb-2">
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold mb-1 sm:mb-2">
                     {getUgandanGreeting()}, {managerProfile.name}!
                   </h1>
-                  <p className="text-yellow-100 text-xl">
+                  <p className="text-yellow-100 text-sm sm:text-xl">
                     Welcome to your FAREDEAL command center 🇺🇬
                   </p>
-                  <p className="text-yellow-200 text-lg mt-1">
+                  <p className="text-yellow-200 text-xs sm:text-lg mt-1">
                     Kampala, Uganda • {currentTime.toLocaleTimeString('en-UG', { 
                       timeZone: 'Africa/Kampala',
                       hour12: true 
@@ -90,36 +90,36 @@ const UgandaOverviewDashboard = ({
               </div>
               
               {/* Today's Performance Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-3xl">💰</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-4 sm:mt-8">
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="text-2xl sm:text-3xl">💰</div>
                     <div>
-                      <p className="text-yellow-100 text-sm font-medium">Today's Revenue</p>
-                      <p className="text-2xl font-bold">{formatCurrency(businessMetrics.todayRevenue)}</p>
-                      <p className="text-yellow-200 text-sm">+{businessMetrics.weeklyGrowth}% from last week</p>
+                      <p className="text-yellow-100 text-xs sm:text-sm font-medium">Today's Revenue</p>
+                      <p className="text-xl sm:text-2xl font-bold">{formatCurrency(businessMetrics.todayRevenue)}</p>
+                      <p className="text-yellow-200 text-xs sm:text-sm">+{businessMetrics.weeklyGrowth}% from last week</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-3xl">📦</div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="text-2xl sm:text-3xl">📦</div>
                     <div>
-                      <p className="text-yellow-100 text-sm font-medium">Orders Processed</p>
-                      <p className="text-2xl font-bold">{businessMetrics.todayOrders}</p>
-                      <p className="text-yellow-200 text-sm">Serving {businessMetrics.todayCustomers} customers</p>
+                      <p className="text-yellow-100 text-xs sm:text-sm font-medium">Orders Processed</p>
+                      <p className="text-xl sm:text-2xl font-bold">{businessMetrics.todayOrders}</p>
+                      <p className="text-yellow-200 text-xs sm:text-sm">Serving {businessMetrics.todayCustomers} customers</p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 border border-white/30">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-3xl">📱</div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30 sm:col-span-2 md:col-span-1">
+                  <div className="flex items-center space-x-2 sm:space-x-3">
+                    <div className="text-2xl sm:text-3xl">📱</div>
                     <div>
-                      <p className="text-yellow-100 text-sm font-medium">Mobile Money</p>
-                      <p className="text-2xl font-bold">{businessMetrics.mobileMoneyRatio}%</p>
-                      <p className="text-yellow-200 text-sm">of today's transactions</p>
+                      <p className="text-yellow-100 text-xs sm:text-sm font-medium">Mobile Money</p>
+                      <p className="text-xl sm:text-2xl font-bold">{businessMetrics.mobileMoneyRatio}%</p>
+                      <p className="text-yellow-200 text-xs sm:text-sm">of today's transactions</p>
                     </div>
                   </div>
                 </div>
@@ -127,37 +127,37 @@ const UgandaOverviewDashboard = ({
             </div>
             
             {/* Quick Actions Panel */}
-            <div className="lg:ml-8">
-              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
-                <h3 className="text-xl font-bold mb-4 text-center">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-3">
+            <div className="lg:ml-8 w-full lg:w-auto">
+              <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/30">
+                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Quick Actions</h3>
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
                   <button
                     onClick={() => setActiveTab('team')}
-                    className="bg-white/30 hover:bg-white/40 p-3 rounded-xl transition-all duration-300 text-center"
+                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
                   >
-                    <div className="text-2xl mb-1">👥</div>
-                    <div className="text-sm font-medium">Team</div>
+                    <div className="text-xl sm:text-2xl mb-1">👥</div>
+                    <div className="text-xs sm:text-sm font-medium">Team</div>
                   </button>
                   <button
                     onClick={() => setActiveTab('orders')}
-                    className="bg-white/30 hover:bg-white/40 p-3 rounded-xl transition-all duration-300 text-center"
+                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
                   >
-                    <div className="text-2xl mb-1">📋</div>
-                    <div className="text-sm font-medium">Orders</div>
+                    <div className="text-xl sm:text-2xl mb-1">📋</div>
+                    <div className="text-xs sm:text-sm font-medium">Orders</div>
                   </button>
                   <button
                     onClick={() => setShowInventoryModal(true)}
-                    className="bg-white/30 hover:bg-white/40 p-3 rounded-xl transition-all duration-300 text-center"
+                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
                   >
-                    <div className="text-2xl mb-1">📦</div>
-                    <div className="text-sm font-medium">Stock</div>
+                    <div className="text-xl sm:text-2xl mb-1">📦</div>
+                    <div className="text-xs sm:text-sm font-medium">Stock</div>
                   </button>
                   <button
                     onClick={() => setActiveTab('analytics')}
-                    className="bg-white/30 hover:bg-white/40 p-3 rounded-xl transition-all duration-300 text-center"
+                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
                   >
-                    <div className="text-2xl mb-1">📊</div>
-                    <div className="text-sm font-medium">Reports</div>
+                    <div className="text-xl sm:text-2xl mb-1">📊</div>
+                    <div className="text-xs sm:text-sm font-medium">Reports</div>
                   </button>
                 </div>
               </div>
@@ -167,7 +167,7 @@ const UgandaOverviewDashboard = ({
       </div>
 
       {/* Enhanced Key Metrics with Uganda Context */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {[
           { 
             title: 'Total Revenue', 
