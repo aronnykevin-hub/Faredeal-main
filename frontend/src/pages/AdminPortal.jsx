@@ -15,7 +15,7 @@ import {
   FiXCircle, FiUserPlus, FiSearch, FiFilter, FiDownload,
   FiUpload, FiTrash2, FiEdit, FiEye, FiRotateCw, FiX,
   FiMoreVertical, FiMail, FiPhone, FiBriefcase, FiFileText,
-  FiChevronDown
+  FiChevronDown, FiMenu, FiChevronUp, FiChevronRight, FiLogOut
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -84,6 +84,10 @@ const AdminPortal = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [allUsersLoading, setAllUsersLoading] = useState(false);
   const [viewMode, setViewMode] = useState('pending'); // 'pending' or 'all'
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // User Management Filters
   const [filterRole, setFilterRole] = useState('all');
@@ -460,6 +464,16 @@ const AdminPortal = () => {
       showNotification('Failed to load portal configuration, using defaults', 'error');
     }
   };
+
+  // Mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Initialize real-time updates
   const initializeRealTimeUpdates = () => {
@@ -5452,20 +5466,52 @@ const AdminPortal = () => {
         `
       }} />
 
-      {/* Admin Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-50 container-glass animate-slideInLeft">
-        <div className="p-6">
-          <div className="flex items-center space-x-3 mb-8">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+      {/* Mobile Header with Hamburger */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg z-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg border-2 border-white/30 transition-all"
+            >
+              <FiMenu className="h-6 w-6 text-white" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
               <FiShield className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">{portalConfig.systemName}</h2>
-              <p className="text-sm text-gray-500">System Admin</p>
+              <h1 className="text-lg font-bold text-white">Admin Portal</h1>
             </div>
           </div>
+        </div>
+      )}
 
-          <nav className="space-y-1">
+      {/* Mobile Sidebar Menu */}
+      {isMobile && showMobileMenu && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
+          <div 
+            className="w-80 max-w-[85vw] bg-white shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
+                  <FiShield className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">{portalConfig.systemName}</h2>
+                  <p className="text-blue-100 text-sm">System Administrator</p>
+                </div>
+              </div>
+            </div>
+
+            <nav className="p-4 space-y-1">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
               // { id: 'approvals', label: 'Pending Approvals', icon: FiUserCheck },
@@ -5483,6 +5529,75 @@ const AdminPortal = () => {
             ].map((item) => (
               <button
                 key={item.id}
+                onClick={() => {
+                  setActiveSection(item.id);
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 relative ${
+                  activeSection === item.id 
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <item.icon className="h-5 w-5" />
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.id === 'users' && pendingUsers.length > 0 && (
+                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    {pendingUsers.length}
+                  </span>
+                )}
+                {activeSection === item.id && (
+                  <FiChevronRight className="h-5 w-5" />
+                )}
+              </button>
+            ))}
+            
+            <div className="p-4 border-t border-gray-200 mt-4">
+              <button
+                onClick={() => {
+                  // Handle logout
+                  window.location.href = '/admin-auth';
+                }}
+                className="w-full p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all flex items-center justify-center gap-2"
+              >
+                <FiLogOut className="h-4 w-4 text-red-600" />
+                <span className="text-red-600 font-medium">Logout</span>
+              </button>
+            </div>
+          </nav>
+          </div>
+          
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
+      {!isMobile && (
+        <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-50 container-glass animate-slideInLeft">
+          <div className="p-6">
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <FiShield className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">{portalConfig.systemName}</h2>
+                <p className="text-sm text-gray-500">System Admin</p>
+              </div>
+            </div>
+
+            <nav className="space-y-1">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
+              { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
+              { id: 'inventory', label: 'Inventory Control', icon: FiShoppingBag },
+              { id: 'orders', label: 'Order Management', icon: FiCalendar },
+              { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
+              { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
+              { id: 'users', label: 'User Management', icon: FiUsers },
+              { id: 'analytics', label: 'Business Analytics', icon: FiPieChart },
+            ].map((item) => (
+              <button
+                key={item.id}
                 onClick={() => setActiveSection(item.id)}
                 className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 relative ${
                   activeSection === item.id 
@@ -5492,25 +5607,20 @@ const AdminPortal = () => {
               >
                 <item.icon className="h-5 w-5" />
                 <span className="flex-1 text-left">{item.label}</span>
-                {/* Show badge for pending users */}
                 {item.id === 'users' && pendingUsers.length > 0 && (
                   <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {pendingUsers.length}
-                  </span>
-                )}
-                {item.id === 'approvals' && pendingUsers.length > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 bg-yellow-500 text-white text-xs font-bold rounded-full animate-pulse">
                     {pendingUsers.length}
                   </span>
                 )}
               </button>
             ))}
           </nav>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content Area */}
-      <div className="ml-64 p-8">
+      <div className={`${isMobile ? 'pt-16' : 'ml-64'} p-4 sm:p-8`}>
         {/* Header */}
         <div className="container-glass rounded-2xl shadow-lg p-6 mb-8 animate-fadeInUp">
           <div className="flex items-center justify-between">
