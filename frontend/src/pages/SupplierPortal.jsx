@@ -131,6 +131,9 @@ const SupplierPortal = () => {
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState(null);
 
+  // Payment Status collapse state
+  const [showPaymentStatus, setShowPaymentStatus] = useState(false);
+
   // Helper function to calculate years from created date
   const calculateYears = (createdAt) => {
     if (!createdAt) return 0;
@@ -1681,44 +1684,76 @@ const SupplierPortal = () => {
         ))}
       </div>
 
-      {/* Payment Statistics */}
+      {/* Payment Statistics - Collapsible */}
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">💰 Payment Status Overview</h3>
-          <FiDollarSign className="h-6 w-6 text-green-500" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="text-center p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-xl border-2 border-green-300">
-            <div className="text-3xl mb-2">✅</div>
-            <p className="text-sm text-green-700 font-semibold mb-1">Paid Orders</p>
-            <p className="text-2xl font-bold text-green-800">{performanceMetrics.paidOrders || 0}</p>
-            <p className="text-xs text-green-600 mt-1">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+        <button
+          onClick={() => setShowPaymentStatus(!showPaymentStatus)}
+          className="w-full flex items-center justify-between mb-4 text-xl font-bold text-gray-900 hover:text-purple-600 transition-colors"
+        >
+          <div className="flex items-center space-x-2">
+            <span>💰 Payment Status Overview</span>
           </div>
-          <div className="text-center p-4 bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl border-2 border-yellow-300">
-            <div className="text-3xl mb-2">⚠️</div>
-            <p className="text-sm text-yellow-700 font-semibold mb-1">Half Paid</p>
-            <p className="text-2xl font-bold text-yellow-800">{performanceMetrics.partiallyPaidOrders || 0}</p>
-            <p className="text-xs text-yellow-600 mt-1">Partial Payments</p>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border-2 border-red-300">
-            <div className="text-3xl mb-2">❌</div>
-            <p className="text-sm text-red-700 font-semibold mb-1">Unpaid Orders</p>
-            <p className="text-2xl font-bold text-red-800">{performanceMetrics.unpaidOrders || 0}</p>
-            <p className="text-xs text-red-600 mt-1">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border-2 border-blue-300">
-            <div className="text-3xl mb-2">💵</div>
-            <p className="text-sm text-blue-700 font-semibold mb-1">Total Received</p>
-            <p className="text-xl font-bold text-blue-800">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
-            <p className="text-xs text-blue-600 mt-1">Payments Received</p>
-          </div>
-          <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl border-2 border-purple-300">
-            <div className="text-3xl mb-2">📊</div>
-            <p className="text-sm text-purple-700 font-semibold mb-1">Outstanding</p>
-            <p className="text-xl font-bold text-purple-800">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
-            <p className="text-xs text-purple-600 mt-1">Balance Due</p>
-          </div>
-        </div>
+          {showPaymentStatus ? <FiChevronUp className="h-6 w-6" /> : <FiChevronDown className="h-6 w-6" />}
+        </button>
+        
+        {showPaymentStatus && (
+          <ul className="space-y-3 animate-fadeIn">
+            <li className="flex items-start space-x-3 p-3 hover:bg-green-50 rounded-lg transition-all">
+              <span className="text-green-500 text-xl mt-1">•</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-green-700 font-semibold">Paid Orders</span>
+                  <span className="text-2xl font-bold text-green-800">{performanceMetrics.paidOrders || 0}</span>
+                </div>
+                <p className="text-xs text-green-600">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+              </div>
+            </li>
+            
+            <li className="flex items-start space-x-3 p-3 hover:bg-yellow-50 rounded-lg transition-all">
+              <span className="text-yellow-500 text-xl mt-1">•</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-yellow-700 font-semibold">Half Paid</span>
+                  <span className="text-2xl font-bold text-yellow-800">{performanceMetrics.partiallyPaidOrders || 0}</span>
+                </div>
+                <p className="text-xs text-yellow-600">Partial Payments</p>
+              </div>
+            </li>
+            
+            <li className="flex items-start space-x-3 p-3 hover:bg-red-50 rounded-lg transition-all">
+              <span className="text-red-500 text-xl mt-1">•</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-red-700 font-semibold">Unpaid Orders</span>
+                  <span className="text-2xl font-bold text-red-800">{performanceMetrics.unpaidOrders || 0}</span>
+                </div>
+                <p className="text-xs text-red-600">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
+              </div>
+            </li>
+            
+            <li className="flex items-start space-x-3 p-3 hover:bg-blue-50 rounded-lg transition-all">
+              <span className="text-blue-500 text-xl mt-1">•</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-blue-700 font-semibold">Total Received</span>
+                  <span className="text-xl font-bold text-blue-800">{formatCurrency(performanceMetrics.totalPaid || 0)}</span>
+                </div>
+                <p className="text-xs text-blue-600">Payments Received</p>
+              </div>
+            </li>
+            
+            <li className="flex items-start space-x-3 p-3 hover:bg-purple-50 rounded-lg transition-all">
+              <span className="text-purple-500 text-xl mt-1">•</span>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-purple-700 font-semibold">Outstanding</span>
+                  <span className="text-xl font-bold text-purple-800">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</span>
+                </div>
+                <p className="text-xs text-purple-600">Balance Due</p>
+              </div>
+            </li>
+          </ul>
+        )}
       </div>
 
       {/* Revenue Chart */}
