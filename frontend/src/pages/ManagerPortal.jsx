@@ -10882,31 +10882,36 @@ FAREDEAL Uganda Management Team
               </div>
             </button>
 
-            {/* Mobile Menu Button - Uganda Style (Mobile Only) */}
+            {/* Mobile Menu Button - Modern Hamburger (Mobile Only) */}
             {isMobile && (
               <button
                 onClick={() => setShowMobileDropdown(!showMobileDropdown)}
                 className="relative group md:hidden"
-                title="Mobile Menu - Uganda"
+                title="Mobile Menu"
               >
-                <div className="relative p-3 bg-gradient-to-br from-yellow-400/20 via-red-500/20 to-black/20 backdrop-blur-sm rounded-2xl border-2 border-yellow-400/30 hover:border-yellow-400/50 transition-all duration-500 transform hover:scale-110 shadow-lg">
-                  {/* Uganda flag gradient background */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-red-500/20 to-black/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
-                  {/* Hamburger Menu with Uganda colors */}
-                  <div className="relative z-10 w-5 h-5 flex flex-col justify-center space-y-1">
-                    <div className="w-full h-0.5 bg-yellow-300 rounded transform group-hover:rotate-45 group-hover:translate-y-1.5 transition-all duration-300"></div>
-                    <div className="w-full h-0.5 bg-red-400 rounded group-hover:opacity-0 transition-all duration-300"></div>
-                    <div className="w-full h-0.5 bg-white rounded transform group-hover:-rotate-45 group-hover:-translate-y-1.5 transition-all duration-300"></div>
+                <div className="relative p-3 bg-white/90 backdrop-blur-sm rounded-xl border-2 border-gray-200 hover:border-purple-400 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-xl">
+                  {/* Modern Hamburger Icon - Three clean horizontal lines */}
+                  <div className="relative z-10 w-6 h-5 flex flex-col justify-between">
+                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                      showMobileDropdown ? 'rotate-45 translate-y-2' : ''
+                    }`}></div>
+                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                      showMobileDropdown ? 'opacity-0' : 'opacity-100'
+                    }`}></div>
+                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                      showMobileDropdown ? '-rotate-45 -translate-y-2' : ''
+                    }`}></div>
                   </div>
                   
-                  {/* Uganda flag indicator */}
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 via-red-500 to-black rounded-full border-2 border-white shadow-sm">
-                    <span className="absolute inset-0 flex items-center justify-center text-xs">🇺🇬</span>
-                  </div>
+                  {/* Notification badge if there are updates */}
+                  {notificationCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">{notificationCount > 9 ? '9+' : notificationCount}</span>
+                    </div>
+                  )}
                   
-                  {/* Glowing ring effect */}
-                  <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/50 opacity-0 group-hover:opacity-100 animate-pulse"></div>
+                  {/* Hover effect ring */}
+                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                 </div>
               </button>
             )}
@@ -11406,195 +11411,179 @@ FAREDEAL Uganda Management Team
       )}
 
       {/* Enhanced Mobile Dropdown for Uganda */}
+      {/* Modern Mobile Sidebar Menu - Slides from left */}
       {isMobile && showMobileDropdown && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowMobileDropdown(false)}>
-          <div className="absolute top-0 left-0 right-0 bg-gradient-to-br from-yellow-400 via-red-500 to-black shadow-2xl border-b-4 border-yellow-400">
-            <div 
-              className="mobile-dropdown-container bg-white/95 backdrop-blur-sm m-4 rounded-3xl shadow-2xl overflow-hidden transform transition-all duration-300 animate-slideDown"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Uganda Header */}
-              <div className="bg-gradient-to-r from-yellow-400 via-red-500 to-black text-white p-6 relative overflow-hidden">
-                {/* Uganda Flag Pattern Background */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-0 left-0 right-0 h-1/3 bg-black"></div>
-                  <div className="absolute top-1/3 left-0 right-0 h-1/3 bg-yellow-400"></div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-red-500"></div>
-                </div>
-                
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
-                      <span className="text-2xl animate-bounce">🇺🇬</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-xl">FAREDEAL</h3>
-                      <p className="text-yellow-200 text-sm font-medium">Pearl of Africa</p>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => setShowMobileDropdown(false)}
-                    className="p-2 hover:bg-white/20 rounded-full transition-colors"
-                  >
-                    <FiX className="h-6 w-6" />
-                  </button>
-                </div>
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileDropdown(false)}>
+          {/* Sidebar - slides from left */}
+          <div 
+            className="mobile-dropdown-container w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out animate-slideInLeft overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header with Profile */}
+            <div className="bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 text-white p-6">
+              {/* Close button */}
+              <button 
+                onClick={() => setShowMobileDropdown(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
 
-                {/* Manager Info */}
-                <div className="mt-4 p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-lg font-bold border-2 border-white">
-                        {managerProfile.avatar}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-lg">{managerProfile.name}</h4>
-                        <div className="flex items-center space-x-2 text-sm">
-                          <div className="flex items-center space-x-1">
-                            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                            <span className="text-green-200">Online</span>
-                          </div>
-                          <span className="text-white/60">•</span>
-                          <div className="flex items-center space-x-1">
-                            <span>📍</span>
-                            <span className="text-yellow-200">{managerProfile.location.split(',')[0]}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowMobileDropdown(false);
-                        startEditingProfile();
-                      }}
-                      className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors shadow-md flex items-center gap-1"
-                    >
-                      <span>✏️</span>
-                      <span>Edit</span>
-                    </button>
-                  </div>
+              {/* Logo/Brand */}
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
+                  <span className="text-2xl">🇺🇬</span>
                 </div>
-
-                {/* Quick Stats */}
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold">⚡</div>
-                      <div className="text-xs text-yellow-200 mt-1">Quick Actions</div>
-                    </div>
-                  </div>
-                  <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-300">{notificationCount}</div>
-                      <div className="text-xs text-yellow-200 mt-1">New Updates</div>
-                    </div>
-                  </div>
+                <div>
+                  <h2 className="text-xl font-bold">FAREDEAL</h2>
+                  <p className="text-blue-100 text-sm">Manager Portal</p>
                 </div>
               </div>
 
-              {/* Navigation Menu */}
-              <div className="p-4 space-y-2">
-                {[
-                  { id: 'overview', icon: '📊', label: 'Dashboard', desc: 'Business overview', color: 'bg-blue-50 border-blue-200 text-blue-800' },
-                  { id: 'portal-control', icon: '🚀', label: 'Portal Control', desc: 'AI portal management', color: 'bg-cyan-50 border-cyan-200 text-cyan-800' },
-                  { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', color: 'bg-green-50 border-green-200 text-green-800' },
-                  { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', color: 'bg-purple-50 border-purple-200 text-purple-800' },
-                  { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Verify partners', color: 'bg-orange-50 border-orange-200 text-orange-800' },
-                  { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', color: 'bg-cyan-50 border-cyan-200 text-cyan-800' },
-                  { id: 'inventory', icon: '📋', label: 'Inventory', desc: 'Stock control', color: 'bg-indigo-50 border-indigo-200 text-indigo-800' },
-                  { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', color: 'bg-pink-50 border-pink-200 text-pink-800' },
-                  { id: 'alerts', icon: '🔔', label: 'Alerts', desc: 'Notifications', color: 'bg-red-50 border-red-200 text-red-800' }
-                ].map((item, index) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setShowMobileDropdown(false);
-                      toast.success(`📱 Switched to ${item.label} - ${item.desc}`);
-                    }}
-                    className={`w-full p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:shadow-lg ${
-                      activeTab === item.id 
-                        ? `${item.color} shadow-lg scale-105` 
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center text-xl ${
-                        activeTab === item.id ? 'bg-white/50' : 'bg-gray-200'
-                      }`}>
-                        {item.icon}
+              {/* User Profile Card */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white shadow-lg">
+                    {managerProfile.avatar}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg">{managerProfile.name}</h3>
+                    <div className="flex items-center space-x-2 text-sm">
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-green-200">Online</span>
                       </div>
-                      <div className="flex-1 text-left">
-                        <h4 className="font-bold text-lg">{item.label}</h4>
-                        <p className="text-sm opacity-75">{item.desc}</p>
-                      </div>
-                      {activeTab === item.id && (
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-current rounded-full animate-pulse"></div>
-                          <FiChevronRight className="h-5 w-5" />
-                        </div>
-                      )}
                     </div>
-                  </button>
-                ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowMobileDropdown(false);
+                    startEditingProfile();
+                  }}
+                  className="w-full bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex items-center justify-center gap-2 border border-white/30"
+                >
+                  <FiSettings className="h-4 w-4" />
+                  <span>Edit Profile</span>
+                </button>
               </div>
+            </div>
 
-              {/* Uganda-themed Footer */}
-              <div className="p-4 bg-gradient-to-r from-yellow-400/10 via-red-500/10 to-black/10 border-t border-gray-200">
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => {
-                      toast.success('🌍 Exploring Uganda business opportunities');
-                      setShowMobileDropdown(false);
-                    }}
-                    className="p-3 bg-yellow-100 rounded-xl text-center border border-yellow-200 hover:bg-yellow-200 transition-colors"
-                  >
-                    <div className="text-lg">🌍</div>
-                    <div className="text-xs font-medium text-yellow-800 mt-1">Explore</div>
-                  </button>
+            {/* Navigation Menu - Clean List Style */}
+            <div className="p-4 space-y-1">
+              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Main Menu
+              </div>
+              {[
+                { id: 'overview', icon: '📊', label: 'Dashboard', desc: 'Business overview', gradient: 'from-blue-500 to-blue-600' },
+                { id: 'portal-control', icon: '🚀', label: 'Portal Control', desc: 'AI management', gradient: 'from-cyan-500 to-cyan-600' },
+                { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', gradient: 'from-green-500 to-green-600' },
+                { id: 'transactions', icon: '🧾', label: 'Transactions', desc: 'Sales & receipts', gradient: 'from-yellow-500 to-yellow-600' },
+                { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', gradient: 'from-purple-500 to-purple-600' },
+                { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Partner verification', gradient: 'from-orange-500 to-orange-600' },
+                { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', gradient: 'from-cyan-500 to-cyan-600' },
+                { id: 'tillsupplies', icon: '🏪', label: 'Till Supplies', desc: 'Cashier requests', gradient: 'from-teal-500 to-teal-600' },
+                { id: 'inventory', icon: '📋', label: 'Inventory', desc: 'Stock control', gradient: 'from-indigo-500 to-indigo-600' },
+                { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', gradient: 'from-pink-500 to-pink-600' },
+                { id: 'alerts', icon: '🔔', label: 'Alerts', desc: 'Notifications', gradient: 'from-red-500 to-red-600' }
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setShowMobileDropdown(false);
+                    toast.success(`Switched to ${item.label}`);
+                  }}
+                  className={`w-full group relative flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+                    activeTab === item.id 
+                      ? 'bg-gradient-to-r ' + item.gradient + ' text-white shadow-lg scale-[1.02]' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {/* Icon */}
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg text-xl transition-all ${
+                    activeTab === item.id ? 'bg-white/20' : 'bg-gray-100 group-hover:scale-110'
+                  }`}>
+                    {item.icon}
+                  </div>
                   
-                  <button
-                    onClick={() => {
-                      setShowNotifications(!showNotifications);
-                      setShowMobileDropdown(false);
-                    }}
-                    className="p-3 bg-red-100 rounded-xl text-center border border-red-200 hover:bg-red-200 transition-colors relative"
-                  >
-                    <div className="text-lg">🔔</div>
-                    <div className="text-xs font-medium text-red-800 mt-1">Alerts</div>
-                    {notificationCount > 0 && (
-                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                        {notificationCount}
-                      </div>
-                    )}
-                  </button>
+                  {/* Text */}
+                  <div className="flex-1 text-left">
+                    <h4 className="font-semibold text-sm">{item.label}</h4>
+                    <p className={`text-xs ${activeTab === item.id ? 'text-white/80' : 'text-gray-500'}`}>
+                      {item.desc}
+                    </p>
+                  </div>
                   
-                  <button
-                    onClick={() => {
-                      toast.info('⚙️ Opening Uganda portal settings');
-                      setShowMobileDropdown(false);
-                    }}
-                    className="p-3 bg-black/10 rounded-xl text-center border border-gray-300 hover:bg-black/20 transition-colors"
-                  >
-                    <div className="text-lg">⚙️</div>
-                    <div className="text-xs font-medium text-gray-800 mt-1">Settings</div>
-                  </button>
-                </div>
+                  {/* Active indicator */}
+                  {activeTab === item.id && (
+                    <div className="absolute right-3">
+                      <FiChevronRight className="h-5 w-5" />
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="p-4 border-t border-gray-200">
+              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                Quick Actions
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => {
+                    setShowNotifications(!showNotifications);
+                    setShowMobileDropdown(false);
+                  }}
+                  className="relative p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all"
+                >
+                  <div className="text-xl mb-1">🔔</div>
+                  <div className="text-xs font-medium text-red-800">Alerts</div>
+                  {notificationCount > 0 && (
+                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                      {notificationCount}
+                    </div>
+                  )}
+                </button>
                 
-                {/* Uganda Pride Message */}
-                <div className="mt-3 text-center">
-                  <p className="text-xs text-gray-600">
-                    🇺🇬 <span className="font-semibold">Proudly serving Uganda</span> 🇺🇬
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    "For God and My Country"
-                  </p>
-                </div>
+                <button
+                  onClick={() => {
+                    startEditingProfile();
+                    setShowMobileDropdown(false);
+                  }}
+                  className="p-3 bg-blue-50 hover:bg-blue-100 rounded-xl text-center border border-blue-200 transition-all"
+                >
+                  <div className="text-xl mb-1">⚙️</div>
+                  <div className="text-xs font-medium text-blue-800">Settings</div>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    handleManagerLogout();
+                    setShowMobileDropdown(false);
+                  }}
+                  className="p-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-center border border-gray-300 transition-all"
+                >
+                  <div className="text-xl mb-1">🚪</div>
+                  <div className="text-xs font-medium text-gray-800">Logout</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <div className="text-center">
+                <p className="text-xs text-gray-600">
+                  🇺🇬 <span className="font-semibold">Proudly serving Uganda</span>
+                </p>
+                <p className="text-xs text-gray-500 mt-1">"For God and My Country"</p>
               </div>
             </div>
           </div>
+
+          {/* Backdrop - dark overlay on the right */}
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileDropdown(false)}></div>
         </div>
       )}
 
@@ -12728,6 +12717,17 @@ FAREDEAL Uganda Management Team
           }
         }
         
+        @keyframes slideInLeft {
+          from {
+            transform: translateX(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
         @keyframes fadeInScale {
           from {
             transform: scale(0.95);
@@ -12745,6 +12745,10 @@ FAREDEAL Uganda Management Team
         
         .animate-slideInFromTop {
           animation: slideInFromTop 0.4s ease-out;
+        }
+        
+        .animate-slideInLeft {
+          animation: slideInLeft 0.3s ease-out;
         }
         
         .animate-fadeInScale {
