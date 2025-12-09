@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   FiTrendingUp, FiUsers, FiDollarSign, FiPackage, FiClock, 
-  FiBell, FiCalendar, FiRefreshCw, FiDownload, FiChevronRight 
+  FiBell, FiCalendar, FiRefreshCw, FiDownload, FiChevronRight, FiChevronDown, FiChevronUp 
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -24,6 +24,8 @@ const UgandaOverviewDashboard = ({
   setShowInventoryModal,
   openEditModal
 }) => {
+
+  const [showStrategicGoals, setShowStrategicGoals] = useState(false);
 
   const getUgandanGreeting = () => {
     const hour = currentTime.getHours();
@@ -122,43 +124,6 @@ const UgandaOverviewDashboard = ({
                       <p className="text-yellow-200 text-xs sm:text-sm">of today's transactions</p>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Quick Actions Panel */}
-            <div className="lg:ml-8 w-full lg:w-auto">
-              <div className="bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-white/30">
-                <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    onClick={() => setActiveTab('team')}
-                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
-                  >
-                    <div className="text-xl sm:text-2xl mb-1">👥</div>
-                    <div className="text-xs sm:text-sm font-medium">Team</div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('orders')}
-                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
-                  >
-                    <div className="text-xl sm:text-2xl mb-1">📋</div>
-                    <div className="text-xs sm:text-sm font-medium">Orders</div>
-                  </button>
-                  <button
-                    onClick={() => setShowInventoryModal(true)}
-                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
-                  >
-                    <div className="text-xl sm:text-2xl mb-1">📦</div>
-                    <div className="text-xs sm:text-sm font-medium">Stock</div>
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('analytics')}
-                    className="bg-white/30 hover:bg-white/40 p-2 sm:p-3 rounded-lg sm:rounded-xl transition-all duration-300 text-center"
-                  >
-                    <div className="text-xl sm:text-2xl mb-1">📊</div>
-                    <div className="text-xs sm:text-sm font-medium">Reports</div>
-                  </button>
                 </div>
               </div>
             </div>
@@ -370,44 +335,58 @@ const UgandaOverviewDashboard = ({
         </div>
       </div>
 
-      {/* Strategic Goals with Uganda Context */}
+      {/* Strategic Goals with Uganda Context - Collapsible */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
-            <span className="text-2xl">🎯</span>
-            <span>Strategic Goals • Ebiruubirirwa</span>
-          </h3>
-          <div className="space-y-4">
-            {strategicGoals && strategicGoals.length > 0 ? (
-              strategicGoals.map((goal) => (
-                <div key={goal.id} className="border rounded-xl p-4 hover:shadow-md transition-all duration-300 bg-gradient-to-r from-gray-50 to-yellow-50">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-bold text-gray-900">{goal.title}</h4>
-                    <span className="text-sm text-gray-500 bg-white px-2 py-1 rounded-full">{goal.progress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-                    <div 
-                      className="bg-gradient-to-r from-yellow-400 to-orange-500 h-3 rounded-full transition-all duration-500"
-                      style={{ width: `${goal.progress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>Target: {typeof goal.target === 'number' && goal.target > 1000 ? formatCurrency(goal.target) : goal.target}</span>
-                    <span>Current: {typeof goal.current === 'number' && goal.current > 1000 ? formatCurrency(goal.current) : goal.current}</span>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Deadline: {goal.deadline}
-                  </div>
+          <button
+            onClick={() => setShowStrategicGoals(!showStrategicGoals)}
+            className="w-full flex items-center justify-between text-xl font-bold text-gray-900 mb-4 hover:text-yellow-600 transition-colors"
+          >
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">🎯</span>
+              <span>Strategic Goals • Ebiruubirirwa</span>
+            </div>
+            {showStrategicGoals ? <FiChevronUp className="h-6 w-6" /> : <FiChevronDown className="h-6 w-6" />}
+          </button>
+          
+          {showStrategicGoals && (
+            <div className="space-y-3 animate-fadeIn">
+              {strategicGoals && strategicGoals.length > 0 ? (
+                <ul className="space-y-3">
+                  {strategicGoals.map((goal) => (
+                    <li key={goal.id} className="flex items-start space-x-3 p-3 hover:bg-yellow-50 rounded-lg transition-all">
+                      <span className="text-yellow-500 text-xl mt-1">•</span>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-bold text-gray-900">{goal.title}</h4>
+                          <span className="text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded-full">{goal.progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                          <div 
+                            className="bg-gradient-to-r from-yellow-400 to-orange-500 h-2 rounded-full transition-all duration-500"
+                            style={{ width: `${goal.progress}%` }}
+                          ></div>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-600">
+                          <span>Target: {typeof goal.target === 'number' && goal.target > 1000 ? formatCurrency(goal.target) : goal.target}</span>
+                          <span>Current: {typeof goal.current === 'number' && goal.current > 1000 ? formatCurrency(goal.current) : goal.current}</span>
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          Deadline: {goal.deadline}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-8">
+                  <span className="text-4xl mb-2 block">🎯</span>
+                  <p className="text-gray-500 font-medium">Loading strategic goals...</p>
+                  <p className="text-sm text-gray-400">Data will appear shortly</p>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <span className="text-4xl mb-2 block">🎯</span>
-                <p className="text-gray-500 font-medium">Loading strategic goals...</p>
-                <p className="text-sm text-gray-400">Data will appear shortly</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Performance Indicators */}

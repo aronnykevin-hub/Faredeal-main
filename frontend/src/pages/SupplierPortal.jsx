@@ -12,7 +12,8 @@ import {
   FiBookmark, FiGrid, FiList, FiInfo, FiHelpCircle,
   FiMaximize, FiMinimize, FiRotateCw, FiUpload, FiPrinter,
   FiTag, FiHash, FiImage, FiCheckCircle, FiXCircle, FiUsers,
-  FiShoppingCart, FiPercent, FiFlag, FiWifi, FiSend, FiFileText
+  FiShoppingCart, FiPercent, FiFlag, FiWifi, FiSend, FiFileText,
+  FiMenu, FiX, FiChevronUp
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -111,6 +112,10 @@ const SupplierPortal = () => {
     totalEarnings: 0,
     processingFees: 0
   });
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   // Edit Profile States
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -1086,6 +1091,16 @@ const SupplierPortal = () => {
     checkAuthAndLoad();
 
     return () => clearInterval(timer);
+  }, []);
+
+  // Mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   // Function to load payment data from database
@@ -2396,29 +2411,53 @@ const SupplierPortal = () => {
       <div className="bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-700 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Main Header Content */}
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-6">
-              {/* Animated Logo */}
-              <div className="relative">
-                <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-110 transition-all duration-300">
-                  <span className="text-4xl animate-bounce">🏢</span>
+          <div className="flex justify-between items-center py-4 sm:py-6">
+            {/* Mobile: Show only hamburger button */}
+            {isMobile ? (
+              <div className="flex items-center justify-between w-full">
+                <button
+                  onClick={() => setShowMobileMenu(!showMobileMenu)}
+                  className="p-3 bg-white/20 hover:bg-white/30 rounded-xl border-2 border-white/30 transition-all"
+                >
+                  <div className="space-y-1.5">
+                    <div className="w-6 h-0.5 bg-white"></div>
+                    <div className="w-6 h-0.5 bg-white"></div>
+                    <div className="w-6 h-0.5 bg-white"></div>
+                  </div>
+                </button>
+                
+                <div className="flex items-center space-x-2">
+                  <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                    <span className="text-2xl">🏢</span>
+                  </div>
+                  <h1 className="text-xl font-bold text-white">Supplier Portal</h1>
                 </div>
-                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
               </div>
-              
-              <div>
-                <h1 className="text-3xl font-bold text-white mb-1 flex items-center space-x-3">
-                  Supplier Portal
-                  <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
-                    PREMIUM
-                  </span>
-                </h1>
-                <p className="text-purple-100 text-lg">Partnership Management Hub</p>
-              </div>
-            </div>
-            
-            {/* Right Side - Profile & Actions */}
-            <div className="flex items-center space-x-4">
+            ) : (
+              <>
+                {/* Desktop: Full Header */}
+                <div className="flex items-center space-x-6">
+                  {/* Animated Logo */}
+                  <div className="relative">
+                    <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center shadow-xl transform hover:scale-110 transition-all duration-300">
+                      <span className="text-4xl animate-bounce">🏢</span>
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                  </div>
+                  
+                  <div>
+                    <h1 className="text-3xl font-bold text-white mb-1 flex items-center space-x-3">
+                      Supplier Portal
+                      <span className="px-3 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full">
+                        PREMIUM
+                      </span>
+                    </h1>
+                    <p className="text-purple-100 text-lg">Partnership Management Hub</p>
+                  </div>
+                </div>
+                
+                {/* Right Side - Profile & Actions */}
+                <div className="flex items-center space-x-4">
               {/* Quick Stats Container */}
               <div className="hidden lg:flex items-center space-x-4 mr-4">
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/20">
@@ -2480,9 +2519,12 @@ const SupplierPortal = () => {
                 </button>
               </div>
             </div>
+            </>
+            )}
           </div>
 
-          {/* Status Bar with Live Stats */}
+          {/* Status Bar with Live Stats - Hidden on mobile */}
+          {!isMobile && (
           <div className="pb-4">
             <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
@@ -2559,30 +2601,132 @@ const SupplierPortal = () => {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'border-purple-500 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+      {/* Mobile Sidebar Menu */}
+      {isMobile && showMobileMenu && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
+          <div 
+            className="w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 text-white p-6">
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
               >
-                <tab.icon className="h-5 w-5" />
-                <span>{tab.label}</span>
+                <FiX className="h-5 w-5" />
               </button>
-            ))}
-          </nav>
+
+              <div className="flex items-center space-x-3 mb-6">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
+                  <span className="text-2xl">🏢</span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">FAREDEAL</h2>
+                  <p className="text-blue-100 text-sm">Supplier Portal</p>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-2xl font-bold border-2 border-white shadow-lg">
+                    {supplierProfile.avatar}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg">{supplierProfile.name}</h3>
+                    <div className="flex items-center space-x-2 text-sm">
+                      <div className="flex items-center space-x-1">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <span className="text-green-200">Active</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Menu */}
+            <div className="p-4 space-y-1">
+              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Main Menu
+              </div>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setShowMobileMenu(false);
+                  }}
+                  className={`w-full group relative flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
+                    activeTab === tab.id 
+                      ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg scale-[1.02]' 
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${
+                    activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 group-hover:scale-110'
+                  }`}>
+                    <tab.icon className="h-5 w-5" />
+                  </div>
+                  
+                  <div className="flex-1 text-left">
+                    <h4 className="font-semibold text-sm">{tab.label}</h4>
+                  </div>
+                  
+                  {activeTab === tab.id && (
+                    <FiChevronRight className="h-5 w-5" />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => {
+                  // Handle logout
+                  navigate('/supplier-auth');
+                }}
+                className="w-full p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all flex items-center justify-center gap-2"
+              >
+                <FiLogOut className="h-4 w-4 text-red-600" />
+                <span className="text-red-600 font-medium">Logout</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
         </div>
-      </div>
+      )}
+
+      {/* Navigation Tabs - Desktop Only */}
+      {!isMobile && (
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav className="flex space-x-8">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
+                    activeTab === tab.id
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <tab.icon className="h-5 w-5" />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
+      )
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

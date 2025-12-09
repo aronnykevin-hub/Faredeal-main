@@ -367,6 +367,8 @@ const ManagerPortal = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState('all');
   const [showMobileDropdown, setShowMobileDropdown] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showMainQuickActions, setShowMainQuickActions] = useState(false);
   
   // Reports system state
   const [selectedReportCategory, setSelectedReportCategory] = useState('general');
@@ -8559,29 +8561,42 @@ _Automated Business Report System_`)}`;
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="bg-white rounded-xl p-6 shadow-lg">
-        <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[
-            { title: 'Add Team Member', icon: FiUsers, color: 'bg-blue-600 hover:bg-blue-700', action: () => openEditModal('team', null, 'add') },
-            { title: 'Approve Supplier', icon: FiCheckCircle, color: 'bg-green-600 hover:bg-green-700', action: () => setActiveTab('suppliers') },
-            { title: 'Verify Orders', icon: FiTruck, color: 'bg-orange-600 hover:bg-orange-700', action: () => setActiveTab('orders') },
-            { title: 'Inventory Access', icon: FiPackage, color: 'bg-purple-600 hover:bg-purple-700', action: () => setShowInventoryModal(true) },
-            { title: 'View Reports', icon: FiBarChart, color: 'bg-indigo-600 hover:bg-indigo-700', action: () => setActiveTab('analytics') },
-            { title: 'Manage Schedule', icon: FiCalendar, color: 'bg-pink-600 hover:bg-pink-700', action: () => setActiveTab('team') },
-            { title: 'Settings', icon: FiSettings, color: 'bg-gray-600 hover:bg-gray-700', action: handleSettingsClick }
-          ].map((action, index) => (
-            <button
-              key={index}
-              onClick={action.action}
-              className={`${action.color} text-white p-4 rounded-lg transition-all duration-300 transform hover:scale-105 flex flex-col items-center space-y-2`}
-            >
-              <action.icon className="h-6 w-6" />
-              <span className="text-sm font-medium">{action.title}</span>
-            </button>
-          ))}
-        </div>
+      {/* Quick Actions - Collapsible */}
+      <div className="bg-gradient-to-r from-orange-500 to-red-500 rounded-xl shadow-lg overflow-hidden">
+        <button
+          onClick={() => setShowMainQuickActions(!showMainQuickActions)}
+          className="w-full flex items-center justify-between p-6 text-white hover:bg-black/10 transition-all"
+        >
+          <h3 className="text-xl font-bold flex items-center space-x-2">
+            <span>⚡</span>
+            <span>Quick Actions • Ebiragiro byamangu</span>
+          </h3>
+          {showMainQuickActions ? <FiChevronUp className="h-6 w-6" /> : <FiChevronDown className="h-6 w-6" />}
+        </button>
+        
+        {showMainQuickActions && (
+          <div className="p-6 bg-white animate-fadeIn">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {[
+                { title: 'Add Team', icon: FiUsers, color: 'bg-blue-500 hover:bg-blue-600', action: () => openEditModal('team', null, 'add') },
+                { title: 'New Supplier', icon: FiCheckCircle, color: 'bg-green-500 hover:bg-green-600', action: () => setActiveTab('suppliers') },
+                { title: 'Check Orders', icon: FiTruck, color: 'bg-orange-500 hover:bg-orange-600', action: () => setActiveTab('orders') },
+                { title: 'View Stock', icon: FiPackage, color: 'bg-purple-500 hover:bg-purple-600', action: () => setShowInventoryModal(true) },
+                { title: 'Analytics', icon: FiBarChart, color: 'bg-cyan-500 hover:bg-cyan-600', action: () => setActiveTab('analytics') },
+                { title: 'Team Schedule', icon: FiCalendar, color: 'bg-pink-500 hover:bg-pink-600', action: () => setActiveTab('team') }
+              ].map((action, index) => (
+                <button
+                  key={index}
+                  onClick={action.action}
+                  className={`${action.color} text-white p-6 rounded-xl transition-all duration-300 transform hover:scale-105 flex flex-col items-center space-y-3 shadow-md border-2 border-white/20`}
+                >
+                  <action.icon className="h-8 w-8" />
+                  <span className="text-sm font-bold">{action.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -11329,50 +11344,57 @@ FAREDEAL Uganda Management Team
               ))}
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - Collapsible */}
             <div className="p-4 border-t border-gray-200">
-              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-                Quick Actions
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => {
-                    setShowNotifications(!showNotifications);
-                    setShowMobileDropdown(false);
-                  }}
-                  className="relative p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all"
-                >
-                  <div className="text-xl mb-1">🔔</div>
-                  <div className="text-xs font-medium text-red-800">Alerts</div>
-                  {notificationCount > 0 && (
-                    <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                      {notificationCount}
-                    </div>
-                  )}
-                </button>
-                
-                <button
-                  onClick={() => {
-                    startEditingProfile();
-                    setShowMobileDropdown(false);
-                  }}
-                  className="p-3 bg-blue-50 hover:bg-blue-100 rounded-xl text-center border border-blue-200 transition-all"
-                >
-                  <div className="text-xl mb-1">⚙️</div>
-                  <div className="text-xs font-medium text-blue-800">Settings</div>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    handleManagerLogout();
-                    setShowMobileDropdown(false);
-                  }}
-                  className="p-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-center border border-gray-300 transition-all"
-                >
-                  <div className="text-xl mb-1">🚪</div>
-                  <div className="text-xs font-medium text-gray-800">Logout</div>
-                </button>
-              </div>
+              <button
+                onClick={() => setShowQuickActions(!showQuickActions)}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-gray-700 uppercase tracking-wider mb-2 hover:text-purple-600 transition-colors"
+              >
+                <span>⚡ Quick Actions • Ebiragiro byamangu</span>
+                {showQuickActions ? <FiChevronUp className="h-4 w-4" /> : <FiChevronDown className="h-4 w-4" />}
+              </button>
+              
+              {showQuickActions && (
+                <div className="grid grid-cols-3 gap-2 animate-fadeIn">
+                  <button
+                    onClick={() => {
+                      setShowNotifications(!showNotifications);
+                      setShowMobileDropdown(false);
+                    }}
+                    className="relative p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all"
+                  >
+                    <div className="text-xl mb-1">🔔</div>
+                    <div className="text-xs font-medium text-red-800">Alerts</div>
+                    {notificationCount > 0 && (
+                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
+                        {notificationCount}
+                      </div>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      startEditingProfile();
+                      setShowMobileDropdown(false);
+                    }}
+                    className="p-3 bg-blue-50 hover:bg-blue-100 rounded-xl text-center border border-blue-200 transition-all"
+                  >
+                    <div className="text-xl mb-1">⚙️</div>
+                    <div className="text-xs font-medium text-blue-800">Settings</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      handleManagerLogout();
+                      setShowMobileDropdown(false);
+                    }}
+                    className="p-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-center border border-gray-300 transition-all"
+                  >
+                    <div className="text-xl mb-1">🚪</div>
+                    <div className="text-xs font-medium text-gray-800">Logout</div>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
