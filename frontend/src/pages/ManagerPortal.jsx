@@ -367,7 +367,6 @@ const ManagerPortal = () => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState('all');
   const [showMobileDropdown, setShowMobileDropdown] = useState(false);
-  const [showMainDropdown, setShowMainDropdown] = useState(false);
   
   // Reports system state
   const [selectedReportCategory, setSelectedReportCategory] = useState('general');
@@ -5542,21 +5541,17 @@ _Automated Business Report System_`)}`;
       if (showMobileDropdown && !event.target.closest('.mobile-dropdown-container')) {
         setShowMobileDropdown(false);
       }
-      if (showMainDropdown && !event.target.closest('.main-dropdown-container')) {
-        setShowMainDropdown(false);
-      }
     };
 
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [showMobileDropdown, showMainDropdown]);
+  }, [showMobileDropdown]);
 
   // Handle ESC key to close dropdowns
   useEffect(() => {
     const handleEscapeKey = (event) => {
       if (event.key === 'Escape') {
         setShowMobileDropdown(false);
-        setShowMainDropdown(false);
         setShowNotifications(false);
       }
     };
@@ -10854,217 +10849,170 @@ FAREDEAL Uganda Management Team
 
           {/* Right side - Creative Icon Containers */}
           <div className="flex items-center space-x-4">
-            {/* Main Navigation Dropdown Button - Uganda Style (Always Visible) */}
-            <button
-              onClick={() => setShowMainDropdown(!showMainDropdown)}
-              className="relative group"
-              title="Main Navigation - Uganda Portal"
-            >
-              <div className="relative p-3 bg-gradient-to-br from-yellow-400/20 via-red-500/20 to-black/20 backdrop-blur-sm rounded-2xl border-2 border-yellow-400/30 hover:border-yellow-400/50 transition-all duration-500 transform hover:scale-110 shadow-lg">
-                {/* Uganda flag gradient background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-red-500/20 to-black/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                
-                {/* Navigation Grid Icon with Uganda colors */}
-                <div className="relative z-10 w-5 h-5 grid grid-cols-2 gap-1">
-                  <div className="w-2 h-2 bg-yellow-300 rounded-sm transform group-hover:rotate-45 transition-all duration-300"></div>
-                  <div className="w-2 h-2 bg-red-400 rounded-sm transform group-hover:-rotate-45 transition-all duration-300"></div>
-                  <div className="w-2 h-2 bg-white rounded-sm transform group-hover:rotate-45 transition-all duration-300"></div>
-                  <div className="w-2 h-2 bg-yellow-300 rounded-sm transform group-hover:-rotate-45 transition-all duration-300"></div>
-                </div>
-                
-                {/* Uganda flag indicator */}
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-gradient-to-r from-yellow-400 via-red-500 to-black rounded-full border-2 border-white shadow-sm">
-                  <span className="absolute inset-0 flex items-center justify-center text-xs">🇺🇬</span>
-                </div>
-                
-                {/* Glowing ring effect */}
-                <div className="absolute inset-0 rounded-2xl border-2 border-yellow-400/50 opacity-0 group-hover:opacity-100 animate-pulse"></div>
-              </div>
-            </button>
-
-            {/* Mobile Menu Button - Modern Hamburger (Mobile Only) */}
-            {isMobile && (
+            {/* Mobile Menu Button - Always visible on mobile, replaces all other buttons */}
+            {isMobile ? (
               <button
                 onClick={() => setShowMobileDropdown(!showMobileDropdown)}
-                className="relative group md:hidden"
+                className="relative group"
                 title="Mobile Menu"
               >
-                <div className="relative p-3 bg-white/90 backdrop-blur-sm rounded-xl border-2 border-gray-200 hover:border-purple-400 transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-xl">
-                  {/* Modern Hamburger Icon - Three clean horizontal lines */}
+                <div className="relative p-3 bg-purple-600 rounded-xl shadow-lg hover:bg-purple-700 transition-all duration-300">
+                  {/* Modern Hamburger Icon - Three horizontal lines */}
                   <div className="relative z-10 w-6 h-5 flex flex-col justify-between">
-                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                    <div className={`w-full h-0.5 bg-white rounded-full transition-all duration-300 ${
                       showMobileDropdown ? 'rotate-45 translate-y-2' : ''
                     }`}></div>
-                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                    <div className={`w-full h-0.5 bg-white rounded-full transition-all duration-300 ${
                       showMobileDropdown ? 'opacity-0' : 'opacity-100'
                     }`}></div>
-                    <div className={`w-full h-0.5 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full transition-all duration-300 ${
+                    <div className={`w-full h-0.5 bg-white rounded-full transition-all duration-300 ${
                       showMobileDropdown ? '-rotate-45 -translate-y-2' : ''
                     }`}></div>
                   </div>
                   
                   {/* Notification badge if there are updates */}
                   {notificationCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-red-500 to-pink-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
                       <span className="text-white text-xs font-bold">{notificationCount > 9 ? '9+' : notificationCount}</span>
                     </div>
                   )}
-                  
-                  {/* Hover effect ring */}
-                  <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-purple-400 to-blue-400 opacity-0 group-hover:opacity-20 transition-opacity duration-300"></div>
                 </div>
               </button>
-            )}
-
-            {/* Hexagonal Notification Bell Container */}
-            <button
-              onClick={handleNotificationClick}
-              className="relative group"
-              title="Notifications"
-            >
-              <div className="relative p-3 bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-white/20 hover:bg-white/25 transition-all duration-500 transform hover:scale-110 hover:rotate-3 shadow-lg">
-                {/* Hexagonal background effect */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 to-purple-600/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                
-                <FiBell className="h-5 w-5 text-white relative z-10 group-hover:animate-bounce" />
-                
-                {/* Enhanced notification badge */}
-                {notificationCount > 0 && (
-                  <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold border-2 border-white shadow-lg">
-                    <span className="animate-pulse">{notificationCount}</span>
+            ) : (
+              <>
+                {/* Notification Bell */}
+                <button
+                  onClick={handleNotificationClick}
+                  className="relative group"
+                  title="Notifications"
+                >
+                  <div className="relative p-3 bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-white/20 hover:bg-white/25 transition-all duration-500 transform hover:scale-110 hover:rotate-3 shadow-lg">
+                    <div className="absolute inset-0 bg-gradient-to-br from-blue-400/30 to-purple-600/30 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    <FiBell className="h-5 w-5 text-white relative z-10 group-hover:animate-bounce" />
+                    
+                    {notificationCount > 0 && (
+                      <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold border-2 border-white shadow-lg">
+                        <span className="animate-pulse">{notificationCount}</span>
+                      </div>
+                    )}
+                    
+                    <div className="absolute inset-0 rounded-2xl border-2 border-blue-400/50 opacity-0 group-hover:opacity-100 animate-ping"></div>
                   </div>
-                )}
-                
-                {/* Glowing ring effect */}
-                <div className="absolute inset-0 rounded-2xl border-2 border-blue-400/50 opacity-0 group-hover:opacity-100 animate-ping"></div>
-              </div>
-            </button>
+                </button>
 
-            {/* Diamond-shaped Settings Container */}
-            <button
-              onClick={() => {
-                startEditingProfile();
-                toast.info('💼 Edit your profile details');
-              }}
-              className="relative group"
-              title="Edit Profile"
-            >
-              <div className="relative p-3 bg-white/15 backdrop-blur-sm transform rotate-45 rounded-lg border-2 border-white/20 hover:bg-white/25 transition-all duration-500 group-hover:scale-110 shadow-lg">
-                {/* Inner diamond content */}
-                <div className="transform -rotate-45">
-                  <FiSettings className="h-5 w-5 text-white group-hover:rotate-180 transition-transform duration-700" />
-                </div>
-                
-                {/* Rotating border effect */}
-                <div className="absolute inset-0 border-2 border-gradient-to-r from-purple-400 to-pink-400 rounded-lg opacity-0 group-hover:opacity-100 animate-spin-slow"></div>
-              </div>
-              
-              {/* Floating sparkles */}
-              <div className="absolute -top-1 -left-1 w-2 h-2 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping"></div>
-              <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping" style={{ animationDelay: '0.5s' }}></div>
-            </button>
+                {/* Settings */}
+                <button
+                  onClick={() => {
+                    startEditingProfile();
+                    toast.info('💼 Edit your profile details');
+                  }}
+                  className="relative group"
+                  title="Edit Profile"
+                >
+                  <div className="relative p-3 bg-white/15 backdrop-blur-sm transform rotate-45 rounded-lg border-2 border-white/20 hover:bg-white/25 transition-all duration-500 group-hover:scale-110 shadow-lg">
+                    <div className="transform -rotate-45">
+                      <FiSettings className="h-5 w-5 text-white group-hover:rotate-180 transition-transform duration-700" />
+                    </div>
+                    
+                    <div className="absolute inset-0 border-2 border-gradient-to-r from-purple-400 to-pink-400 rounded-lg opacity-0 group-hover:opacity-100 animate-spin-slow"></div>
+                  </div>
+                  
+                  <div className="absolute -top-1 -left-1 w-2 h-2 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping"></div>
+                  <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping" style={{ animationDelay: '0.5s' }}></div>
+                </button>
 
-            {/* Morphing Profile Container */}
-            <button
-              onClick={handleProfileClick}
-              className="relative group"
-            >
-              <div className="flex items-center space-x-3 bg-white/15 backdrop-blur-sm hover:bg-white/25 rounded-full pr-4 pl-2 py-2 transition-all duration-500 transform hover:scale-105 border-2 border-white/20 shadow-lg group-hover:shadow-2xl">
-                {/* Animated avatar container with upload functionality */}
-                <div className="relative">
-                  <label htmlFor="manager-profile-pic-upload" className="cursor-pointer">
-                    <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm group-hover:scale-110 transition-all duration-300 shadow-lg border-2 border-white/30 overflow-hidden">
-                      {profilePicUrl || managerProfile.avatar_url ? (
-                        <img 
-                          src={profilePicUrl || managerProfile.avatar_url} 
-                          alt="Profile" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg group-hover:animate-bounce">{managerProfile.avatar}</span>
+                {/* Profile */}
+                <button
+                  onClick={handleProfileClick}
+                  className="relative group"
+                >
+                  <div className="flex items-center space-x-3 bg-white/15 backdrop-blur-sm hover:bg-white/25 rounded-full pr-4 pl-2 py-2 transition-all duration-500 transform hover:scale-105 border-2 border-white/20 shadow-lg group-hover:shadow-2xl">
+                    {/* Animated avatar container with upload functionality */}
+                    <div className="relative">
+                      <label htmlFor="manager-profile-pic-upload" className="cursor-pointer">
+                        <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-red-500 rounded-full flex items-center justify-center text-white font-bold text-sm group-hover:scale-110 transition-all duration-300 shadow-lg border-2 border-white/30 overflow-hidden">
+                          {profilePicUrl || managerProfile.avatar_url ? (
+                            <img 
+                              src={profilePicUrl || managerProfile.avatar_url} 
+                              alt="Profile" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-lg group-hover:animate-bounce">{managerProfile.avatar}</span>
+                          )}
+                        </div>
+                        
+                        {/* Camera icon overlay on hover */}
+                        <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
+                          <FiCamera className="h-4 w-4 text-white" />
+                        </div>
+                      </label>
+                      
+                      {/* Hidden file input */}
+                      <input
+                        id="manager-profile-pic-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfilePictureUpload}
+                        className="hidden"
+                      />
+                      
+                      {/* Upload progress indicator */}
+                      {uploadingProfilePic && (
+                        <div className="absolute inset-0 bg-black/80 rounded-full flex items-center justify-center">
+                          <div className="animate-spin text-white">
+                            <FiRefreshCw className="h-4 w-4" />
+                          </div>
+                        </div>
                       )}
                     </div>
                     
-                    {/* Camera icon overlay on hover */}
-                    <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-300">
-                      <FiCamera className="h-4 w-4 text-white" />
-                    </div>
-                  </label>
-                  
-                  {/* Hidden file input */}
-                  <input
-                    id="manager-profile-pic-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleProfilePictureUpload}
-                    className="hidden"
-                    disabled={uploadingProfilePic}
-                  />
-                  
-                  {/* Orbiting status indicator */}
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse shadow-md">
-                    <div className="w-full h-full bg-green-500 rounded-full animate-ping"></div>
-                  </div>
-                  
-                  {/* Rotating halo effect */}
-                  <div className="absolute inset-0 rounded-full border-2 border-yellow-400/50 opacity-0 group-hover:opacity-100 animate-spin pointer-events-none"></div>
-                  
-                  {/* Upload indicator */}
-                  {uploadingProfilePic && (
-                    <div className="absolute inset-0 bg-black/80 rounded-full flex items-center justify-center">
-                      <div className="animate-spin text-white">
-                        <FiRefreshCw className="h-4 w-4" />
+                    {/* Profile info with enhanced styling */}
+                    <div className="text-left text-white">
+                      <div className="text-sm font-bold group-hover:text-yellow-200 transition-colors">
+                        {managerProfile.name}
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-sm"></div>
+                          <span className="text-green-200 font-medium">
+                            {managerProfile.status}
+                          </span>
+                        </div>
+                        <span className="text-white/70">•</span>
+                        <span className="text-orange-200 flex items-center space-x-1">
+                          <span>📍</span>
+                          <span>{managerProfile.location.split(',')[0]}</span>
+                        </span>
                       </div>
                     </div>
-                  )}
-                </div>
-                
-                {/* Profile info with enhanced styling */}
-                <div className="text-left text-white">
-                  <div className="text-sm font-bold group-hover:text-yellow-200 transition-colors">
-                    {managerProfile.name}
-                  </div>
-                  <div className="flex items-center space-x-2 text-xs">
-                    <div className="flex items-center space-x-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse shadow-sm"></div>
-                      <span className="text-green-200 font-medium">
-                        {managerProfile.status}
-                      </span>
+                    
+                    {/* Chevron indicator */}
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-2">
+                      <FiChevronDown className="h-4 w-4 text-white/70 group-hover:animate-bounce" />
                     </div>
-                    <span className="text-white/70">•</span>
-                    <span className="text-orange-200 flex items-center space-x-1">
-                      <span>📍</span>
-                      <span>{managerProfile.location.split(',')[0]}</span>
-                    </span>
                   </div>
-                </div>
-                
-                {/* Chevron indicator */}
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 ml-2">
-                  <FiChevronDown className="h-4 w-4 text-white/70 group-hover:animate-bounce" />
-                </div>
-              </div>
-            </button>
+                </button>
 
-            {/* Quick Action Floating Button */}
-            <button
-              onClick={() => {
-                toast.success('🚀 Quick actions menu opened!');
-                // Could open a quick actions modal
-              }}
-              className="relative group"
-              title="Quick Actions"
-            >
-              <div className="relative p-3 bg-gradient-to-br from-purple-500/80 to-pink-500/80 backdrop-blur-sm rounded-full border-2 border-white/30 hover:from-purple-600/90 hover:to-pink-600/90 transition-all duration-500 transform hover:scale-110 shadow-lg group-hover:shadow-2xl">
-                <FiZap className="h-5 w-5 text-white group-hover:animate-pulse" />
-                
-                {/* Electric effect */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-400/50 to-orange-400/50 opacity-0 group-hover:opacity-100 animate-ping"></div>
-                
-                {/* Lightning bolts */}
-                <div className="absolute -top-1 -right-1 text-xs text-yellow-300 opacity-0 group-hover:opacity-100 animate-bounce">⚡</div>
-              </div>
-            </button>
+                {/* Quick Action Floating Button */}
+                <button
+                  onClick={() => {
+                    toast.success('🚀 Quick actions menu opened!');
+                  }}
+                  className="relative group"
+                  title="Quick Actions"
+                >
+                  <div className="relative p-3 bg-gradient-to-br from-purple-500/80 to-pink-500/80 backdrop-blur-sm rounded-full border-2 border-white/30 hover:from-purple-600/90 hover:to-pink-600/90 transition-all duration-500 transform hover:scale-110 shadow-lg group-hover:shadow-2xl">
+                    <FiZap className="h-5 w-5 text-white group-hover:animate-pulse" />
+                    
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-r from-yellow-400/50 to-orange-400/50 opacity-0 group-hover:opacity-100 animate-ping"></div>
+                    
+                    <div className="absolute -top-1 -right-1 text-xs text-yellow-300 opacity-0 group-hover:opacity-100 animate-bounce">⚡</div>
+                  </div>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -11267,150 +11215,6 @@ FAREDEAL Uganda Management Team
         />
       </Suspense>
 
-      {/* Main Navigation Dropdown - Creative Uganda Design (Always Available) */}
-      {showMainDropdown && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowMainDropdown(false)}>
-          <div className="absolute top-20 right-4 w-80 max-w-full">
-            <div 
-              className="main-dropdown-container bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl border-2 border-yellow-400/30 overflow-hidden transform transition-all duration-400 animate-slideDown"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Uganda Header */}
-              <div className="bg-gradient-to-r from-yellow-400 via-red-500 to-black text-white p-4 relative overflow-hidden">
-                {/* Uganda Flag Pattern Background */}
-                <div className="absolute inset-0 opacity-20">
-                  <div className="absolute top-0 left-0 right-0 h-1/3 bg-black"></div>
-                  <div className="absolute top-1/3 left-0 right-0 h-1/3 bg-yellow-400"></div>
-                  <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-red-500"></div>
-                </div>
-                
-                <div className="relative z-10 flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
-                      <span className="text-xl animate-bounce">🇺🇬</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-lg">FAREDEAL Navigation</h3>
-                      <p className="text-yellow-200 text-xs font-medium">Pearl of Africa Portal</p>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    onClick={() => setShowMainDropdown(false)}
-                    className="p-2 hover:bg-white/20 rounded-full transition-colors"
-                  >
-                    <FiX className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Navigation Grid */}
-              <div className="p-4 grid grid-cols-2 gap-3">
-                {[
-                  { id: 'overview', icon: '📊', label: 'Dashboard', desc: 'Business overview', color: 'bg-blue-50 border-blue-200 text-blue-800', gradient: 'from-blue-400 to-blue-600' },
-                  { id: 'portal-control', icon: '🚀', label: 'Portal Control', desc: 'AI-powered portal management', color: 'bg-cyan-50 border-cyan-200 text-cyan-800', gradient: 'from-cyan-400 to-blue-600' },
-                  { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', color: 'bg-green-50 border-green-200 text-green-800', gradient: 'from-green-400 to-green-600' },
-                  { id: 'transactions', icon: '🧾', label: 'Transactions', desc: 'Sales & receipts', color: 'bg-yellow-50 border-yellow-200 text-yellow-800', gradient: 'from-yellow-400 to-yellow-600' },
-                  { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', color: 'bg-purple-50 border-purple-200 text-purple-800', gradient: 'from-purple-400 to-purple-600' },
-                  { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Verify partners', color: 'bg-orange-50 border-orange-200 text-orange-800', gradient: 'from-orange-400 to-orange-600' },
-                  { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', color: 'bg-cyan-50 border-cyan-200 text-cyan-800', gradient: 'from-cyan-400 to-cyan-600' },
-                  { id: 'tillsupplies', icon: '🏪', label: 'Till Supplies', desc: 'Cashier requests', color: 'bg-teal-50 border-teal-200 text-teal-800', gradient: 'from-teal-400 to-teal-600' },
-                  { id: 'inventory', icon: '📋', label: 'Inventory', desc: 'Stock control', color: 'bg-indigo-50 border-indigo-200 text-indigo-800', gradient: 'from-indigo-400 to-indigo-600' },
-                  { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', color: 'bg-pink-50 border-pink-200 text-pink-800', gradient: 'from-pink-400 to-pink-600' },
-                  { id: 'alerts', icon: '🔔', label: 'Alerts', desc: 'Notifications', color: 'bg-red-50 border-red-200 text-red-800', gradient: 'from-red-400 to-red-600' }
-                ].map((item, index) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveTab(item.id);
-                      setShowMainDropdown(false);
-                      toast.success(`🇺🇬 Switched to ${item.label} - ${item.desc}`);
-                    }}
-                    className={`relative p-4 rounded-2xl border-2 transition-all duration-300 transform hover:scale-105 hover:shadow-xl group ${
-                      activeTab === item.id 
-                        ? `${item.color} shadow-lg scale-105 ring-2 ring-yellow-400` 
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                  >
-                    {/* Background Gradient Effect */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-10 rounded-2xl transition-opacity duration-300`}></div>
-                    
-                    <div className="relative z-10 text-center">
-                      <div className={`w-12 h-12 mx-auto rounded-full flex items-center justify-center text-xl mb-2 transition-all duration-300 ${
-                        activeTab === item.id ? 'bg-white/50 scale-110' : 'bg-gray-200 group-hover:bg-white group-hover:scale-110'
-                      }`}>
-                        {item.icon}
-                      </div>
-                      <h4 className="font-bold text-sm mb-1">{item.label}</h4>
-                      <p className="text-xs opacity-75 leading-tight">{item.desc}</p>
-                      
-                      {/* Active Indicator */}
-                      {activeTab === item.id && (
-                        <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-yellow-400 to-red-500 rounded-full flex items-center justify-center">
-                          <FiCheck className="h-3 w-3 text-white" />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Quick Actions Footer */}
-              <div className="p-4 bg-gradient-to-r from-yellow-400/10 via-red-500/10 to-black/10 border-t border-gray-200">
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => {
-                      setShowNotifications(!showNotifications);
-                      setShowMainDropdown(false);
-                    }}
-                    className="p-2 bg-yellow-100 rounded-xl text-center border border-yellow-200 hover:bg-yellow-200 transition-colors relative group"
-                  >
-                    <div className="text-lg">🔔</div>
-                    <div className="text-xs font-medium text-yellow-800 mt-1">Alerts</div>
-                    {notificationCount > 0 && (
-                      <div className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center font-bold animate-pulse">
-                        {notificationCount}
-                      </div>
-                    )}
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      toast.success('🌍 Exploring Uganda business opportunities');
-                      setShowMainDropdown(false);
-                    }}
-                    className="p-2 bg-red-100 rounded-xl text-center border border-red-200 hover:bg-red-200 transition-colors"
-                  >
-                    <div className="text-lg">🌍</div>
-                    <div className="text-xs font-medium text-red-800 mt-1">Explore</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      toast.info('⚙️ Opening Uganda portal settings');
-                      setShowMainDropdown(false);
-                    }}
-                    className="p-2 bg-black/10 rounded-xl text-center border border-gray-300 hover:bg-black/20 transition-colors"
-                  >
-                    <div className="text-lg">⚙️</div>
-                    <div className="text-xs font-medium text-gray-800 mt-1">Settings</div>
-                  </button>
-                </div>
-                
-                {/* Uganda Pride Message */}
-                <div className="mt-3 text-center">
-                  <p className="text-xs text-gray-600">
-                    🇺🇬 <span className="font-semibold uganda-text">Proudly serving Uganda</span> 🇺🇬
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Mobile Dropdown for Uganda */}
       {/* Modern Mobile Sidebar Menu - Slides from left */}
       {isMobile && showMobileDropdown && (
         <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileDropdown(false)}>

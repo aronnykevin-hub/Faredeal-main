@@ -12,8 +12,10 @@ if (!supabaseAnonKey) {
   console.error('⚠️ Missing Supabase Anon Key. Please check your environment variables.')
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+// Create Supabase client as singleton
+let supabaseInstance = null
+
+export const supabase = supabaseInstance || (supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
@@ -25,7 +27,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       eventsPerSecond: 10,
     },
   },
-})
+}))
 
 // Authentication helpers
 export const auth = {
