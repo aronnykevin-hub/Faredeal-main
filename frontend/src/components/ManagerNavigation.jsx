@@ -84,145 +84,110 @@ const ManagerNavigation = ({ activeTab, setActiveTab, isMobile }) => {
   if (isMobile) {
     return (
       <>
-        {/* Mobile Navigation */}
-        <nav className="bg-white shadow-lg border-b border-gray-200">
-          <div className="px-3 py-4">
-            {/* Main Navigation Tabs */}
-            <div className="flex space-x-3 overflow-x-auto scrollbar-hide pb-4">
+        {/* Mobile Navigation - Horizontal Scroll */}
+        <nav className="bg-white shadow-md border-b border-gray-200 sticky top-0 z-40">
+          <div className="px-4 py-3">
+            {/* Horizontal Scrolling Cards */}
+            <div className="flex space-x-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory pb-2">
               {tabs.map((tab, index) => (
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab.id, tab.label)}
-                  className={`flex flex-col items-center justify-center p-4 rounded-2xl min-w-[100px] transition-all duration-500 transform ${
+                  className={`flex-shrink-0 snap-start flex flex-col items-center justify-center p-4 rounded-2xl w-[110px] transition-all duration-300 ${
                     activeTab === tab.id
-                      ? `bg-gradient-to-br ${tab.color} text-white shadow-2xl scale-110 -translate-y-1`
-                      : 'bg-white text-gray-600 hover:bg-gray-50 shadow-md hover:shadow-lg hover:scale-105 border border-gray-200'
+                      ? `bg-gradient-to-br ${tab.color} text-white shadow-xl scale-105`
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100 shadow-sm border-2 border-gray-200'
                   }`}
-                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className={`relative ${activeTab === tab.id ? 'animate-bounce' : ''}`}>
-                    <div className="text-2xl mb-2">{tab.ugandaEmoji}</div>
-                    {activeTab === tab.id && (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full animate-ping"></div>
-                    )}
+                  {/* Icon/Emoji */}
+                  <div className={`text-3xl mb-2 ${activeTab === tab.id ? 'animate-bounce' : ''}`}>
+                    {tab.ugandaEmoji}
                   </div>
                   
+                  {/* Label */}
                   <span className={`text-xs font-bold text-center leading-tight ${
                     activeTab === tab.id ? 'text-white' : 'text-gray-700'
                   }`}>
                     {tab.label}
                   </span>
                   
-                  <span className={`text-xs text-center leading-tight ${
-                    activeTab === tab.id ? 'text-yellow-100' : 'text-gray-500'
+                  {/* Description */}
+                  <span className={`text-[10px] text-center leading-tight mt-1 ${
+                    activeTab === tab.id ? 'text-white/80' : 'text-gray-500'
                   }`}>
                     {tab.description}
                   </span>
                   
+                  {/* Active Indicator */}
                   {activeTab === tab.id && (
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full mt-1 animate-pulse shadow-lg"></div>
+                    <div className="absolute -bottom-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                   )}
                 </button>
               ))}
             </div>
             
-            {/* Navigation Indicator */}
-            <div className="flex justify-center mt-3">
-              <div className="flex space-x-1">
-                {tabs.map((tab) => (
-                  <div
-                    key={tab.id}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      activeTab === tab.id 
-                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 w-6' 
-                        : 'bg-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Stats Bar for Mobile */}
-          <div className="bg-gradient-to-r from-green-50 via-blue-50 to-purple-50 px-3 py-4 border-t border-gray-100">
-            <div className="grid grid-cols-3 gap-3">
-              <button 
-                onClick={() => {
-                  setActiveTab('analytics');
-                  toast.info('📊 Viewing today\'s revenue - Ensimbi (Money) analytics');
-                }}
-                className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-lg">💰</span>
-                  <div className="text-left">
-                    <div className="text-xs text-gray-600 font-medium">Leo (Today)</div>
-                    <div className="text-sm font-bold text-green-600">UGX 2.4M</div>
-                  </div>
-                </div>
-              </button>
-              
-              <button 
-                onClick={() => {
-                  setActiveTab('orders');
-                  toast.info('📦 Viewing orders - Ebyaguze (Purchases)');
-                }}
-                className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-lg">📦</span>
-                  <div className="text-left">
-                    <div className="text-xs text-gray-600 font-medium">Orders</div>
-                    <div className="text-sm font-bold text-blue-600">28</div>
-                  </div>
-                </div>
-              </button>
-              
-              <button 
-                onClick={() => {
-                  setActiveTab('team');
-                  toast.info('👥 Viewing team - Abantu (People) dashboard');
-                }}
-                className="bg-white rounded-xl p-3 shadow-sm hover:shadow-md transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="text-lg">👥</span>
-                  <div className="text-left">
-                    <div className="text-xs text-gray-600 font-medium">Online</div>
-                    <div className="text-sm font-bold text-purple-600">15</div>
-                  </div>
-                </div>
-              </button>
-            </div>
-            
-            {/* Quick Action Bar */}
-            <div className="mt-4 flex justify-center space-x-2">
-              <button 
-                onClick={() => toast.success('🔄 Data refreshed - Ebiddeko!')}
-                className="flex items-center space-x-1 bg-green-500 text-white px-4 py-2 rounded-full text-xs font-medium hover:bg-green-600 transition-colors"
-              >
-                <FiRefreshCw className="h-3 w-3" />
-                <span>Refresh</span>
-              </button>
-              
-              <button 
-                onClick={() => toast.info('📧 Alerts opened - Obubaka!')}
-                className="flex items-center space-x-1 bg-yellow-500 text-white px-4 py-2 rounded-full text-xs font-medium hover:bg-yellow-600 transition-colors"
-              >
-                <FiBell className="h-3 w-3" />
-                <span>Alerts</span>
-              </button>
-              
-              <button 
-                onClick={() => toast.success('📊 Report generated - Lipoota!')}
-                className="flex items-center space-x-1 bg-blue-500 text-white px-4 py-2 rounded-full text-xs font-medium hover:bg-blue-600 transition-colors"
-              >
-                <FiDownload className="h-3 w-3" />
-                <span>Export</span>
-              </button>
+            {/* Page Indicator Dots */}
+            <div className="flex justify-center mt-2 space-x-1">
+              {tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    activeTab === tab.id 
+                      ? 'bg-gradient-to-r from-orange-400 to-orange-600 w-6' 
+                      : 'bg-gray-300 w-1.5'
+                  }`}
+                />
+              ))}
             </div>
           </div>
         </nav>
+
+        {/* Quick Stats Bar - Collapsible */}
+        <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 px-4 py-3 border-b border-gray-200">
+          <div className="grid grid-cols-3 gap-2">
+            <button 
+              onClick={() => {
+                setActiveTab('analytics');
+                toast.info('📊 Revenue analytics');
+              }}
+              className="bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="text-center">
+                <div className="text-lg">💰</div>
+                <div className="text-[10px] text-gray-500">Today</div>
+                <div className="text-xs font-bold text-green-600">UGX 2.4M</div>
+              </div>
+            </button>
+            
+            <button 
+              onClick={() => {
+                setActiveTab('orders');
+                toast.info('📦 Orders overview');
+              }}
+              className="bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="text-center">
+                <div className="text-lg">📦</div>
+                <div className="text-[10px] text-gray-500">Orders</div>
+                <div className="text-xs font-bold text-blue-600">28</div>
+              </div>
+            </button>
+            
+            <button 
+              onClick={() => {
+                setActiveTab('team');
+                toast.info('👥 Team dashboard');
+              }}
+              className="bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-all"
+            >
+              <div className="text-center">
+                <div className="text-lg">👥</div>
+                <div className="text-[10px] text-gray-500">Online</div>
+                <div className="text-xs font-bold text-purple-600">15</div>
+              </div>
+            </button>
+          </div>
+        </div>
       </>
     );
   }
@@ -266,5 +231,21 @@ const ManagerNavigation = ({ activeTab, setActiveTab, isMobile }) => {
     </div>
   );
 };
+
+// Add custom styles for scrollbar hiding
+const style = document.createElement('style');
+style.textContent = `
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+if (typeof document !== 'undefined' && !document.getElementById('scrollbar-hide-style')) {
+  style.id = 'scrollbar-hide-style';
+  document.head.appendChild(style);
+}
 
 export default ManagerNavigation;
