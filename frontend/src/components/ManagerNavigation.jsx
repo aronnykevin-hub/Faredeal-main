@@ -1,3 +1,4 @@
+// ManagerNavigation Component v2.0 - Mobile: Hidden, Desktop: Full Navigation
 import React from 'react';
 import { 
   FiBarChart, FiPieChart, FiUsers, FiCheckCircle, FiTruck, 
@@ -81,9 +82,8 @@ const ManagerNavigation = ({ activeTab, setActiveTab, isMobile }) => {
     toast.success(`📱 Switched to ${tabLabel} - Webale! (Thank you!)`);
   };
 
+  // On mobile, hide this navigation completely - hamburger menu handles it
   if (isMobile) {
-    // On mobile, navigation is handled by the hamburger menu in ManagerPortal
-    // This component returns null to avoid duplicate navigation
     return null;
   }
 
