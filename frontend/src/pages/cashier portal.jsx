@@ -9,7 +9,8 @@ import {
   FiDownload, FiUpload, FiPrinter, FiMail, FiStar, FiHeart,
   FiShoppingCart, FiTag, FiHash, FiImage, FiInfo, FiHelpCircle,
   FiBarChart, FiPieChart, FiActivity, FiGift, FiNavigation, 
-  FiX, FiXCircle, FiCheck, FiPercent, FiPhone, FiWifi, FiGlobe, FiCamera
+  FiX, FiXCircle, FiCheck, FiPercent, FiPhone, FiWifi, FiGlobe, FiCamera,
+  FiMenu, FiChevronDown
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -31,6 +32,16 @@ import { supabase } from '../services/supabase';
 const CashierPortal = () => {
   const [activeTab, setActiveTab] = useState('pos');
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [currentTransaction, setCurrentTransaction] = useState({
     items: [],
     subtotal: 0,
@@ -2692,69 +2703,148 @@ const CashierPortal = () => {
         `
       }} />
       
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="h-10 w-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">🛒</span>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Cashier Portal 🇺🇬</h1>
-                <p className="text-gray-600">Uganda Supermarket Cashier Workspace</p>
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-yellow-600 to-red-600 shadow-lg z-50 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg border-2 border-white/30 transition-all"
+            >
+              <FiMenu className="h-6 w-6 text-white" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">🛒</span>
+              <h1 className="text-lg font-bold text-white">Cashier Portal</h1>
+            </div>
+            
+            <div className="w-10"></div>
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile Sidebar Menu */}
+      {isMobile && showMobileMenu && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
+          <div 
+            className="w-80 max-w-[85vw] bg-white shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-yellow-600 to-red-600 text-white p-6">
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
+                  <span className="text-2xl">🛒</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{cashierProfile.name}</h2>
+                  <p className="text-yellow-100 text-sm">{cashierProfile.role}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={() => setActiveTab('profile')}
-                className="text-right hover:bg-gray-50 p-2 rounded-lg transition-all duration-300 cursor-pointer group"
-              >
-                <p className="text-sm text-gray-600 group-hover:text-gray-900 font-medium">{cashierProfile.name}</p>
-                <p className="text-xs text-gray-500 group-hover:text-gray-700">{cashierProfile.role}</p>
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300">
-                <FiBell className="h-6 w-6" />
-              </button>
-              <button 
-                onClick={() => setActiveTab('profile')}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300"
-                title="Profile Settings"
-              >
-                <FiSettings className="h-6 w-6" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300">
-                <FiLogOut className="h-6 w-6" />
-              </button>
+
+            <nav className="p-4 space-y-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    setShowMobileMenu(false);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-yellow-500 to-red-500 text-white shadow-lg'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <tab.icon className="h-5 w-5" />
+                  <span className="flex-1 text-left font-semibold">{tab.label}</span>
+                  {activeTab === tab.id && (
+                    <FiChevronDown className="h-5 w-5" />
+                  )}
+                </button>
+              ))}
+            </nav>
+          </div>
+          
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
+        </div>
+      )}
+      
+      {/* Desktop Header */}
+      {!isMobile && (
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-4">
+                <div className="h-10 w-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">🛒</span>
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Cashier Portal 🇺🇬</h1>
+                  <p className="text-gray-600">Uganda Supermarket Cashier Workspace</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <button 
+                  onClick={() => setActiveTab('profile')}
+                  className="text-right hover:bg-gray-50 p-2 rounded-lg transition-all duration-300 cursor-pointer group"
+                >
+                  <p className="text-sm text-gray-600 group-hover:text-gray-900 font-medium">{cashierProfile.name}</p>
+                  <p className="text-xs text-gray-500 group-hover:text-gray-700">{cashierProfile.role}</p>
+                </button>
+                <button className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300">
+                  <FiBell className="h-6 w-6" />
+                </button>
+                <button 
+                  onClick={() => setActiveTab('profile')}
+                  className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300"
+                  title="Profile Settings"
+                >
+                  <FiSettings className="h-6 w-6" />
+                </button>
+                <button className="p-2 text-gray-400 hover:text-gray-600 transition-all duration-300">
+                  <FiLogOut className="h-6 w-6" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Navigation Tabs */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'border-yellow-500 text-yellow-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <tab.icon className="h-5 w-5" />
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </nav>
+      {/* Navigation Tabs - Desktop Only */}
+      {!isMobile && (
+        <div className="bg-white border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav className="flex space-x-8">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-300 ${
+                    activeTab === tab.id
+                      ? 'border-yellow-500 text-yellow-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <tab.icon className="h-5 w-5" />
+                  <span>{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${isMobile ? 'pt-20 pb-6' : 'py-8'}`}>
         {activeTab === 'pos' && renderPOS()}
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'transactions' && (

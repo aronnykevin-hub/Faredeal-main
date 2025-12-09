@@ -88,6 +88,7 @@ const AdminPortal = () => {
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showQuickAccess, setShowQuickAccess] = useState(false);
 
   // User Management Filters
   const [filterRole, setFilterRole] = useState('all');
@@ -1650,73 +1651,111 @@ const AdminPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-8">
-      {/* Enhanced Master Dashboard Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-2xl p-8 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-4xl font-bold mb-3 flex items-center">
-              <span className="mr-4 text-5xl">🎯</span>
-              Master Admin Dashboard
+    <div className="space-y-4 sm:space-y-8">
+      {/* Enhanced Master Dashboard Header - Mobile Optimized */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-xl sm:rounded-2xl p-4 sm:p-8 text-white shadow-2xl">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
+        
+        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex-1">
+            <h2 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 flex items-center">
+              <span className="mr-2 sm:mr-4 text-3xl sm:text-5xl animate-bounce">🎯</span>
+              <span className="leading-tight">Master Admin Dashboard</span>
             </h2>
-            <p className="text-blue-100 text-lg mb-4">Complete system oversight and operational control</p>
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-blue-200">All Systems Operational</span>
+            <p className="text-blue-100 text-sm sm:text-lg mb-3 sm:mb-4">Complete system oversight and operational control</p>
+            
+            {/* Mobile: Compact badges */}
+            <div className="flex flex-wrap gap-2 sm:gap-4">
+              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-blue-100 text-xs sm:text-sm font-medium">All Systems</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FiDatabase className="h-5 w-5 text-purple-300" />
-                <span className="text-purple-200">Real-time Data</span>
+              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
+                <FiDatabase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-300" />
+                <span className="text-purple-100 text-xs sm:text-sm font-medium">Real-time</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FiShield className="h-5 w-5 text-pink-300" />
-                <span className="text-pink-200">Maximum Security</span>
+              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
+                <FiShield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-300" />
+                <span className="text-pink-100 text-xs sm:text-sm font-medium">Secure</span>
               </div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-6xl font-bold">∞</div>
-            <div className="text-blue-200 text-xl">Admin Power</div>
-            <div className="text-blue-300 text-sm">Unlimited Access</div>
+          
+          {/* Mobile: Compact power indicator */}
+          <div className="flex sm:block items-center gap-4 sm:text-right">
+            <div className="bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border-2 border-white/20">
+              <div className="text-4xl sm:text-6xl font-bold animate-pulse">∞</div>
+              <div className="text-blue-200 text-sm sm:text-xl font-semibold mt-1">Admin Power</div>
+              <div className="text-blue-300 text-xs sm:text-sm">Unlimited Access</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Quick Access to All Sections */}
-      <div className="bg-white rounded-2xl shadow-2xl p-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <span className="mr-3 text-3xl">🚀</span>
-          Quick Access Hub - All Sections
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {[
-            { id: 'inventory', label: 'Inventory', icon: '📦', color: 'emerald', stats: '6 Products' },
-            { id: 'orders', label: 'Orders', icon: '📋', color: 'orange', stats: '2,847 Orders' },
-            { id: 'payments', label: 'Payments', icon: '💳', color: 'green', stats: '$127K Revenue' },
-            { id: 'suppliers', label: 'Suppliers', icon: '🏭', color: 'purple', stats: '24 Suppliers' },
-            { id: 'users', label: 'Users', icon: '👥', color: 'blue', stats: '1,234 Users' },
-            { id: 'analytics', label: 'Analytics', icon: '📈', color: 'pink', stats: '+22% Growth' },
-            { id: 'operations', label: 'Operations', icon: '⚙️', color: 'gray', stats: '99.9% Uptime' },
-            { id: 'settings', label: 'Settings', icon: '🛠️', color: 'indigo', stats: 'Configuration' },
-            { id: 'security', label: 'Security', icon: '🛡️', color: 'red', stats: 'Protected' },
-            { id: 'monitoring', label: 'Monitoring', icon: '📡', color: 'yellow', stats: 'Live Data' }
-          ].map((section, index) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`bg-gradient-to-br from-${section.color}-50 to-${section.color}-100 hover:from-${section.color}-100 hover:to-${section.color}-200 p-6 rounded-xl border-2 border-${section.color}-200 hover:border-${section.color}-400 transform hover:scale-105 transition-all duration-300 text-center animate-fadeInUp`}
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="text-4xl mb-3">{section.icon}</div>
-              <div className={`text-${section.color}-900 font-bold text-lg mb-1`}>{section.label}</div>
-              <div className={`text-${section.color}-700 text-sm`}>{section.stats}</div>
-              <div className={`mt-2 w-full h-1 bg-${section.color}-300 rounded-full`}>
-                <div className={`h-full bg-${section.color}-600 rounded-full transition-all duration-1000`} style={{ width: '75%' }}></div>
-              </div>
-            </button>
-          ))}
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl shadow-2xl p-6 border-2 border-purple-200">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -mr-32 -mt-32 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-pink-400/20 to-yellow-400/20 rounded-full blur-3xl -ml-24 -mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div 
+          className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          onClick={() => setShowQuickAccess(!showQuickAccess)}
+        >
+          <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center">
+            <span className="mr-3 text-2xl sm:text-3xl animate-bounce">🚀</span>
+            Quick Access Hub - All Sections
+          </h3>
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+            {showQuickAccess ? (
+              <FiChevronUp className="h-5 w-5 text-white" />
+            ) : (
+              <FiChevronDown className="h-5 w-5 text-white" />
+            )}
+          </div>
         </div>
+        
+        {showQuickAccess && (
+          <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fadeIn">
+            {[
+              { id: 'inventory', label: 'Inventory', icon: '📦', stats: '6 Products', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50/80', border: 'border-emerald-300', bullet: 'text-emerald-500' },
+              { id: 'orders', label: 'Orders', icon: '📋', stats: '2,847 Orders', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-50/80', border: 'border-orange-300', bullet: 'text-orange-500' },
+              { id: 'payments', label: 'Payments', icon: '💳', stats: '$127K Revenue', gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-50/80', border: 'border-green-300', bullet: 'text-green-500' },
+              { id: 'suppliers', label: 'Suppliers', icon: '🏭', stats: '24 Suppliers', gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50/80', border: 'border-purple-300', bullet: 'text-purple-500' },
+              { id: 'users', label: 'Users', icon: '👥', stats: '1,234 Users', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50/80', border: 'border-blue-300', bullet: 'text-blue-500' },
+              { id: 'analytics', label: 'Analytics', icon: '📈', stats: '+22% Growth', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-50/80', border: 'border-pink-300', bullet: 'text-pink-500' },
+              { id: 'operations', label: 'Operations', icon: '⚙️', stats: '99.9% Uptime', gradient: 'from-gray-600 to-slate-600', bg: 'bg-gray-50/80', border: 'border-gray-300', bullet: 'text-gray-600' },
+              { id: 'settings', label: 'Settings', icon: '🛠️', stats: 'Configuration', gradient: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-50/80', border: 'border-indigo-300', bullet: 'text-indigo-500' },
+              { id: 'security', label: 'Security', icon: '🛡️', stats: 'Protected', gradient: 'from-red-500 to-orange-500', bg: 'bg-red-50/80', border: 'border-red-300', bullet: 'text-red-500' },
+              { id: 'monitoring', label: 'Monitoring', icon: '📡', stats: 'Live Data', gradient: 'from-yellow-500 to-orange-500', bg: 'bg-yellow-50/80', border: 'border-yellow-300', bullet: 'text-yellow-600' }
+            ].map((section, index) => (
+              <button
+                key={section.id}
+                onClick={() => {
+                  setActiveSection(section.id);
+                  setShowQuickAccess(false);
+                }}
+                className={`relative flex items-start space-x-3 p-4 ${section.bg} backdrop-blur-sm rounded-xl border-2 ${section.border} hover:shadow-xl transition-all duration-300 group text-left transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-r ${section.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className="relative">
+                  <span className={`${section.bullet} text-2xl font-bold animate-pulse`}>•</span>
+                </div>
+                <div className="relative flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-2xl group-hover:scale-125 transition-transform duration-300 animate-bounce" style={{ animationDelay: `${index * 100}ms` }}>{section.icon}</span>
+                    <span className={`font-bold text-gray-800 group-hover:bg-gradient-to-r group-hover:${section.gradient} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>{section.label}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">{section.stats}</span>
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${section.gradient} animate-ping`}></div>
+                  </div>
+                </div>
+                <FiChevronRight className={`h-5 w-5 ${section.bullet} opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`} />
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Employee & Manager Sign-in Control Center */}

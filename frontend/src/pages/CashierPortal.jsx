@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import {
   FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiEdit2, FiSave, FiX,
   FiClock, FiDollarSign, FiShoppingCart, FiTrendingUp, FiAward, FiCamera,
-  FiLogOut, FiSettings, FiShield, FiCheckCircle, FiCreditCard
+  FiLogOut, FiSettings, FiShield, FiCheckCircle, FiCreditCard, FiMenu
 } from 'react-icons/fi';
 
 const CashierPortal = () => {
@@ -16,6 +16,10 @@ const CashierPortal = () => {
   const [editing, setEditing] = useState(false);
   const [profilePicUrl, setProfilePicUrl] = useState(null);
   const [uploadingProfilePic, setUploadingProfilePic] = useState(false);
+  
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   const [cashierProfile, setCashierProfile] = useState({
     name: '',
@@ -43,6 +47,15 @@ const CashierPortal = () => {
   // Load cashier profile on mount
   useEffect(() => {
     loadCashierProfile();
+  }, []);
+  
+  // Mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const loadCashierProfile = async () => {
@@ -287,50 +300,134 @@ const CashierPortal = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
-      {/* Header */}
-      <div className="bg-white shadow-md border-b-4 border-green-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Mobile Header */}
+      {isMobile && (
+        <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-green-600 to-blue-600 shadow-lg z-50 px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-                💰
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">Cashier Portal</h1>
-                <p className="text-sm text-gray-600">Manage your profile & settings</p>
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg border-2 border-white/30 transition-all"
+            >
+              <FiMenu className="h-6 w-6 text-white" />
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-2xl">💰</span>
+              <h1 className="text-lg font-bold text-white">Cashier Portal</h1>
+            </div>
+            
+            <div className="w-10"></div>
+          </div>
+        </div>
+      )}
+      
+      {/* Mobile Sidebar Menu */}
+      {isMobile && showMobileMenu && (
+        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
+          <div 
+            className="w-80 max-w-[85vw] bg-white shadow-2xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
+              <button 
+                onClick={() => setShowMobileMenu(false)}
+                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <FiX className="h-5 w-5" />
+              </button>
+
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
+                  {profilePicUrl || cashierProfile.avatar_url ? (
+                    <img src={profilePicUrl || cashierProfile.avatar_url} alt="Profile" className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    <span className="text-2xl">{cashierProfile.avatar}</span>
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold">{cashierProfile.name}</h2>
+                  <p className="text-green-100 text-sm">@{cashierProfile.username}</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+
+            <div className="p-4 space-y-2">
               <button
-                onClick={goToPOS}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                onClick={() => {
+                  goToPOS();
+                  setShowMobileMenu(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-green-50 hover:bg-green-100 transition-all group"
               >
-                <FiShoppingCart className="w-5 h-5" />
-                <span>Go to POS</span>
+                <FiShoppingCart className="h-5 w-5 text-green-600" />
+                <span className="flex-1 text-left font-semibold text-gray-800">Go to POS</span>
               </button>
+              
               <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
+                onClick={() => {
+                  handleLogout();
+                  setShowMobileMenu(false);
+                }}
+                className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 transition-all group"
               >
-                <FiLogOut className="w-5 h-5" />
-                <span>Logout</span>
+                <FiLogOut className="h-5 w-5 text-red-600" />
+                <span className="flex-1 text-left font-semibold text-gray-800">Logout</span>
               </button>
             </div>
           </div>
+          
+          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
         </div>
-      </div>
+      )}
+      
+      {/* Desktop Header */}
+      {!isMobile && (
+        <div className="bg-white shadow-md border-b-4 border-green-500">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg animate-pulse">
+                  💰
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">Cashier Portal</h1>
+                  <p className="text-sm text-gray-600">Manage your profile & settings</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={goToPOS}
+                  className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:shadow-xl transition-all transform hover:scale-105 flex items-center space-x-2"
+                >
+                  <FiShoppingCart className="w-5 h-5" />
+                  <span>Go to POS</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-lg hover:shadow-xl transition-all transform hover:scale-105 flex items-center space-x-2"
+                >
+                  <FiLogOut className="w-5 h-5" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 ${isMobile ? 'pt-20 pb-6' : 'py-8'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
           
-          {/* Profile Card */}
+          {/* Profile Card - Mobile Optimized */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-green-100">
-              <div className="text-center">
+            <div className="relative overflow-hidden bg-gradient-to-br from-white via-green-50/30 to-blue-50/30 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border-2 border-green-100">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-400/10 to-blue-400/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+              
+              <div className="relative text-center">
                 {/* Profile Picture */}
-                <div className="relative inline-block mb-4">
-                  <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white overflow-hidden shadow-xl border-4 border-white">
+                <div className="relative inline-block mb-3 sm:mb-4">
+                  <div className="w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white overflow-hidden shadow-xl border-4 border-white transform transition-all hover:scale-105">
                     {profilePicUrl || cashierProfile.avatar_url ? (
                       <img 
                         src={profilePicUrl || cashierProfile.avatar_url} 
@@ -338,19 +435,19 @@ const CashierPortal = () => {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <span className="text-5xl">{cashierProfile.avatar}</span>
+                      <span className="text-4xl sm:text-5xl animate-pulse">{cashierProfile.avatar}</span>
                     )}
                   </div>
                   
                   {/* Upload Button Overlay */}
                   <label 
                     htmlFor="cashier-profile-pic-upload"
-                    className="absolute bottom-0 right-0 w-10 h-10 bg-green-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-green-700 transition-colors shadow-lg border-2 border-white"
+                    className="absolute bottom-0 right-0 w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-r from-green-600 to-green-700 rounded-full flex items-center justify-center cursor-pointer hover:shadow-xl transition-all transform hover:scale-110 shadow-lg border-2 border-white"
                   >
                     {uploadingProfilePic ? (
-                      <div className="animate-spin">⏳</div>
+                      <div className="animate-spin text-lg">⏳</div>
                     ) : (
-                      <FiCamera className="text-white w-5 h-5" />
+                      <FiCamera className="text-white w-4 h-4 sm:w-5 sm:h-5" />
                     )}
                     <input
                       id="cashier-profile-pic-upload"
@@ -363,26 +460,26 @@ const CashierPortal = () => {
                   </label>
                 </div>
 
-                <h2 className="text-2xl font-bold text-gray-800 mb-1">{cashierProfile.name}</h2>
-                <p className="text-gray-600 mb-2">@{cashierProfile.username}</p>
+                <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-1">{cashierProfile.name}</h2>
+                <p className="text-gray-600 text-sm sm:text-base mb-3">@{cashierProfile.username}</p>
                 
                 {/* Status Badge */}
-                <div className="inline-flex items-center space-x-2 px-4 py-2 rounded-full bg-gradient-to-r from-green-100 to-blue-100 mb-4">
+                <div className="inline-flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-full bg-gradient-to-r from-green-100 to-blue-100 mb-3 sm:mb-4 shadow-sm">
                   {cashierProfile.isActive ? (
                     <>
-                      <FiCheckCircle className="w-5 h-5 text-green-600" />
-                      <span className="text-sm font-semibold text-green-700">Active</span>
+                      <FiCheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 animate-pulse" />
+                      <span className="text-xs sm:text-sm font-semibold text-green-700">Active</span>
                     </>
                   ) : (
                     <>
-                      <FiClock className="w-5 h-5 text-yellow-600" />
-                      <span className="text-sm font-semibold text-yellow-700">Pending Approval</span>
+                      <FiClock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600 animate-spin" style={{ animationDuration: '3s' }} />
+                      <span className="text-xs sm:text-sm font-semibold text-yellow-700">Pending Approval</span>
                     </>
                   )}
                 </div>
 
                 {/* Quick Stats */}
-                <div className="mt-6 space-y-3">
+                <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
                   <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <FiCalendar className="w-5 h-5 text-green-600" />
