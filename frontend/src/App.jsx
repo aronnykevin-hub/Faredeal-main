@@ -37,8 +37,28 @@ import CustomerDelivery from '@/pages/CustomerDelivery';
 import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
+  // Validate if current URL is allowed for admin access
+  const isAllowedAdminURL = () => {
+    const currentURL = window.location.href.toLowerCase();
+    const allowedURLs = [
+      'http://localhost:5173/#admin',
+      'https://faredeal-main.vercel.app/#admin'
+    ];
+    
+    // Check if current URL matches any allowed URL pattern
+    return allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+  };
+
   // Simple admin access check using #admin hash or localStorage
   const checkAdminAccess = () => {
+    // First check if URL is allowed for admin access
+    if (!isAllowedAdminURL() && window.location.hash === '#admin') {
+      // Redirect to unauthorized page or show error
+      alert('Admin access is only allowed from:\n- http://localhost:5173/#admin\n- https://faredeal-main.vercel.app/#admin');
+      window.location.href = '/';
+      return false;
+    }
+    
     // Check for #admin in URL or stored admin access or admin-related paths
     const isAdminRoute = 
       window.location.hash === '#admin' || 

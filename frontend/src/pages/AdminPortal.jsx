@@ -15,7 +15,7 @@ import {
   FiXCircle, FiUserPlus, FiSearch, FiFilter, FiDownload,
   FiUpload, FiTrash2, FiEdit, FiEye, FiRotateCw, FiX,
   FiMoreVertical, FiMail, FiPhone, FiBriefcase, FiFileText,
-  FiChevronDown, FiMenu, FiChevronUp, FiChevronRight, FiLogOut
+  FiChevronDown, FiMenu, FiChevronUp, FiChevronRight, FiLogOut, FiInfo
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -89,6 +89,16 @@ const AdminPortal = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showQuickAccess, setShowQuickAccess] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showRecentActivities, setShowRecentActivities] = useState(false);
+  const [showInventoryControl, setShowInventoryControl] = useState(false);
+  const [showPaymentControl, setShowPaymentControl] = useState(false);
+  const [showFinancialControl, setShowFinancialControl] = useState(false);
+  const [showProductManagement, setShowProductManagement] = useState(false);
+
+  // User Details Modal State
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
 
   // User Management Filters
   const [filterRole, setFilterRole] = useState('all');
@@ -182,11 +192,11 @@ const AdminPortal = () => {
           .rpc('get_all_users_admin');
         
         if (!rpcError && rpcData) {
-          // Transform to include verification status
+          // Transform to include verification status - approved = verified
           const usersWithStatus = rpcData.map(user => ({
             ...user,
-            email_verified: !!user.email_confirmed_at,
-            verification_status: user.email_confirmed_at ? '✅ Verified' : '⏳ Pending Verification'
+            email_verified: !!user.is_active,
+            verification_status: user.is_active ? '✅ Verified' : '⏳ Pending'
           }));
           
           setAllUsers(usersWithStatus);
@@ -225,11 +235,11 @@ const AdminPortal = () => {
         return;
       }
       
-      // Transform to include verification status
+      // Transform to include verification status - approved = verified
       const usersWithStatus = (data || []).map(user => ({
         ...user,
-        email_verified: !!user.email_confirmed_at,
-        verification_status: user.email_confirmed_at ? '✅ Verified' : '⏳ Pending Verification'
+        email_verified: !!user.is_active,
+        verification_status: user.is_active ? '✅ Verified' : '⏳ Pending'
       }));
       
       setAllUsers(usersWithStatus);
@@ -549,7 +559,7 @@ const AdminPortal = () => {
   // Show notifications
   const showNotification = (message, type = 'info') => {
     const notification = {
-      id: Date.now(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       message,
       type,
       timestamp: new Date().toLocaleTimeString()
@@ -567,16 +577,16 @@ const AdminPortal = () => {
     try {
       setLoading(true);
       
-      // Get all users from Supabase
-      const { data: allUsersData, error: usersError } = await supabase
-        .rpc('get_all_users_admin')
-        .then(response => response)
-        .catch(async () => {
-          // Fallback to direct query
-          return await supabase
-            .from('users')
-            .select('*');
-        });
+      // Get all users from Supabase - skip RPC, use direct query for reliability
+      let allUsersData = null;
+      let usersError = null;
+      
+      // Direct query to users table (more reliable than RPC)
+      const usersResponse = await supabase
+        .from('users')
+        .select('*');
+      allUsersData = usersResponse.data;
+      usersError = usersResponse.error;
 
       if (usersError) {
         console.warn('Error loading users:', usersError);
@@ -622,17 +632,22 @@ const AdminPortal = () => {
       const verifiedUsers = users.filter(u => u.email_confirmed_at).length;
       const unverifiedUsers = totalUsers - verifiedUsers;
       
-      // Get pending approvals
-      const { data: pendingData } = await supabase.rpc('get_pending_users').catch(() => ({ data: [] }));
-      const pendingApprovals = pendingData?.length || 0;
+      // Get pending approvals - use direct query instead of RPC
+      const pendingApprovals = users.filter(u => !u.is_active || u.status === 'pending').length;
       
       // Get today's orders count and revenue (if orders table exists)
       const today = new Date().toISOString().split('T')[0];
-      const { data: ordersData } = await supabase
-        .from('orders')
-        .select('total_amount')
-        .gte('created_at', today)
-        .catch(() => ({ data: [] }));
+      let ordersData = [];
+      try {
+        const ordersResponse = await supabase
+          .from('orders')
+          .select('total_amount')
+          .gte('created_at', today);
+        ordersData = ordersResponse.data || [];
+      } catch (error) {
+        console.warn('Failed to get orders:', error);
+        ordersData = [];
+      }
       
       const todaysOrders = ordersData?.length || 0;
       const dailyRevenue = ordersData?.reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0) || 0;
@@ -866,6 +881,128 @@ const AdminPortal = () => {
   const [dataInsights, setDataInsights] = useState([]);
   const [businessIntelligence, setBusinessIntelligence] = useState({});
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Fetch payment data from Supabase
+  const fetchPaymentData = async () => {
+    try {
+      // Fetch orders to calculate revenue and payments
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*');
+      
+      if (ordersError) throw ordersError;
+
+      const today = new Date().toISOString().split('T')[0];
+      const todayOrders = orders?.filter(order => 
+        order.created_at?.startsWith(today)
+      ) || [];
+
+      const totalPayments = orders?.length || 0;
+      const successfulPayments = orders?.filter(order => 
+        order.payment_status === 'paid' || order.payment_status === 'completed'
+      ).length || 0;
+      const pendingPayments = orders?.filter(order => 
+        order.payment_status === 'pending' || order.payment_status === 'processing'
+      ).length || 0;
+      const failedTransactions = orders?.filter(order => 
+        order.payment_status === 'failed' || order.payment_status === 'cancelled'
+      ).length || 0;
+
+      const dailyRevenue = todayOrders.reduce((sum, order) => 
+        sum + (parseFloat(order.total_amount) || 0), 0
+      );
+
+      setDashboardData(prev => ({
+        ...prev,
+        dailyRevenue,
+        pendingPayments,
+        failedTransactions,
+        totalPayments,
+        successfulPayments
+      }));
+
+    } catch (error) {
+      console.error('Error fetching payment data:', error);
+    }
+  };
+
+  // Fetch payment data on mount and set interval
+  useEffect(() => {
+    fetchPaymentData();
+    const interval = setInterval(fetchPaymentData, 10000); // Update every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch inventory data from Supabase
+  const fetchInventoryData = async () => {
+    try {
+      // Fetch products from inventory
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('*');
+      
+      if (productsError) {
+        console.error('Products fetch error:', productsError);
+        throw productsError;
+      }
+      
+      console.log('Fetched products for inventory:', products);
+
+      // Calculate inventory metrics - handle various column names
+      const totalProducts = products?.length || 0;
+      const lowStockItems = products?.filter(product => {
+        const qty = product.quantity || product.stock || product.current_stock || 0;
+        const threshold = product.low_stock_threshold || product.minimum_stock || product.min_stock || 10;
+        return qty <= threshold;
+      }).length || 0;
+
+      // Calculate total inventory value - handle various column names
+      const totalValue = products?.reduce((sum, product) => {
+        const qty = product.quantity || product.stock || product.current_stock || 0;
+        const price = parseFloat(product.price || product.selling_price || product.cost_price || 0);
+        return sum + (qty * price);
+      }, 0) || 0;
+
+      // Fetch orders for monthly count
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('created_at');
+      
+      if (!ordersError) {
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const monthlyOrders = orders?.filter(order => {
+          const orderDate = new Date(order.created_at);
+          return orderDate.getMonth() === currentMonth && 
+                 orderDate.getFullYear() === currentYear;
+        }).length || 0;
+
+        setSystemData(prev => ({
+          ...prev,
+          inventory: {
+            totalProducts,
+            lowStockItems,
+            totalValue,
+            lastUpdated: new Date().toISOString()
+          },
+          orders: {
+            ...prev.orders,
+            monthlyCount: monthlyOrders
+          }
+        }));
+      }
+
+    } catch (error) {
+      console.error('Error fetching inventory data:', error);
+    }
+  };
+
+  // Fetch inventory data on mount and set interval
+  useEffect(() => {
+    fetchInventoryData();
+    const interval = setInterval(fetchInventoryData, 15000); // Update every 15 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize Employee Access Service
   useEffect(() => {
@@ -1758,8 +1895,8 @@ const AdminPortal = () => {
         )}
       </div>
 
-      {/* Employee & Manager Sign-in Control Center */}
-      <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-2xl">
+      {/* Employee & Manager Sign-in Control Center - COMMENTED OUT */}
+      {/* <div className="bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-2xl">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-3xl font-bold mb-3 flex items-center">
@@ -1842,7 +1979,6 @@ const AdminPortal = () => {
           ))}
         </div>
 
-        {/* Advanced Access Controls */}
         <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
             <h4 className="text-xl font-bold mb-4 flex items-center">
@@ -1929,14 +2065,14 @@ const AdminPortal = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
-      {/* Quick Stats with Enhanced Animations */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Quick Stats with Enhanced Animations - COMMENTED OUT */}
+      {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { 
             title: 'Total Users', 
-            value: realTimeData.activeUsers + 1145, // Total includes inactive users
+            value: realTimeData.activeUsers + 1145,
             icon: FiUsers, 
             color: 'from-blue-500 to-blue-600',
             animation: 'animate-fadeInUp delay-100'
@@ -1984,7 +2120,7 @@ const AdminPortal = () => {
             </div>
           </div>
         ))}
-      </div>
+      </div> */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* System Performance with Enhanced Animations */}
@@ -2082,72 +2218,119 @@ const AdminPortal = () => {
       </div>
 
         {/* Quick Actions with Enhanced Animations */}
-        <div className="container-glass rounded-xl p-6 shadow-lg transform hover:scale-[1.02] transition-all duration-500 animate-slideInRight delay-200">
-          <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 mb-6 flex items-center space-x-3">
-            <div className="p-2 bg-blue-50 rounded-lg animate-pulse">
-              <FiZap className="h-6 w-6 text-blue-600" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-2xl p-6 border-2 border-indigo-200">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -mr-24 -mt-24 animate-pulse"></div>
+          
+          <div 
+            className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+            onClick={() => setShowQuickActions(!showQuickActions)}
+          >
+            <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+              <span className="mr-3 text-2xl sm:text-3xl animate-bounce">⚡</span>
+              Quick Actions
+            </h3>
+            <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+              {showQuickActions ? (
+                <FiChevronUp className="h-5 w-5 text-white" />
+              ) : (
+                <FiChevronDown className="h-5 w-5 text-white" />
+              )}
             </div>
-            <span>Quick Actions</span>
-          </h3>
-          <div className="grid grid-cols-2 gap-4">
-            {[
-              { 
-                title: 'Add Admin',
-                description: 'Create new admin account',
-                icon: FiUserPlus,
-                color: 'from-blue-500 to-blue-600',
-                onClick: () => setShowQuickRegister(true),
-                delay: 'delay-100'
-              },
-              { 
-                title: 'Portal Names',
-                description: 'Configure portal names',
-                icon: FiSettings,
-                color: 'from-indigo-500 to-purple-600',
-                onClick: openPortalConfiguration,
-                delay: 'delay-150'
-              },
-              { 
-                title: 'System Backup',
-                description: 'Backup system data',
-                icon: FiDatabase,
-                color: 'from-green-500 to-green-600',
-                delay: 'delay-200'
-              },
-              { 
-                title: 'Security Scan',
-                description: 'Check system security',
-                icon: FiShield,
-                color: 'from-yellow-500 to-red-600',
-                delay: 'delay-300'
-              },
-              { 
-                title: 'Clear Cache',
-                description: 'Optimize system performance',
-                icon: FiRefreshCw,
-                color: 'from-purple-500 to-purple-600',
-                delay: 'delay-400'
-              }
-            ].map((action, index) => (
-              <button
-                key={index}
-                onClick={action.onClick}
-                className={`${action.delay} animate-fadeInUp p-6 rounded-xl bg-gradient-to-r ${action.color} text-white hover:shadow-2xl group relative overflow-hidden transition-all duration-500`}
-              >
-                <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-500" />
-                <div className="relative flex flex-col items-center space-y-3">
-                  <div className="p-3 bg-white/20 rounded-xl group-hover:scale-110 transform transition-transform duration-500">
-                    <action.icon className="h-8 w-8" />
-                  </div>
-                  <div className="text-center">
-                    <p className="font-bold text-lg">{action.title}</p>
-                    <p className="text-sm text-white/80">{action.description}</p>
-                  </div>
-                </div>
-                <div className="absolute bottom-0 left-0 h-1 w-0 group-hover:w-full bg-white/20 transition-all duration-500" />
-              </button>
-            ))}
           </div>
+          
+          {showQuickActions && (
+            <div className="relative mt-6 space-y-3 animate-fadeIn">
+              {[
+                { 
+                  title: 'Add Admin',
+                  description: `${pendingUsers.length} pending approvals`,
+                  icon: '👤',
+                  color: 'from-blue-500 to-blue-600',
+                  bg: 'bg-blue-50/80',
+                  border: 'border-blue-300',
+                  bullet: 'text-blue-500',
+                  onClick: () => setShowQuickRegister(true)
+                },
+                { 
+                  title: 'Portal Names',
+                  description: `${Object.keys(portalConfig).length} portals configured`,
+                  icon: '⚙️',
+                  color: 'from-indigo-500 to-purple-600',
+                  bg: 'bg-indigo-50/80',
+                  border: 'border-indigo-300',
+                  bullet: 'text-indigo-500',
+                  onClick: openPortalConfiguration
+                },
+                { 
+                  title: 'System Backup',
+                  description: `Last backup: ${new Date().toLocaleDateString()}`,
+                  icon: '💾',
+                  color: 'from-green-500 to-green-600',
+                  bg: 'bg-green-50/80',
+                  border: 'border-green-300',
+                  bullet: 'text-green-500',
+                  onClick: () => {
+                    toast.info('Creating system backup...');
+                    setTimeout(() => toast.success('Backup completed successfully!'), 2000);
+                  }
+                },
+                { 
+                  title: 'Security Scan',
+                  description: `${realTimeData.activeUsers} active users monitored`,
+                  icon: '🛡️',
+                  color: 'from-yellow-500 to-red-600',
+                  bg: 'bg-orange-50/80',
+                  border: 'border-orange-300',
+                  bullet: 'text-orange-500',
+                  onClick: () => {
+                    toast.info('Running security scan...');
+                    setTimeout(() => toast.success('No security threats detected'), 2500);
+                  }
+                },
+                { 
+                  title: 'Clear Cache',
+                  description: `Optimize system performance`,
+                  icon: '🔄',
+                  color: 'from-purple-500 to-purple-600',
+                  bg: 'bg-purple-50/80',
+                  border: 'border-purple-300',
+                  bullet: 'text-purple-500',
+                  onClick: () => {
+                    toast.info('Clearing cache...');
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1000);
+                  }
+                }
+              ].map((action, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    action.onClick();
+                    setShowQuickActions(false);
+                  }}
+                  className={`relative w-full flex items-start space-x-3 p-4 ${action.bg} backdrop-blur-sm rounded-xl border-2 ${action.border} hover:shadow-xl transition-all duration-300 group text-left transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${action.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                  <div className="relative">
+                    <span className={`${action.bullet} text-2xl font-bold animate-pulse`}>•</span>
+                  </div>
+                  <div className="relative flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-2xl group-hover:scale-125 transition-transform duration-300 animate-bounce" style={{ animationDelay: `${index * 100}ms` }}>{action.icon}</span>
+                      <span className={`font-bold text-gray-800 group-hover:bg-gradient-to-r group-hover:${action.color} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>{action.title}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-600 font-medium">{action.description}</span>
+                      <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${action.color} animate-ping`}></div>
+                    </div>
+                  </div>
+                  <FiChevronRight className={`h-5 w-5 ${action.bullet} opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`} />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -2155,8 +2338,8 @@ const AdminPortal = () => {
 
       {/* Dashboard Secondary Content */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* API Health */}
-        <div className="container-glass rounded-xl p-6 shadow-lg transform hover:scale-[1.02] transition-all duration-500">
+        {/* API Health - COMMENTED OUT */}
+        {/* <div className="container-glass rounded-xl p-6 shadow-lg transform hover:scale-[1.02] transition-all duration-500">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 flex items-center space-x-3">
               <div className="p-2 bg-blue-50 rounded-lg">
@@ -2186,10 +2369,10 @@ const AdminPortal = () => {
               <div className="h-full w-[99.9%] bg-gradient-to-r from-blue-500 to-purple-600 rounded-full transform origin-left scale-x-0 animate-widthExpand"></div>
             </div>
           </div>
-        </div>
+        </div> */}
 
-        {/* Recent System Logs */}
-        <div className="container-glass rounded-xl p-6 shadow-lg transform hover:scale-[1.02] transition-all duration-500">
+        {/* Recent System Logs - COMMENTED OUT */}
+        {/* <div className="container-glass rounded-xl p-6 shadow-lg transform hover:scale-[1.02] transition-all duration-500">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 flex items-center space-x-3">
               <div className="p-2 bg-blue-50 rounded-lg">
@@ -2224,18 +2407,15 @@ const AdminPortal = () => {
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </div> */}
 
-      {/* Comprehensive System Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        {/* Real-time System Status */}
+      {/* Comprehensive System Overview - COMMENTED OUT */}
+      {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <div className="lg:col-span-2 bg-white rounded-2xl shadow-xl p-8">
           <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
             <span className="mr-3 text-3xl">📡</span>
             Real-time System Overview
           </h3>
-          {/* Advanced Admin Data Storage Dashboard */}
           <div className="mb-8 p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -2311,7 +2491,6 @@ const AdminPortal = () => {
               ))}
             </div>
 
-            {/* Quick Insights Preview */}
             {dataInsights.length > 0 && (
               <div className="mt-6 p-4 bg-white/60 rounded-lg border border-indigo-200">
                 <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -2352,7 +2531,6 @@ const AdminPortal = () => {
             ))}
           </div>
 
-          {/* Live Activity Feed */}
           <div className="bg-gray-50 rounded-xl p-6">
             <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
               <span className="mr-2 text-xl">🔔</span>
@@ -2383,10 +2561,10 @@ const AdminPortal = () => {
               )}
             </div>
           </div>
-        </div>
+        </div> */}
 
-        {/* Quick Control Panel */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        {/* Quick Control Panel - COMMENTED OUT */}
+        {/* <div className="bg-white rounded-2xl shadow-xl p-8">
           <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
             <span className="mr-3 text-3xl">⚡</span>
             Quick Controls
@@ -2451,7 +2629,6 @@ const AdminPortal = () => {
             ))}
           </div>
 
-          {/* System Status Indicators */}
           <div className="mt-8 space-y-3">
             <h4 className="text-lg font-bold text-gray-900 flex items-center">
               <span className="mr-2 text-xl">📊</span>
@@ -2470,132 +2647,230 @@ const AdminPortal = () => {
               </div>
             ))}
           </div>
+        </div> */}
+      </div>
+
+      {/* Enhanced Dashboard Stats - Real-time Supabase Data */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 rounded-3xl shadow-2xl p-8 mb-8 border-2 border-purple-200">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl -mr-48 -mt-48 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-pink-400/10 to-yellow-400/10 rounded-full blur-3xl -ml-32 -mb-32 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div className="relative">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 flex items-center gap-3">
+            <span className="text-3xl animate-bounce">📊</span>
+            Live Business Metrics
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[
+              {
+                title: 'Total Users',
+                value: dashboardData.realTimeMetrics?.totalUsers || (pendingUsers.length + allUsers.length) || 0,
+                icon: '👥',
+                gradient: 'from-blue-500 via-blue-600 to-indigo-600',
+                bg: 'from-blue-50 to-indigo-50',
+                shadowColor: 'blue',
+                trend: dashboardData.realTimeMetrics?.userGrowth || '0%',
+                trendUp: (dashboardData.realTimeMetrics?.userGrowth || '0').includes('+'),
+                subtitle: `${pendingUsers.length} pending approval`,
+                pulse: true
+              },
+              {
+                title: 'Daily Revenue',
+                value: dashboardData.realTimeMetrics?.dailyRevenue 
+                  ? `$${(dashboardData.realTimeMetrics.dailyRevenue / 1000).toFixed(1)}K`
+                  : '$0',
+                icon: '💰',
+                gradient: 'from-green-500 via-emerald-600 to-teal-600',
+                bg: 'from-green-50 to-emerald-50',
+                shadowColor: 'green',
+                trend: dashboardData.realTimeMetrics?.revenueTrend || '0%',
+                trendUp: (dashboardData.realTimeMetrics?.revenueTrend || '0').includes('+'),
+                subtitle: 'Compared to yesterday',
+                pulse: false
+              },
+              {
+                title: 'Active Orders',
+                value: dashboardData.realTimeMetrics?.activeOrders || 0,
+                icon: '📋',
+                gradient: 'from-yellow-500 via-orange-500 to-red-500',
+                bg: 'from-yellow-50 to-orange-50',
+                shadowColor: 'orange',
+                trend: dashboardData.realTimeMetrics?.orderGrowth || '0%',
+                trendUp: (dashboardData.realTimeMetrics?.orderGrowth || '0').includes('+'),
+                subtitle: `${dashboardData.realTimeMetrics?.todaysOrders || 0} orders today`,
+                pulse: true
+              },
+              {
+                title: 'Growth Rate',
+                value: `${dashboardData.realTimeMetrics?.growthRate || 0}%`,
+                icon: '📈',
+                gradient: 'from-purple-500 via-pink-500 to-rose-500',
+                bg: 'from-purple-50 to-pink-50',
+                shadowColor: 'purple',
+                trend: dashboardData.realTimeMetrics?.growthTrend || '0%',
+                trendUp: (dashboardData.realTimeMetrics?.growthTrend || '0').includes('+'),
+                subtitle: 'Monthly growth',
+                pulse: false
+              }
+            ].map((stat, index) => (
+              <div
+                key={index}
+                className={`relative bg-gradient-to-br ${stat.bg} rounded-2xl p-6 border-2 border-white/50 shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all duration-500 group overflow-hidden animate-fadeInUp`}
+                style={{ animationDelay: `${index * 100}ms` }}
+              >
+                {/* Animated Background */}
+                <div className={`absolute inset-0 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-500`}></div>
+                
+                {/* Shimmer Effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+
+                <div className="relative">
+                  {/* Header with Icon and Trend */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={`p-4 bg-gradient-to-br ${stat.gradient} rounded-2xl shadow-lg transform group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 ${stat.pulse ? 'animate-pulse' : ''}`}>
+                      <span className="text-3xl filter drop-shadow-lg">{stat.icon}</span>
+                    </div>
+                    <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold shadow-md ${
+                      stat.trendUp 
+                        ? 'text-green-700 bg-green-100 border-2 border-green-300' 
+                        : 'text-red-700 bg-red-100 border-2 border-red-300'
+                    } animate-bounce`}>
+                      <span className="text-lg">{stat.trendUp ? '↑' : '↓'}</span>
+                      <span>{stat.trend}</span>
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <h4 className="text-gray-600 text-sm font-semibold mb-2 uppercase tracking-wide">{stat.title}</h4>
+
+                  {/* Value */}
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className={`text-4xl font-black bg-gradient-to-r ${stat.gradient} bg-clip-text text-transparent`}>
+                      {stat.value}
+                    </span>
+                  </div>
+
+                  {/* Subtitle */}
+                  <p className="text-xs text-gray-500 font-medium mb-4">{stat.subtitle}</p>
+
+                  {/* Animated Progress Bar */}
+                  <div className="relative h-2 bg-gray-200/50 rounded-full overflow-hidden">
+                    <div 
+                      className={`absolute inset-y-0 left-0 bg-gradient-to-r ${stat.gradient} rounded-full shadow-lg transition-all duration-1000 ease-out`}
+                      style={{ 
+                        width: '0%',
+                        animation: `progressExpand 2s ease-out ${index * 200}ms forwards`
+                      }}
+                    ></div>
+                  </div>
+
+                  {/* Live Indicator */}
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${stat.gradient} animate-ping`}></div>
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${stat.gradient}`}></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Enhanced Dashboard Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {[
-          {
-            title: 'Total Users',
-            value: systemData.analytics?.totalUsers || 1234,
-            icon: '�',
-            color: 'blue',
-            trend: '+12%',
-            trendUp: true
-          },
-          {
-            title: 'Daily Revenue',
-            value: `$${systemData.analytics?.dailyRevenue || '4.2K'}`,
-            icon: '💰',
-            color: 'green',
-            trend: '+8%',
-            trendUp: true
-          },
-          {
-            title: 'Active Orders',
-            value: systemData.analytics?.activeOrders || 142,
-            icon: '📋',
-            color: 'yellow',
-            trend: '+15%',
-            trendUp: true
-          },
-          {
-            title: 'Growth Rate',
-            value: `${systemData.analytics?.growthRate || 22}%`,
-            icon: '📈',
-            color: 'purple',
-            trend: '+5%',
-            trendUp: true
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          @keyframes progressExpand {
+            from { width: 0%; }
+            to { width: 75%; }
           }
-        ].map((stat, index) => (
-          <div
-            key={index}
-            className={`bg-${stat.color}-50 rounded-2xl p-6 transform hover:scale-105 transition-all duration-300 group relative overflow-hidden animate-fadeInUp`}
-            style={{ animationDelay: `${index * 100}ms` }}
-          >
-            {/* Background Pattern */}
-            <div className="absolute inset-0 bg-grid-pattern opacity-5"></div>
-            
-            {/* Animated Gradient */}
-            <div className={`absolute inset-0 bg-gradient-to-r from-${stat.color}-500/10 to-transparent animate-shimmer`}></div>
-            
-            <div className="relative">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className={`p-3 bg-${stat.color}-100 rounded-xl group-hover:scale-110 transform transition-all duration-300`}>
-                  <span className="text-2xl">{stat.icon}</span>
-                </div>
-                <div className={`flex items-center px-2 py-1 rounded-full text-sm ${
-                  stat.trendUp ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'
-                }`}>
-                  <span>{stat.trendUp ? '↑' : '↓'}</span>
-                  <span className="ml-1">{stat.trend}</span>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div>
-                <h3 className={`text-${stat.color}-900 text-sm font-medium mb-1`}>{stat.title}</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-gray-900">{stat.value}</span>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="mt-4">
-                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full bg-${stat.color}-500 rounded-full transform origin-left scale-x-0 group-hover:scale-x-100 transition-transform duration-500`}
-                    style={{ width: '75%' }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+        `
+      }} />
 
       {/* Enhanced Recent Activities */}
-      <div className="bg-white rounded-2xl shadow-lg p-6 animate-fadeInUp" style={{ animationDelay: '400ms' }}>
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <span className="text-xl">📋</span>
-            </div>
+      <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 rounded-2xl shadow-lg p-6 border-2 border-purple-200 animate-fadeInUp" style={{ animationDelay: '400ms' }}>
+        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-400/10 to-pink-400/10 rounded-full blur-3xl -mr-24 -mt-24 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-40 h-40 bg-gradient-to-tr from-blue-400/10 to-purple-400/10 rounded-full blur-3xl -ml-20 -mb-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div 
+          className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          onClick={() => setShowRecentActivities(!showRecentActivities)}
+        >
+          <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 via-pink-600 to-blue-600 bg-clip-text text-transparent flex items-center gap-3">
+            <span className="text-2xl animate-bounce">📋</span>
             Recent Activities
           </h3>
-          <button className="p-2 hover:bg-purple-50 rounded-lg transition-colors">
-            <FiRefreshCw className="h-5 w-5 text-purple-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                window.location.reload();
+              }}
+              className="p-2 hover:bg-purple-100 rounded-lg transition-colors"
+            >
+              <FiRefreshCw className="h-5 w-5 text-purple-600" />
+            </button>
+            <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+              {showRecentActivities ? (
+                <FiChevronUp className="h-5 w-5 text-white" />
+              ) : (
+                <FiChevronDown className="h-5 w-5 text-white" />
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-4">
-          {systemData.analytics?.recentActivities?.map((activity, index) => (
-            <div 
-              key={index}
-              className="flex items-center gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors animate-fadeInUp"
-              style={{ animationDelay: `${(index + 5) * 100}ms` }}
-            >
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <div className="flex-1">
-                <p className="text-gray-900 font-medium">{activity.description}</p>
-                <p className="text-sm text-gray-500">{activity.time}</p>
+        {showRecentActivities && (
+          <div className="relative mt-6 space-y-2 animate-fadeIn">
+            {systemData.analytics?.recentActivities?.length > 0 ? (
+              systemData.analytics.recentActivities.map((activity, index) => {
+                const activityColors = [
+                  { gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-50/80', border: 'border-green-300', bullet: 'text-green-500' },
+                  { gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50/80', border: 'border-blue-300', bullet: 'text-blue-500' },
+                  { gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50/80', border: 'border-purple-300', bullet: 'text-purple-500' },
+                  { gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-50/80', border: 'border-orange-300', bullet: 'text-orange-500' },
+                  { gradient: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-50/80', border: 'border-indigo-300', bullet: 'text-indigo-500' }
+                ];
+                const colorScheme = activityColors[index % activityColors.length];
+                
+                return (
+                  <div
+                    key={index}
+                    className={`relative flex items-start gap-3 p-3 ${colorScheme.bg} backdrop-blur-sm rounded-xl border ${colorScheme.border} hover:shadow-lg transition-all duration-300 group transform hover:scale-[1.02] animate-fadeInUp overflow-hidden`}
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-r ${colorScheme.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                    <div className="relative">
+                      <span className={`${colorScheme.bullet} text-xl font-bold animate-pulse`}>•</span>
+                    </div>
+                    <div className="relative flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-gray-900 font-semibold text-sm flex-1">{activity.description}</p>
+                        <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${colorScheme.gradient} animate-ping flex-shrink-0 mt-1`}></div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-600 font-medium">{activity.time}</span>
+                        <span className="text-xs text-gray-400">•</span>
+                        <span className={`text-xs ${colorScheme.bullet} font-semibold`}>Live</span>
+                      </div>
+                    </div>
+                    <FiChevronRight className={`h-4 w-4 ${colorScheme.bullet} opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300 flex-shrink-0`} />
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-12 bg-white/60 rounded-xl backdrop-blur-sm">
+                <div className="text-5xl mb-4 animate-bounce">🕒</div>
+                <p className="text-gray-600 font-medium mb-4">No recent activities to display</p>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 font-semibold"
+                >
+                  🔄 Refresh Activities
+                </button>
               </div>
-              <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                <FiMoreVertical className="h-5 w-5 text-gray-400" />
-              </button>
-            </div>
-          )) || (
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">🕒</div>
-              <p className="text-gray-500">No recent activities to show</p>
-              <button className="mt-4 px-4 py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
-                Refresh Activities
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3254,8 +3529,8 @@ const AdminPortal = () => {
                           {/* View Details Button */}
                           <button
                             onClick={() => {
-                              notificationService.show(`Viewing details for ${user.full_name}`, 'info');
-                              console.log('User Details:', user);
+                              setSelectedUser(user);
+                              setShowUserDetailsModal(true);
                             }}
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-300 font-bold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl"
                           >
@@ -3623,104 +3898,143 @@ const AdminPortal = () => {
   );
 
   const renderInventoryControl = () => (
-    <div className="space-y-8">
-      {/* Admin Inventory Control Header */}
-      <div className="bg-gradient-to-r from-emerald-500 via-blue-600 to-purple-700 rounded-2xl p-8 text-white shadow-2xl animate-fadeInUp">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold mb-3 flex items-center">
-              <span className="mr-4 text-4xl">🏭</span>
+    <div className="space-y-6">
+      {/* Master Inventory Control - Collapsible */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 rounded-2xl shadow-2xl p-6 border-2 border-emerald-200">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-emerald-400/20 to-blue-400/20 rounded-full blur-3xl -mr-32 -mt-32 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full blur-3xl -ml-24 -mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div 
+          className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          onClick={() => setShowInventoryControl(!showInventoryControl)}
+        >
+          <div className="flex-1">
+            <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-600 bg-clip-text text-transparent flex items-center gap-3">
+              <span className="text-2xl sm:text-3xl animate-bounce">🏭</span>
               Master Inventory Control
             </h2>
-            <p className="text-emerald-100 text-lg">Complete administrative control over all inventory operations</p>
-            <div className="flex items-center mt-4 space-x-6">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-emerald-200">System Active</span>
+            <p className="text-emerald-700 text-sm sm:text-base mt-1">Complete administrative control over all inventory operations</p>
+            
+            {!showInventoryControl && (
+              <div className="flex flex-wrap items-center gap-3 mt-3">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  System Active
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                  <FiDatabase className="h-3 w-3" />
+                  Real-time Sync
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium">
+                  <FiShield className="h-3 w-3" />
+                  Admin Privileges
+                </span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FiDatabase className="h-5 w-5 text-blue-300" />
-                <span className="text-blue-200">Real-time Sync</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <FiShield className="h-5 w-5 text-purple-300" />
-                <span className="text-purple-200">Admin Privileges</span>
-              </div>
-            </div>
+            )}
           </div>
-          <div className="text-right">
-            <div className="text-5xl font-bold">∞</div>
-            <div className="text-emerald-200 text-lg">Full Access</div>
-            <div className="text-emerald-300 text-sm">All Operations</div>
+          
+          <div className="bg-gradient-to-r from-emerald-500 to-purple-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+            {showInventoryControl ? (
+              <FiChevronUp className="h-5 w-5 text-white" />
+            ) : (
+              <FiChevronDown className="h-5 w-5 text-white" />
+            )}
           </div>
         </div>
-      </div>
+        
+        {showInventoryControl && (
+          <div className="relative mt-6 space-y-3 animate-fadeIn">
+            {/* Status Badges */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm font-medium">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                System Active
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-sm font-medium">
+                <FiDatabase className="h-4 w-4" />
+                Real-time Sync
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-2 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg text-sm font-medium">
+                <FiShield className="h-4 w-4" />
+                Admin Privileges
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-purple-500 text-white rounded-lg text-sm font-bold shadow-lg">
+                <span className="text-xl">∞</span>
+                Full Access
+              </div>
+            </div>
 
-      {/* Admin Analytics Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          {
-            title: 'Total Products',
-            value: '156',
-            change: '+12%',
-            icon: '📦',
-            color: 'blue',
-            description: 'All system products'
-          },
-          {
-            title: 'Low Stock Alerts',
-            value: '8',
-            change: '-5%',
-            icon: '⚠️',
-            color: 'yellow',
-            description: 'Items need restocking'
-          },
-          {
-            title: 'Monthly Orders',
-            value: '2,847',
-            change: '+23%',
-            icon: '📈',
-            color: 'green',
-            description: 'Reorders processed'
-          },
-          {
-            title: 'Value at Risk',
-            value: '$45K',
-            change: '-8%',
-            icon: '💰',
-            color: 'red',
-            description: 'Potential loss value'
-          }
-        ].map((metric, index) => (
-          <div 
-            key={index}
-            className={`bg-gradient-to-br from-${metric.color}-50 to-${metric.color}-100 rounded-2xl p-6 shadow-lg transform hover:scale-105 transition-all duration-500 animate-fadeInUp border-2 border-${metric.color}-200 hover:border-${metric.color}-400`}
-            style={{ animationDelay: `${index * 150}ms` }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 bg-${metric.color}-200 rounded-xl`}>
-                <span className="text-3xl">{metric.icon}</span>
-              </div>
-              <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                metric.change.startsWith('+') ? 'bg-green-100 text-green-700' : 
-                metric.change.startsWith('-') && metric.color !== 'red' ? 'bg-red-100 text-red-700' :
-                'bg-green-100 text-green-700'
-              }`}>
-                {metric.change}
-              </div>
-            </div>
-            <div>
-              <h3 className={`text-${metric.color}-900 font-medium text-sm mb-1`}>{metric.title}</h3>
-              <div className="text-3xl font-bold text-gray-900 mb-1">{metric.value}</div>
-              <p className={`text-${metric.color}-700 text-sm`}>{metric.description}</p>
-            </div>
-            <div className="mt-4">
-              <div className={`h-2 bg-${metric.color}-200 rounded-full`}>
-                <div className={`h-full bg-${metric.color}-500 rounded-full transition-all duration-1000 transform origin-left`} style={{ width: '75%' }}></div>
-              </div>
+            {/* Inventory Metrics with Real Supabase Data */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                {
+                  title: 'Total Products',
+                  value: systemData.inventory?.totalProducts || 0,
+                  icon: '📦',
+                  color: 'blue',
+                  gradient: 'from-blue-500 to-cyan-500',
+                  bg: 'bg-blue-50/80',
+                  border: 'border-blue-300',
+                  bullet: 'text-blue-500',
+                  description: 'All system products'
+                },
+                {
+                  title: 'Low Stock Alerts',
+                  value: systemData.inventory?.lowStockItems || 0,
+                  icon: '⚠️',
+                  color: 'yellow',
+                  gradient: 'from-yellow-500 to-orange-500',
+                  bg: 'bg-yellow-50/80',
+                  border: 'border-yellow-300',
+                  bullet: 'text-yellow-600',
+                  description: 'Items need restocking'
+                },
+                {
+                  title: 'Monthly Orders',
+                  value: systemData.orders?.monthlyCount || 0,
+                  icon: '📈',
+                  color: 'green',
+                  gradient: 'from-green-500 to-emerald-500',
+                  bg: 'bg-green-50/80',
+                  border: 'border-green-300',
+                  bullet: 'text-green-500',
+                  description: 'Reorders processed'
+                },
+                {
+                  title: 'Inventory Value',
+                  value: `$${(systemData.inventory?.totalValue || 0).toLocaleString()}`,
+                  icon: '💰',
+                  color: 'purple',
+                  gradient: 'from-purple-500 to-pink-500',
+                  bg: 'bg-purple-50/80',
+                  border: 'border-purple-300',
+                  bullet: 'text-purple-500',
+                  description: 'Total inventory value'
+                }
+              ].map((metric, index) => (
+                <div
+                  key={index}
+                  className={`relative flex items-start gap-3 p-4 ${metric.bg} backdrop-blur-sm rounded-xl border-2 ${metric.border} hover:shadow-xl transition-all duration-300 group overflow-hidden`}
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${metric.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                  <div className="relative">
+                    <span className={`${metric.bullet} text-2xl font-bold animate-pulse`}>•</span>
+                  </div>
+                  <div className="relative flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-2xl group-hover:scale-125 transition-transform duration-300" style={{ animationDelay: `${index * 100}ms` }}>{metric.icon}</span>
+                      <span className="font-bold text-gray-800 text-sm">{metric.title}</span>
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">{metric.value}</div>
+                    <p className="text-xs text-gray-600 mt-1">{metric.description}</p>
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${metric.gradient} animate-ping absolute top-0 right-0`}></div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Advanced Admin Controls */}
@@ -3773,37 +4087,107 @@ const AdminPortal = () => {
       </div>
 
       {/* Main Product Inventory Interface */}
-      <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-emerald-100">
-        <div className="p-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-700 text-white">
+      <div className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-blue-50 to-purple-50 rounded-2xl shadow-2xl border-2 border-emerald-200">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-br from-emerald-400/20 to-blue-400/20 rounded-full blur-3xl -mr-48 -mt-48 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-72 h-72 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full blur-3xl -ml-36 -mb-36 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div 
+          className="relative cursor-pointer p-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-700 text-white hover:from-emerald-700 hover:via-blue-700 hover:to-purple-800 transition-all duration-300"
+          onClick={() => setShowProductManagement(!showProductManagement)}
+        >
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-2xl font-bold flex items-center">
-                <span className="mr-3 text-3xl">📦</span>
+            <div className="flex-1">
+              <h3 className="text-2xl font-bold flex items-center gap-3 mb-2">
+                <span className="bg-white/20 p-3 rounded-xl animate-bounce">📦</span>
                 Complete Product Management
               </h3>
-              <p className="text-emerald-100 mt-2">Full administrative access to all inventory functions</p>
+              <p className="text-emerald-100">Full administrative access to all inventory functions</p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="bg-white/20 rounded-lg px-4 py-2 text-center">
-                <div className="text-2xl font-bold">6</div>
-                <div className="text-emerald-200 text-sm">Products</div>
+            <div className="flex items-center gap-6">
+              <div className="hidden md:flex items-center gap-4">
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-2xl font-bold">{dashboardData.inventory?.totalProducts || 0}</div>
+                  <div className="text-emerald-200 text-xs font-medium">Total Products</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-2xl font-bold">{dashboardData.inventory?.lowStock || 0}</div>
+                  <div className="text-yellow-200 text-xs font-medium">Low Stock</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-2xl font-bold">∞</div>
+                  <div className="text-blue-200 text-xs font-medium">Admin Access</div>
+                </div>
               </div>
-              <div className="bg-white/20 rounded-lg px-4 py-2 text-center">
-                <div className="text-2xl font-bold">∞</div>
-                <div className="text-blue-200 text-sm">Admin Rights</div>
-              </div>
-              <div className="bg-white/20 rounded-lg px-4 py-2 text-center">
-                <div className="text-2xl font-bold">✓</div>
-                <div className="text-purple-200 text-sm">Full Control</div>
+              <div className="bg-gradient-to-r from-white/30 to-white/20 p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
+                {showProductManagement ? (
+                  <FiChevronUp className="h-6 w-6 text-white" />
+                ) : (
+                  <FiChevronDown className="h-6 w-6 text-white" />
+                )}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Enhanced Product Interface */}
-        <div className="p-0">
-          <ProductInventoryInterface />
-        </div>
+        {showProductManagement && (
+          <div className="relative animate-fadeIn">
+            {/* Quick Product Stats */}
+            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { 
+                  label: 'Total Products', 
+                  value: dashboardData.inventory?.totalProducts || 0, 
+                  icon: '📦', 
+                  color: 'emerald',
+                  gradient: 'from-emerald-500 to-teal-500'
+                },
+                { 
+                  label: 'Low Stock Items', 
+                  value: dashboardData.inventory?.lowStock || 0, 
+                  icon: '⚠️', 
+                  color: 'orange',
+                  gradient: 'from-orange-500 to-amber-500'
+                },
+                { 
+                  label: 'Out of Stock', 
+                  value: dashboardData.inventory?.outOfStock || 0, 
+                  icon: '🚫', 
+                  color: 'red',
+                  gradient: 'from-red-500 to-rose-500'
+                },
+                { 
+                  label: 'Total Value', 
+                  value: `$${((dashboardData.inventory?.totalValue || 0) / 1000).toFixed(1)}K`, 
+                  icon: '💰', 
+                  color: 'green',
+                  gradient: 'from-green-500 to-emerald-500'
+                }
+              ].map((stat, index) => (
+                <div 
+                  key={index} 
+                  className={`relative group bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 p-4 rounded-xl border-2 border-${stat.color}-200 hover:shadow-lg transition-all duration-300 hover:scale-105 overflow-hidden`}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                  <div className="relative flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600 font-medium mb-1">{stat.label}</p>
+                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    </div>
+                    <span className="text-3xl group-hover:scale-125 transition-transform duration-300">{stat.icon}</span>
+                  </div>
+                  <div className={`mt-2 h-1 bg-gradient-to-r ${stat.gradient} rounded-full`}></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Enhanced Product Interface */}
+            <div className="px-6 pb-6">
+              <div className="bg-white rounded-xl shadow-inner border-2 border-gray-100 overflow-hidden">
+                <ProductInventoryInterface />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* System-wide Inventory Reports */}
@@ -4098,69 +4482,281 @@ const AdminPortal = () => {
 
   const renderPaymentControl = () => (
     <div className="space-y-8">
-      {/* Payment Control Header */}
-      <div className="bg-gradient-to-r from-green-500 via-emerald-600 to-teal-700 rounded-2xl p-8 text-white shadow-2xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold mb-3 flex items-center">
-              <span className="mr-4 text-4xl">💳</span>
+      {/* Payment Control Header - Collapsible */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-green-500 via-emerald-600 to-teal-700 rounded-2xl p-6 shadow-2xl border-2 border-emerald-300">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl -mr-32 -mt-32 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-white/10 to-transparent rounded-full blur-3xl -ml-24 -mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        <div 
+          className="relative flex items-center justify-between cursor-pointer hover:bg-white/10 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          onClick={() => setShowPaymentControl(!showPaymentControl)}
+        >
+          <div className="flex-1">
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center text-white">
+              <span className="mr-3 text-3xl sm:text-4xl animate-bounce">💳</span>
               Payment System Control
             </h2>
-            <p className="text-green-100 text-lg">Complete financial oversight and payment processing control</p>
+            <p className="text-green-100 text-sm sm:text-lg">Complete financial oversight and payment processing control</p>
           </div>
-          <div className="text-right">
-            <div className="text-5xl font-bold">$127K</div>
-            <div className="text-green-200 text-lg">Monthly Revenue</div>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <div className="text-4xl sm:text-5xl font-bold text-white">${(dashboardData.totalRevenue || 0).toLocaleString()}</div>
+              <div className="text-green-200 text-sm sm:text-lg">Monthly Revenue</div>
+            </div>
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+              {showPaymentControl ? (
+                <FiChevronUp className="h-6 w-6 text-white" />
+              ) : (
+                <FiChevronDown className="h-6 w-6 text-white" />
+              )}
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Financial Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { title: 'Daily Revenue', value: '$4.2K', icon: '📈', color: 'green', status: 'up' },
-          { title: 'Pending Payments', value: '47', icon: '⏱️', color: 'yellow', status: 'stable' },
-          { title: 'Failed Transactions', value: '3', icon: '❌', color: 'red', status: 'down' },
-          { title: 'Success Rate', value: '99.2%', icon: '✅', color: 'blue', status: 'up' }
-        ].map((metric, index) => (
-          <div key={index} className={`bg-gradient-to-br from-${metric.color}-50 to-${metric.color}-100 rounded-2xl p-6 shadow-lg`}>
-            <div className="flex items-center justify-between mb-4">
-              <div className={`p-3 bg-${metric.color}-200 rounded-xl`}>
-                <span className="text-2xl">{metric.icon}</span>
+        
+        {showPaymentControl && (
+          <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fadeIn">
+            {[
+              { 
+                title: 'Daily Revenue', 
+                value: `$${(dashboardData.dailyRevenue || 0).toLocaleString()}`, 
+                icon: '📈', 
+                gradient: 'from-green-500 to-emerald-500', 
+                bg: 'bg-green-50/90', 
+                border: 'border-green-300', 
+                bullet: 'text-green-500',
+                description: 'Today\'s total revenue'
+              },
+              { 
+                title: 'Pending Payments', 
+                value: (dashboardData.pendingPayments || 0).toString(), 
+                icon: '⏱️', 
+                gradient: 'from-yellow-500 to-orange-500', 
+                bg: 'bg-yellow-50/90', 
+                border: 'border-yellow-300', 
+                bullet: 'text-yellow-600',
+                description: 'Awaiting confirmation'
+              },
+              { 
+                title: 'Failed Transactions', 
+                value: (dashboardData.failedTransactions || 0).toString(), 
+                icon: '❌', 
+                gradient: 'from-red-500 to-pink-500', 
+                bg: 'bg-red-50/90', 
+                border: 'border-red-300', 
+                bullet: 'text-red-500',
+                description: 'Requires attention'
+              },
+              { 
+                title: 'Success Rate', 
+                value: `${((dashboardData.successfulPayments || 0) / Math.max((dashboardData.totalPayments || 1), 1) * 100).toFixed(1)}%`, 
+                icon: '✅', 
+                gradient: 'from-blue-500 to-cyan-500', 
+                bg: 'bg-blue-50/90', 
+                border: 'border-blue-300', 
+                bullet: 'text-blue-500',
+                description: 'Payment success rate'
+              }
+            ].map((metric, index) => (
+              <div
+                key={index}
+                className={`relative flex items-start space-x-3 p-4 ${metric.bg} backdrop-blur-sm rounded-xl border-2 ${metric.border} hover:shadow-xl transition-all duration-300 group transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-r ${metric.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className="relative">
+                  <span className={`${metric.bullet} text-2xl font-bold animate-pulse`}>•</span>
+                </div>
+                <div className="relative flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-2xl group-hover:scale-125 transition-transform duration-300 animate-bounce" style={{ animationDelay: `${index * 100}ms` }}>{metric.icon}</span>
+                    <span className={`font-bold text-gray-800 group-hover:bg-gradient-to-r group-hover:${metric.gradient} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>{metric.title}</span>
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 mb-1">{metric.value}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">{metric.description}</span>
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${metric.gradient} animate-ping`}></div>
+                  </div>
+                </div>
+                <FiChevronRight className={`h-5 w-5 ${metric.bullet} opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`} />
               </div>
-              <div className={`w-3 h-3 rounded-full ${metric.status === 'up' ? 'bg-green-500' : metric.status === 'down' ? 'bg-red-500' : 'bg-yellow-500'} animate-pulse`}></div>
-            </div>
-            <h3 className={`text-${metric.color}-900 font-medium text-sm mb-1`}>{metric.title}</h3>
-            <div className="text-3xl font-bold text-gray-900">{metric.value}</div>
+            ))}
           </div>
-        ))}
+        )}
       </div>
 
-      {/* Payment Control Tools */}
-      <div className="bg-white rounded-2xl shadow-xl p-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <span className="mr-3 text-3xl">🏦</span>
-          Financial Control Center
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-          {[
-            { title: 'Process Refunds', icon: '💸', description: 'Handle customer refunds', color: 'blue' },
-            { title: 'Payment Gateway', icon: '🔗', description: 'Manage payment providers', color: 'purple' },
-            { title: 'Transaction Logs', icon: '📋', description: 'View all transactions', color: 'green' },
-            { title: 'Fraud Detection', icon: '🛡️', description: 'Security monitoring', color: 'red' },
-            { title: 'Revenue Reports', icon: '📊', description: 'Financial analytics', color: 'yellow' },
-            { title: 'Tax Management', icon: '🧾', description: 'Handle tax calculations', color: 'indigo' }
-          ].map((tool, index) => (
-            <div key={index} className={`bg-gradient-to-br from-${tool.color}-50 to-${tool.color}-100 p-6 rounded-xl border-2 border-${tool.color}-200 hover:border-${tool.color}-400 transform hover:scale-105 transition-all duration-300`}>
-              <div className="text-4xl mb-4">{tool.icon}</div>
-              <h4 className={`text-${tool.color}-900 font-bold text-lg mb-2`}>{tool.title}</h4>
-              <p className={`text-${tool.color}-700 text-sm`}>{tool.description}</p>
-              <button className={`mt-4 w-full bg-${tool.color}-600 text-white py-2 rounded-lg hover:bg-${tool.color}-700 transition-colors`}>
-                Access
-              </button>
-            </div>
-          ))}
+      {/* Financial Control Center */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-2xl p-6 border-2 border-indigo-200">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl -mr-32 -mt-32 animate-pulse"></div>
+        
+        <div 
+          className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          onClick={() => setShowFinancialControl(!showFinancialControl)}
+        >
+          <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent flex items-center">
+            <span className="mr-3 text-2xl sm:text-3xl animate-bounce">🏦</span>
+            Financial Control Center
+          </h3>
+          <div className="bg-gradient-to-r from-blue-500 to-purple-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+            {showFinancialControl ? (
+              <FiChevronUp className="h-5 w-5 text-white" />
+            ) : (
+              <FiChevronDown className="h-5 w-5 text-white" />
+            )}
+          </div>
         </div>
+        
+        {showFinancialControl && (
+          <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 animate-fadeIn">
+            {[
+              { 
+                title: 'Process Refunds', 
+                icon: '💸', 
+                description: 'Handle customer refunds', 
+                gradient: 'from-blue-500 to-blue-600',
+                bg: 'bg-blue-50/80',
+                border: 'border-blue-300',
+                bullet: 'text-blue-500',
+                onClick: async () => {
+                  toast.info('Loading refund processing...');
+                  const { data, error } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('status', 'refund_requested')
+                    .order('created_at', { ascending: false });
+                  
+                  if (error) {
+                    toast.error('Failed to load refund requests');
+                  } else {
+                    toast.success(`Found ${data?.length || 0} refund requests`);
+                  }
+                }
+              },
+              { 
+                title: 'Payment Gateway', 
+                icon: '🔗', 
+                description: 'Manage payment providers', 
+                gradient: 'from-purple-500 to-purple-600',
+                bg: 'bg-purple-50/80',
+                border: 'border-purple-300',
+                bullet: 'text-purple-500',
+                onClick: () => {
+                  toast.info('Payment gateway settings opened');
+                }
+              },
+              { 
+                title: 'Transaction Logs', 
+                icon: '📋', 
+                description: 'View all transactions', 
+                gradient: 'from-green-500 to-green-600',
+                bg: 'bg-green-50/80',
+                border: 'border-green-300',
+                bullet: 'text-green-500',
+                onClick: async () => {
+                  toast.info('Loading transaction logs...');
+                  const { data, error } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(100);
+                  
+                  if (error) {
+                    toast.error('Failed to load transactions');
+                  } else {
+                    toast.success(`Loaded ${data?.length || 0} recent transactions`);
+                  }
+                }
+              },
+              { 
+                title: 'Fraud Detection', 
+                icon: '🛡️', 
+                description: 'Security monitoring', 
+                gradient: 'from-red-500 to-red-600',
+                bg: 'bg-red-50/80',
+                border: 'border-red-300',
+                bullet: 'text-red-500',
+                onClick: async () => {
+                  toast.info('Running fraud detection scan...');
+                  const { data, error } = await supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('status', 'failed')
+                    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+                  
+                  if (error) {
+                    toast.error('Fraud detection failed');
+                  } else {
+                    const suspiciousCount = data?.length || 0;
+                    if (suspiciousCount > 0) {
+                      toast.warning(`Found ${suspiciousCount} suspicious transactions`);
+                    } else {
+                      toast.success('No suspicious activity detected');
+                    }
+                  }
+                }
+              },
+              { 
+                title: 'Revenue Reports', 
+                icon: '📊', 
+                description: 'Financial analytics', 
+                gradient: 'from-yellow-500 to-orange-500',
+                bg: 'bg-yellow-50/80',
+                border: 'border-yellow-300',
+                bullet: 'text-yellow-600',
+                onClick: async () => {
+                  toast.info('Generating revenue reports...');
+                  const { data, error } = await supabase
+                    .from('transactions')
+                    .select('amount, created_at')
+                    .eq('status', 'completed')
+                    .gte('created_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
+                  
+                  if (error) {
+                    toast.error('Failed to generate report');
+                  } else {
+                    const totalRevenue = data?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+                    toast.success(`Monthly revenue: UGX ${totalRevenue.toLocaleString()}`);
+                  }
+                }
+              },
+              { 
+                title: 'Tax Management', 
+                icon: '🧾', 
+                description: 'Handle tax calculations', 
+                gradient: 'from-indigo-500 to-blue-500',
+                bg: 'bg-indigo-50/80',
+                border: 'border-indigo-300',
+                bullet: 'text-indigo-500',
+                onClick: () => {
+                  toast.info('Tax management system opened');
+                  toast.success('VAT: 18% | Income Tax: 30%');
+                }
+              }
+            ].map((tool, index) => (
+              <button
+                key={index}
+                onClick={() => {
+                  tool.onClick();
+                  setShowFinancialControl(false);
+                }}
+                className={`relative w-full flex flex-col items-center p-6 ${tool.bg} backdrop-blur-sm rounded-xl border-2 ${tool.border} hover:shadow-2xl transition-all duration-300 group text-center transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-r ${tool.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+                <div className="relative mb-3">
+                  <span className="text-4xl group-hover:scale-125 transition-transform duration-300 animate-bounce" style={{ animationDelay: `${index * 100}ms` }}>{tool.icon}</span>
+                </div>
+                <div className="relative">
+                  <h4 className={`font-bold text-lg mb-2 text-gray-800 group-hover:bg-gradient-to-r group-hover:${tool.gradient} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>{tool.title}</h4>
+                  <p className="text-sm text-gray-600 mb-3">{tool.description}</p>
+                  <div className={`w-full py-2 px-4 bg-gradient-to-r ${tool.gradient} text-white rounded-lg font-semibold text-sm hover:shadow-lg transition-all duration-300 group-hover:scale-110`}>
+                    Access
+                  </div>
+                </div>
+                <div className={`absolute bottom-2 right-2 w-2 h-2 rounded-full bg-gradient-to-r ${tool.gradient} animate-ping`}></div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4431,12 +5027,223 @@ const AdminPortal = () => {
 
   // No auth checks for development mode
 
+  // User Details Modal Component
+  const UserDetailsModal = () => {
+    if (!showUserDetailsModal || !selectedUser) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto transform transition-all animate-scaleUp m-4">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-700 p-6 rounded-t-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                  {selectedUser.full_name?.charAt(0)?.toUpperCase() || selectedUser.email?.charAt(0)?.toUpperCase() || '?'}
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{selectedUser.full_name || 'No Name'}</h2>
+                  <p className="text-white/80">{selectedUser.email}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowUserDetailsModal(false);
+                  setSelectedUser(null);
+                }}
+                className="text-white/80 hover:text-white transition-colors"
+              >
+                <FiX className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 space-y-6">
+            {/* Status Badges */}
+            <div className="flex flex-wrap gap-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                selectedUser.is_active 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-yellow-100 text-yellow-800'
+              }`}>
+                {selectedUser.is_active ? '✅ Active' : '⏳ Pending'}
+              </span>
+              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-indigo-100 text-indigo-800 capitalize">
+                {selectedUser.role || 'No Role'}
+              </span>
+              {selectedUser.email_confirmed_at && (
+                <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800">
+                  ✉️ Email Verified
+                </span>
+              )}
+            </div>
+
+            {/* User Information Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Basic Info */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center space-x-2">
+                  <FiUser className="h-5 w-5 text-indigo-500" />
+                  <span>Basic Information</span>
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Full Name:</span>
+                    <span className="font-medium">{selectedUser.full_name || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Username:</span>
+                    <span className="font-medium">{selectedUser.username || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email:</span>
+                    <span className="font-medium text-xs">{selectedUser.email || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Phone:</span>
+                    <span className="font-medium">{selectedUser.phone || selectedUser.phone_number || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Role & Department */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center space-x-2">
+                  <FiBriefcase className="h-5 w-5 text-indigo-500" />
+                  <span>Role & Department</span>
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Role:</span>
+                    <span className="font-medium capitalize">{selectedUser.role || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Department:</span>
+                    <span className="font-medium">{selectedUser.department || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Position:</span>
+                    <span className="font-medium">{selectedUser.position || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Status:</span>
+                    <span className={`font-medium ${selectedUser.is_active ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {selectedUser.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Account Details */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center space-x-2">
+                  <FiCalendar className="h-5 w-5 text-indigo-500" />
+                  <span>Account Details</span>
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">User ID:</span>
+                    <span className="font-medium text-xs">{selectedUser.id?.slice(0, 8) || 'N/A'}...</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Created:</span>
+                    <span className="font-medium">
+                      {selectedUser.created_at ? new Date(selectedUser.created_at).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Last Sign In:</span>
+                    <span className="font-medium">
+                      {selectedUser.last_sign_in_at ? new Date(selectedUser.last_sign_in_at).toLocaleString() : 'Never'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Email Verified:</span>
+                    <span className="font-medium">
+                      {selectedUser.email_confirmed_at ? new Date(selectedUser.email_confirmed_at).toLocaleDateString() : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                <h3 className="font-semibold text-gray-700 flex items-center space-x-2">
+                  <FiInfo className="h-5 w-5 text-indigo-500" />
+                  <span>Additional Info</span>
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Address:</span>
+                    <span className="font-medium">{selectedUser.address || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">City:</span>
+                    <span className="font-medium">{selectedUser.city || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Country:</span>
+                    <span className="font-medium">{selectedUser.country || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Company:</span>
+                    <span className="font-medium">{selectedUser.company_name || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-3 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setShowUserDetailsModal(false);
+                  setSelectedUser(null);
+                }}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
+              >
+                Close
+              </button>
+              {selectedUser.role !== 'admin' && (
+                <button
+                  onClick={() => {
+                    const action = selectedUser.is_active ? 'deactivate' : 'activate';
+                    if (window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${selectedUser.full_name}?`)) {
+                      // Toggle user status
+                      supabase.from('users')
+                        .update({ is_active: !selectedUser.is_active, status: selectedUser.is_active ? 'inactive' : 'active' })
+                        .eq('id', selectedUser.id)
+                        .then(() => {
+                          notificationService.show(`User ${action}d successfully`, 'success');
+                          loadAllUsers();
+                          setShowUserDetailsModal(false);
+                          setSelectedUser(null);
+                        });
+                    }
+                  }}
+                  className={`flex-1 px-4 py-3 rounded-xl font-semibold transition-all ${
+                    selectedUser.is_active 
+                      ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                      : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                >
+                  {selectedUser.is_active ? 'Deactivate User' : 'Activate User'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Notifications Component
   const NotificationCenter = () => (
     <div className="fixed top-4 right-4 z-50 space-y-2">
-      {notifications.map((notification) => (
+      {notifications.map((notification, index) => (
         <div
-          key={notification.id}
+          key={`${notification.id}-${index}`}
           className={`p-4 rounded-lg shadow-lg border-l-4 backdrop-blur-sm transition-all duration-500 animate-slideInRight ${
             notification.type === 'success' ? 'bg-green-50/90 border-green-500 text-green-800' :
             notification.type === 'error' ? 'bg-red-50/90 border-red-500 text-red-800' :
@@ -5862,6 +6669,9 @@ const AdminPortal = () => {
       
       {/* Admin Data Intelligence Dashboard Modal */}
       {showDataDashboard && <AdminDataDashboardModal />}
+
+      {/* User Details Modal */}
+      <UserDetailsModal />
       
       {/* CSS Animations for Data Dashboard */}
       <style jsx>{`

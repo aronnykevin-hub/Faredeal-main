@@ -26,16 +26,10 @@ const ProductInventoryInterface = () => {
     try {
       setLoading(true);
       
-      // Fetch products with inventory data (skip suppliers for now)
+      // First, try to fetch products without the inventory join
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select(`
-          *,
-          inventory (
-            current_stock
-          )
-        `)
-        .eq('is_active', true)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (productsError) {
@@ -44,23 +38,25 @@ const ProductInventoryInterface = () => {
         return;
       }
 
+      console.log('Raw products from Supabase:', productsData);
+
       // Transform data to match component format
       const transformedProducts = (productsData || []).map(p => ({
         id: p.id,
         name: p.name,
         sku: p.sku,
-        price: parseFloat(p.selling_price || 0),
-        stock: p.inventory?.[0]?.current_stock || 0,
-        minStock: p.inventory?.[0]?.minimum_stock || 10,
-        maxStock: p.inventory?.[0]?.maximum_stock || 100,
+        price: parseFloat(p.selling_price || p.price || 0),
+        stock: p.quantity || p.stock || p.current_stock || 0,
+        minStock: p.low_stock_threshold || p.minimum_stock || p.min_stock || 10,
+        maxStock: p.maximum_stock || p.max_stock || 100,
         status: calculateStatus(
-          p.inventory?.[0]?.current_stock || 0,
-          p.inventory?.[0]?.minimum_stock || 10
+          p.quantity || p.stock || p.current_stock || 0,
+          p.low_stock_threshold || p.minimum_stock || p.min_stock || 10
         ),
-        location: p.inventory?.[0]?.location || 'Not assigned',
-        supplier: p.suppliers?.company_name || 'No supplier',
+        location: p.location || 'Not assigned',
+        supplier: p.supplier_name || p.supplier || 'No supplier',
         productId: p.id,
-        inventoryId: p.inventory?.[0]?.id
+        inventoryId: p.inventory_id || p.id
       }));
 
       setProducts(transformedProducts);

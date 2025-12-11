@@ -617,7 +617,7 @@ const CashierPortal = () => {
 
       // Load today's transactions for this cashier
       const { data: transactions, error } = await supabase
-        .from('transactions')
+        .from('sales_transactions')
         .select('*')
         .eq('cashier_id', user.id)
         .gte('created_at', today.toISOString())
@@ -676,7 +676,7 @@ const CashierPortal = () => {
 
       // Get last 5 transactions
       const { data: transactions, error } = await supabase
-        .from('transactions')
+        .from('sales_transactions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -721,25 +721,30 @@ const CashierPortal = () => {
       const tomorrow = new Date(today);
       tomorrow.setDate(tomorrow.getDate() + 1);
 
-      // Get today's transactions with items
+      // Get today's transactions
       const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('items')
+        .from('sales_transactions')
+        .select('*')
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString());
 
       if (error) {
         console.error('Error loading top products:', error);
+        // Set empty data instead of returning
+        setTopProducts([]);
         return;
       }
 
       if (transactions && transactions.length > 0) {
-        // Aggregate product sales
+        // Check if items are stored as JSON in a column or if we need to join with another table
         const productStats = {};
         
         transactions.forEach(transaction => {
-          if (transaction.items && Array.isArray(transaction.items)) {
-            transaction.items.forEach(item => {
+          // Try different possible column names for items
+          const items = transaction.items || transaction.transaction_items || transaction.line_items || [];
+          
+          if (items && Array.isArray(items)) {
+            items.forEach(item => {
               const productName = item.name || item.product_name || 'Unknown Product';
               if (!productStats[productName]) {
                 productStats[productName] = {
@@ -785,7 +790,7 @@ const CashierPortal = () => {
         nextDay.setDate(nextDay.getDate() + 1);
 
         const { data: dayTransactions, error } = await supabase
-          .from('transactions')
+          .from('sales_transactions')
           .select('*')
           .gte('created_at', date.toISOString())
           .lt('created_at', nextDay.toISOString());
@@ -832,8 +837,8 @@ const CashierPortal = () => {
 
       // Get today's transactions with items
       const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('items')
+        .from('sales_transactions')
+        .select('*')
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString());
 

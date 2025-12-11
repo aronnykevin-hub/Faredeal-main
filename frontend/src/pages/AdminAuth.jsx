@@ -16,6 +16,7 @@ const AdminAuth = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [urlAllowed, setUrlAllowed] = useState(true);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -32,10 +33,32 @@ const AdminAuth = () => {
   const [errors, setErrors] = useState({});
   const [passwordStrength, setPasswordStrength] = useState(0);
 
+  // Check if URL is allowed for admin access
+  useEffect(() => {
+    checkURLAccess();
+  }, []);
+
   // Check if already logged in
   useEffect(() => {
-    checkAuth();
-  }, []);
+    if (urlAllowed) {
+      checkAuth();
+    }
+  }, [urlAllowed]);
+
+  const checkURLAccess = () => {
+    const currentURL = window.location.href.toLowerCase();
+    const allowedURLs = [
+      'http://localhost:5173',
+      'https://faredeal-main.vercel.app'
+    ];
+    
+    const isAllowed = allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+    setUrlAllowed(isAllowed);
+    
+    if (!isAllowed) {
+      console.warn('Admin access blocked - Unauthorized URL:', window.location.href);
+    }
+  };
 
   const checkAuth = async () => {
     try {

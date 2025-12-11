@@ -10,10 +10,28 @@ const AdminProtectedRoute = ({ children }) => {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isURLAllowed, setIsURLAllowed] = useState(false);
 
   useEffect(() => {
+    checkURLAccess();
     checkAuth();
   }, []);
+
+  const checkURLAccess = () => {
+    const currentURL = window.location.href.toLowerCase();
+    const allowedURLs = [
+      'http://localhost:5173',
+      'https://faredeal-main.vercel.app'
+    ];
+    
+    // Check if current URL is from allowed domains
+    const isAllowed = allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+    setIsURLAllowed(isAllowed);
+    
+    if (!isAllowed) {
+      console.warn('Admin access blocked - Unauthorized URL:', window.location.href);
+    }
+  };
 
   const checkAuth = async () => {
     try {
@@ -40,6 +58,29 @@ const AdminProtectedRoute = ({ children }) => {
       setLoading(false);
     }
   };
+
+  // Block access if URL is not allowed
+  if (!isURLAllowed && !loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto text-center p-8 bg-white rounded-lg shadow-xl">
+          <div className="text-6xl mb-4">🚫</div>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Unauthorized Access</h1>
+          <p className="text-gray-700 mb-6">Admin access is only allowed from:</p>
+          <div className="bg-gray-100 p-4 rounded-lg text-left mb-6">
+            <p className="font-mono text-sm mb-2">• http://localhost:5173/#admin</p>
+            <p className="font-mono text-sm">• https://faredeal-main.vercel.app/#admin</p>
+          </div>
+          <button
+            onClick={() => window.location.href = '/'}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Go to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Show loading spinner while checking authentication
   if (loading) {
