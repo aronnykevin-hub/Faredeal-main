@@ -77,8 +77,28 @@ class TransactionService {
         .single();
 
       if (transactionError) {
+        // Handle duplicate receipt number
+        if (transactionError.message?.includes('duplicate') && transactionError.message?.includes('receipt_number')) {
+          console.warn('⚠️ Duplicate receipt number detected, retrying with new number...');
+          // Retry with a new unique receipt number
+          transactionRecord.receipt_number = `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+          
+          const { data: retryTransaction, error: retryError } = await supabase
+            .from('sales_transactions')
+            .insert(transactionRecord)
+            .select()
+            .single();
+          
+          if (retryError) {
+            console.error('❌ Transaction insert error (retry failed):', retryError);
+            throw new Error(`Failed to save transaction: ${retryError.message}`);
+          }
+          
+          return await this.handleSuccessfulTransaction(retryTransaction, items);
+        }
+        
         console.error('❌ Transaction insert error:', transactionError);
-        throw transactionError;
+        throw new Error(transactionError.message || 'Failed to save transaction');
       }
 
       console.log('✅ Transaction saved:', transaction);
@@ -112,15 +132,17 @@ class TransactionService {
       return {
         success: true,
         transaction,
-        receiptNumber,
-        transactionId
+        receiptNumber: transaction.receipt_number || receiptNumber,
+        transactionId: transaction.transaction_id || transactionId
       };
 
     } catch (error) {
       console.error('❌ Error saving transaction:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
+        receiptNumber: null,
+        transactionId: null
       };
     }
   }
@@ -130,27 +152,37 @@ class TransactionService {
   // ===================================================
   async generateReceiptNumber() {
     try {
-      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const today = new Date();
+      const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+      const startOfDay = new Date(today);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(today);
+      endOfDay.setHours(23, 59, 59, 999);
       
-      // Get today's transaction count
+      // Get today's transaction count using proper ISO format
       const { count, error } = await supabase
         .from('sales_transactions')
         .select('*', { count: 'exact', head: true })
-        .gte('transaction_date', new Date().setHours(0, 0, 0, 0))
-        .lte('transaction_date', new Date().setHours(23, 59, 59, 999));
+        .gte('transaction_date', startOfDay.toISOString())
+        .lt('transaction_date', endOfDay.toISOString());
 
       if (error) {
-        console.error('Error counting transactions:', error);
+        console.warn('⚠️ Error counting transactions, using timestamp fallback:', error);
+        // Use timestamp-based fallback
+        return `RCP-${dateStr}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}-${Date.now().toString(36).toUpperCase()}`;
       }
 
       const counter = (count || 0) + 1;
-      const receiptNumber = `RCP-${today}-${String(counter).padStart(4, '0')}`;
+      const receiptNumber = `RCP-${dateStr}-${String(counter).padStart(4, '0')}`;
       
+      console.log(`✅ Generated receipt number: ${receiptNumber} (${counter} today)`);
       return receiptNumber;
     } catch (error) {
-      console.error('Error generating receipt number:', error);
-      // Fallback to timestamp-based
-      return `RCP-${Date.now()}`;
+      console.error('❌ Error generating receipt number:', error);
+      // Fallback to timestamp-based - guaranteed unique
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+      return `RCP-${timestamp}-${random}`;
     }
   }
 
@@ -374,20 +406,20 @@ class TransactionService {
         total_tax_collected: transactions.reduce((sum, t) => sum + parseFloat(t.tax_amount || 0), 0),
         total_discounts_given: transactions.reduce((sum, t) => sum + parseFloat(t.discount_amount || 0), 0),
         
-        // Payment methods
-        cash_transactions: transactions.filter(t => t.payment_method === 'cash').length,
-        cash_amount: transactions.filter(t => t.payment_method === 'cash').reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
-        momo_transactions: transactions.filter(t => t.payment_method === 'momo').length,
-        momo_amount: transactions.filter(t => t.payment_method === 'momo').reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
-        airtel_transactions: transactions.filter(t => t.payment_method === 'airtel').length,
-        airtel_amount: transactions.filter(t => t.payment_method === 'airtel').reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
-        card_transactions: transactions.filter(t => t.payment_method === 'card').length,
-        card_amount: transactions.filter(t => t.payment_method === 'card').reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
+        // Payment methods - Fixed: using payment_provider instead of payment_method
+        cash_transactions: transactions.filter(t => t.payment_provider?.toLowerCase() === 'cash').length,
+        cash_amount: transactions.filter(t => t.payment_provider?.toLowerCase() === 'cash').reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
+        momo_transactions: transactions.filter(t => t.payment_provider?.toLowerCase().includes('mtn') || t.payment_provider?.toLowerCase().includes('momo')).length,
+        momo_amount: transactions.filter(t => t.payment_provider?.toLowerCase().includes('mtn') || t.payment_provider?.toLowerCase().includes('momo')).reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
+        airtel_transactions: transactions.filter(t => t.payment_provider?.toLowerCase().includes('airtel')).length,
+        airtel_amount: transactions.filter(t => t.payment_provider?.toLowerCase().includes('airtel')).reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
+        card_transactions: transactions.filter(t => t.payment_provider?.toLowerCase().includes('card') || t.payment_provider?.toLowerCase().includes('visa') || t.payment_provider?.toLowerCase().includes('mastercard')).length,
+        card_amount: transactions.filter(t => t.payment_provider?.toLowerCase().includes('card') || t.payment_provider?.toLowerCase().includes('visa') || t.payment_provider?.toLowerCase().includes('mastercard')).reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0),
         
         // Performance
         average_basket_size: transactions.length > 0 ? transactions.reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0) / transactions.length : 0,
         largest_transaction: Math.max(...transactions.map(t => parseFloat(t.total_amount || 0)), 0),
-        smallest_transaction: transactions.length > 0 ? Math.min(...transactions.map(t => parseFloat(t.total_amount || 0))) : 0,
+        smallest_transaction: transactions.length > 0 ? Math.min(...transactions.filter(t => parseFloat(t.total_amount || 0) > 0).map(t => parseFloat(t.total_amount || 0))) : 0,
         total_items_sold: transactions.reduce((sum, t) => sum + parseInt(t.items_count || 0), 0),
       };
 

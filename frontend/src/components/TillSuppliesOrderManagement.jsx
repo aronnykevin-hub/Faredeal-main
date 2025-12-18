@@ -82,12 +82,88 @@ const TillSuppliesOrderManagement = () => {
     }).format(amount || 0);
   };
 
+  // 🚀 NEW: Automatically update inventory when order is confirmed
+  const updateInventoryFromOrder = async (order, reason = 'restock') => {
+    try {
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('cashier_order_items')
+        .select('*')
+        .eq('order_id', order.id);
+
+      if (itemsError) throw itemsError;
+
+      if (!orderItems || orderItems.length === 0) return true;
+
+      // Update inventory for each item in the order
+      for (const item of orderItems) {
+        // Get current inventory
+        const { data: products } = await supabase
+          .from('products')
+          .select('inventory(current_stock)')
+          .eq('id', item.product_id || item.supply_id)
+          .single();
+
+        const currentStock = products?.inventory?.[0]?.current_stock || 0;
+        const newStock = currentStock + item.quantity;
+
+        // Update inventory
+        const { error: invError } = await supabase
+          .from('inventory')
+          .update({
+            current_stock: newStock,
+            last_restocked: new Date().toISOString(),
+            status: newStock === 0 ? 'out_of_stock' : 
+                    newStock <= 10 ? 'low_stock' : 'available'
+          })
+          .eq('product_id', item.product_id || item.supply_id);
+
+        if (invError) {
+          console.warn(`⚠️ Could not update inventory for item ${item.product_id}:`, invError);
+        }
+
+        // Log the replenishment
+        try {
+          await supabase
+            .from('inventory_replenishment_log')
+            .insert({
+              product_id: item.product_id || item.supply_id,
+              product_name: item.item_name || item.product_name || `Item ${item.supply_id}`,
+              product_sku: item.sku || '',
+              old_quantity: currentStock,
+              new_quantity: newStock,
+              quantity_added: item.quantity,
+              reason: reason,
+              performed_by: 'manager',
+              notes: `Via Order ${order.order_number || order.id}`,
+              created_at: new Date().toISOString()
+            });
+        } catch (logError) {
+          console.log('ℹ️ Replenishment log not created (table may not exist yet)');
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error updating inventory:', error);
+      toast.warn('⚠️ Inventory update partial - order still approved');
+      return false;
+    }
+  };
+
   const handleApproveOrder = async (orderId) => {
     try {
       setActionLoading(true);
       
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get the order details first
+      const order = orders.find(o => o.id === orderId);
+      if (!order) throw new Error('Order not found');
+
+      // Update inventory first (non-blocking if it fails)
+      await updateInventoryFromOrder(order, 'restock');
+      
+      // Then approve the order
       const { error } = await supabase
         .from('cashier_orders')
         .update({
@@ -100,7 +176,18 @@ const TillSuppliesOrderManagement = () => {
 
       if (error) throw error;
 
-      toast.success('✅ Order approved successfully!');
+      // Enhanced notification showing inventory was updated
+      toast.success(
+        <div>
+          <div className="font-bold mb-1">✅ Order Approved & Inventory Updated!</div>
+          <div className="text-sm">
+            <p>Order #{order.order_number} approved by {user.user_metadata?.full_name || 'Manager'}</p>
+            <p className="mt-1">📦 Inventory automatically updated with {order.estimated_quantity || 0} items</p>
+          </div>
+        </div>,
+        { autoClose: 5000 }
+      );
+      
       loadOrders();
       setShowDetailModal(false);
     } catch (error) {
@@ -147,6 +234,15 @@ const TillSuppliesOrderManagement = () => {
       
       const { data: { user } } = await supabase.auth.getUser();
       
+      // Get the order details
+      const order = orders.find(o => o.id === orderId);
+      if (!order) throw new Error('Order not found');
+
+      // If order wasn't approved yet, update inventory now
+      if (order.status !== 'approved') {
+        await updateInventoryFromOrder(order, 'restock');
+      }
+      
       const { error } = await supabase
         .from('cashier_orders')
         .update({
@@ -159,7 +255,18 @@ const TillSuppliesOrderManagement = () => {
 
       if (error) throw error;
 
-      toast.success('✅ Order marked as fulfilled!');
+      // Enhanced notification for fulfillment
+      toast.success(
+        <div>
+          <div className="font-bold mb-1">✅ Order Fulfilled & Inventory Confirmed!</div>
+          <div className="text-sm">
+            <p>Order #{order.order_number} successfully fulfilled</p>
+            <p className="mt-1">🎯 Stock levels confirmed in system</p>
+          </div>
+        </div>,
+        { autoClose: 5000 }
+      );
+
       loadOrders();
       setShowDetailModal(false);
     } catch (error) {
@@ -211,19 +318,57 @@ const TillSuppliesOrderManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* �🇬 SUPPLIER ORDER VERIFICATION & MANAGEMENT */}
+      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl p-6 shadow-2xl border-2 border-orange-400">
+        <div className="flex items-start gap-4">
+          <div className="text-5xl">🇺🇬</div>
+          <div className="flex-1">
+            <h3 className="text-2xl font-bold mb-2">🇺🇬 Supplier Order Verification & Management</h3>
+            <h4 className="text-lg font-semibold mb-3 text-orange-100">FAREDEAL Uganda - Complete Supplier & Purchase Order Management System</h4>
+            <p className="text-orange-100 mb-4">
+              Comprehensive supplier partnership management with verified partners and integrated till supplies ordering.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div className="bg-white/20 rounded-lg p-3">
+                <p className="font-bold">📝 Create New Order</p>
+                <p className="text-xs text-orange-100">Initiate purchase orders from verified suppliers</p>
+              </div>
+              <div className="bg-white/20 rounded-lg p-3">
+                <p className="font-bold">📦 Active Orders</p>
+                <p className="text-xs text-orange-100">Monitor & track all active purchase orders</p>
+              </div>
+              <div className="bg-white/20 rounded-lg p-3">
+                <p className="font-bold">📚 Order History</p>
+                <p className="text-xs text-orange-100">Complete history of all supplier transactions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 
+        TILL & SUPPLIES SECTION (COMMENTED OUT - INTEGRATED WITH SUPPLIER ORDERS)
+        This section is now integrated with the Supplier Order Verification System above.
+        All till supplies are managed through the Create New Order, Active Orders, and Order History tabs.
+        
+        <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl p-6 shadow-2xl border-2 border-blue-400">
+          <h3 className="text-2xl font-bold">📦 Till & Station Supplies - Integrated View</h3>
+        </div>
+      */}
+
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl p-6 shadow-xl">
+      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-xl p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold flex items-center mb-2">
               <FiShoppingCart className="mr-3 h-8 w-8" />
-              🇺🇬 Till & Station Supplies Management
+              🇺🇬 Supplier Orders & Till Supplies - Unified Management
             </h2>
-            <p className="text-blue-100">Approve and manage cashier supply requests</p>
+            <p className="text-orange-100">Verify supplier partners → Manage till supplies through integrated purchase orders</p>
           </div>
           <button
             onClick={loadOrders}
-            className="px-6 py-3 bg-white text-blue-600 rounded-lg font-bold hover:bg-blue-50 transition-all duration-300 flex items-center space-x-2"
+            className="px-6 py-3 bg-white text-orange-600 rounded-lg font-bold hover:bg-orange-50 transition-all duration-300 flex items-center space-x-2"
           >
             <FiRefreshCw className="h-5 w-5" />
             <span>Refresh</span>

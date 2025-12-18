@@ -4,7 +4,6 @@ import { ToastContainer } from 'react-toastify';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AppProvider } from '@/contexts/AppContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import FloatingScanner from '@/components/FloatingScanner';
 import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 
 // Pages and Components
@@ -16,7 +15,7 @@ import CashierAuth from '@/pages/CashierAuth';
 import EmployeeAuth from '@/pages/EmployeeAuth';
 import SupplierAuth from '@/pages/SupplierAuth';
 import ManagerPortal from '@/pages/ManagerPortal';
-import CashierPortal from '@/pages/CashierPortal';
+import CashierPortal from '@/pages/CushierPortal';
 import EmployeePortal from '@/pages/cashier portal';
 import SupplierPortal from '@/pages/SupplierPortal';
 import PortalLanding from '@/pages/PortalLanding';
@@ -212,9 +211,6 @@ function App() {
                 } 
               />
             </Routes>
-            
-            {/* Global Floating Scanner */}
-            <FloatingScanner />
             
             <ToastContainer
               position="top-right"

@@ -5,7 +5,7 @@
  * Version: 2.0.0
  */
 
-import supabase from '../assets/configsupabase';
+import { supabase } from './supabase';
 
 class AdminService {
   constructor() {

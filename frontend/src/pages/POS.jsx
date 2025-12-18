@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { createClient } from '@supabase/supabase-js';
 import ReceiptModal from '../components/ReceiptModal';
-import BarcodeScannerModal from '../components/BarcodeScannerModal';
+import DualScannerInterface from '../components/DualScannerInterface';
+import SupplierOrderManagement from '../components/SupplierOrderManagement';
 import {
   FiSearch,
   FiPlus,
@@ -35,10 +37,17 @@ import {
   FiX,
   FiVolume2,
   FiPackage,
-  FiFileText
+  FiFileText,
+  FiTruck
 } from 'react-icons/fi';
 
 const POS = () => {
+  // Initialize Supabase
+  const supabase = createClient(
+    'https://zwmupgbixextqlexknnu.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3bXVwZ2JpeGV4dHFsZXhrbiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzAyNTU3MzE2LCJleHAiOjE3MzQwOTMzMTZ9.OjSqZ_Qz1VdxfCXUBh5B9gZGo1V6Gu3q1sN3y4pV8BA'
+  );
+
   // Core state
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
@@ -55,8 +64,6 @@ const POS = () => {
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [loading, setLoading] = useState(false);
   const [amountReceived, setAmountReceived] = useState('');
-  const [showBarcode, setShowBarcode] = useState(false);
-  const [barcodeInput, setBarcodeInput] = useState('');
   
   // UI Enhancement Features
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -68,7 +75,6 @@ const POS = () => {
   const [lastSale, setLastSale] = useState(null);
   const [theme, setTheme] = useState('vibrant'); // vibrant, minimal, dark
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   
   // Creative Features
   const [cashierMood, setCashierMood] = useState('happy'); // happy, focused, energetic
@@ -77,9 +83,16 @@ const POS = () => {
   const [weatherWidget, setWeatherWidget] = useState('sunny');
   const [celebrations, setCelebrations] = useState([]);
   
+  // Barcode Scanner State
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
+  
   // Refs
-  const barcodeRef = useRef(null);
   const audioRef = useRef(null);
+  const barcodeRef = useRef(null);
+  
+  // Supplier Order Management
+  const [showOrderManagement, setShowOrderManagement] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -98,10 +111,8 @@ const POS = () => {
 
   // Auto-focus barcode scanner
   useEffect(() => {
-    if (showBarcode && barcodeRef.current) {
-      barcodeRef.current.focus();
-    }
-  }, [showBarcode]);
+    // DualScannerInterface handles its own focus management
+  }, []);
 
   // Dynamic mood changes based on sales performance
   useEffect(() => {
@@ -111,14 +122,163 @@ const POS = () => {
     else setCashierMood('focused');
   }, [todaysSales, dailyTarget]);
 
+  // Real-time subscription to products table
+  useEffect(() => {
+    // Initial fetch
+    fetchProducts();
+
+    // Subscribe to product changes
+    const subscription = supabase
+      .channel('products_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events: INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'products'
+        },
+        (payload) => {
+          console.log('🔄 Real-time product update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            // New product added - refresh the products list
+            console.log('🆕 New product detected:', payload.new.name);
+            fetchProducts();
+          } else if (payload.eventType === 'UPDATE') {
+            // Product updated - refresh the products list
+            console.log('📝 Product updated:', payload.new.name);
+            fetchProducts();
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, []);
+
   const fetchProducts = async () => {
     try {
-      const response = await axios.get('/api/products', {
-        params: { limit: 100, isActive: true },
-      });
-      setProducts(response.data.products || []);
+      // Step 1: Fetch from Admin Portal's main inventory (products table with inventory relation)
+      const { data: adminProducts, error: adminError } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          selling_price,
+          cost_price,
+          tax_rate,
+          barcode,
+          sku,
+          category_id,
+          is_active,
+          inventory (
+            id,
+            current_stock,
+            minimum_stock,
+            maximum_stock,
+            status
+          )
+        `)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (adminError) {
+        console.error('❌ Admin inventory fetch error:', adminError);
+      }
+
+      console.log('📦 Products from Admin Portal inventory:', adminProducts?.length || 0);
+
+      // Step 2: Also fetch from POS inventory table (products added via supplier orders)
+      const { data: posInventory, error: posError } = await supabase
+        .from('products_inventory')
+        .select('*')
+        .eq('status', 'available')
+        .order('product_name', { ascending: true });
+
+      if (posError) {
+        console.warn('⚠️ POS inventory fetch warning:', posError);
+      }
+
+      console.log('📦 Products from POS inventory:', posInventory?.length || 0);
+
+      // Combine and transform products from both sources
+      const allProducts = [];
+      const productNames = new Set();
+
+      // Add products from Admin Portal inventory
+      if (adminProducts && adminProducts.length > 0) {
+        adminProducts.forEach(product => {
+          const inventoryData = product.inventory?.[0];
+          if (inventoryData && inventoryData.current_stock > 0) {
+            allProducts.push({
+              _id: product.id,
+              id: product.id,
+              name: product.name,
+              price: product.price || product.selling_price || 0,
+              selling_price: product.selling_price,
+              cost_price: product.cost_price,
+              tax_rate: product.tax_rate,
+              barcode: product.barcode,
+              sku: product.sku,
+              stock: inventoryData?.current_stock || 0,
+              minimum_stock: inventoryData?.minimum_stock || 0,
+              maximum_stock: inventoryData?.maximum_stock || 1000,
+              category_id: product.category_id,
+              isActive: product.is_active,
+              inventoryStatus: inventoryData?.status || 'in_stock',
+              sourcePortal: 'Admin Portal',
+              source: 'admin'
+            });
+            productNames.add(product.name);
+          }
+        });
+      }
+
+      // Add products from POS inventory (supplier orders) - avoid duplicates
+      if (posInventory && posInventory.length > 0) {
+        posInventory.forEach(item => {
+          if (!productNames.has(item.product_name) && item.quantity > 0) {
+            allProducts.push({
+              _id: item.id,
+              id: item.id,
+              name: item.product_name,
+              price: item.selling_price || item.cost_price || 0,
+              selling_price: item.selling_price,
+              cost_price: item.cost_price,
+              tax_rate: 18, // Default tax rate
+              barcode: item.barcode,
+              sku: item.barcode,
+              stock: item.quantity,
+              minimum_stock: item.reorder_level || 5,
+              category_id: null,
+              isActive: true,
+              inventoryStatus: item.status || 'available',
+              sourcePortal: 'POS Inventory',
+              source: 'pos'
+            });
+            productNames.add(item.product_name);
+          }
+        });
+      }
+
+      // Sort by name
+      allProducts.sort((a, b) => a.name.localeCompare(b.name));
+
+      setProducts(allProducts);
+      console.log(`✅ Total products loaded: ${allProducts.length} (Admin: ${adminProducts?.length || 0}, POS: ${posInventory?.length || 0})`);
+      
+      if (allProducts.length === 0) {
+        toast.info('📦 No products available. Add products through:\n1. Admin Portal inventory\n2. Or approve supplier orders');
+      }
     } catch (error) {
-      toast.error('Failed to fetch products');
+      console.error('❌ Failed to fetch products:', error);
+      toast.error('Failed to load products');
       setProducts([]);
     }
   };
@@ -601,7 +761,7 @@ const POS = () => {
           </div>
 
           {/* Barcode Scanner Input */}
-          {showBarcode && (
+          {showBarcodeScanner && (
             <div className="bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-4">
               <div className="flex items-center space-x-3">
                 <FiCamera className="h-6 w-6 text-green-600" />
@@ -647,66 +807,67 @@ const POS = () => {
           </div>
         </div>
 
-        {/* Creative Products Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-            {filteredProducts.map(product => (
-              <div
-                key={product._id}
-                className="bg-white rounded-2xl shadow-lg border border-gray-200 p-4 hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:scale-105 group"
-                onClick={() => addToCart(product)}
-              >
-                <div className="text-center">
-                  {/* Creative Product Avatar */}
-                  <div className="h-20 w-20 mx-auto bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400 rounded-2xl mb-3 flex items-center justify-center group-hover:from-purple-500 group-hover:via-pink-500 group-hover:to-blue-500 transition-all duration-300 shadow-lg">
-                    <span className="text-3xl">
-                      {getProductEmoji(product.category)}
-                    </span>
-                  </div>
-                  
-                  {/* Product Info */}
-                  <h3 className="text-sm font-bold text-gray-900 mb-1 line-clamp-2 group-hover:text-purple-600 transition-colors">
-                    {product.name}
-                  </h3>
-                  
-                  <p className="text-xs text-gray-500 mb-2">
-                    {product.brand} • {product.unit || 'piece'}
-                  </p>
-                  
-                  {/* Price with Ugandan styling */}
-                  <div className="space-y-2">
-                    <p className="text-lg font-bold text-green-600">
-                      {formatCurrency(product.price)}
-                    </p>
-                    
-                    {/* Stock Status with emoji */}
-                    <p className={`text-xs font-bold px-3 py-1 rounded-full ${
-                      product.stock > 10 
-                        ? 'bg-green-100 text-green-800' 
-                        : product.stock > 0 
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {product.stock > 10 ? '✅' : product.stock > 0 ? '⚠️' : '❌'} 
-                      Stock: {product.stock}
-                    </p>
-                    
-                    {/* Local Product Badge */}
-                    {product.countryOfOrigin === 'Uganda' && (
-                      <div className="mt-2">
-                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full font-bold">
-                          🇺🇬 Local Pride
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* POS Inventory Header with Orders Button */}
+        <div className="bg-gradient-to-r from-green-600 to-teal-600 text-white p-6 flex items-center justify-between shadow-lg">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center mb-1">
+              🛒 POS Inventory
+            </h2>
+            <p className="text-green-100 text-sm">Products available for sale in POS system</p>
           </div>
-          
-          {/* Empty State */}
-          {filteredProducts.length === 0 && (
+          <div className="flex items-center space-x-3">
+            <span className="text-3xl font-bold text-green-100">{filteredProducts.length}</span>
+            <span className="text-green-100 font-semibold">Products</span>
+            {/* Commented out Add Product button - Manager portal orders disabled
+            <button
+              onClick={() => setShowOrderManagement(true)}
+              className="ml-6 px-6 py-3 rounded-xl transition-all bg-gradient-to-r from-orange-500 to-red-600 text-white hover:from-orange-600 hover:to-red-700 shadow-lg font-bold flex items-center space-x-2 transform hover:scale-105"
+              title="Manage Supplier Orders"
+            >
+              <FiTruck className="h-5 w-5" />
+              <span>📦 Add Product</span>
+            </button>
+            */}
+          </div>
+        </div>
+
+        {/* Creative Products Grid - Compact Mobile Format */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {filteredProducts.length > 0 ? (
+            <div className="space-y-2">
+              {filteredProducts.map(product => {
+                const stock = product.stock || 0;
+                const stockStatus = stock > 10 ? 'text-green-600' : stock > 0 ? 'text-yellow-600' : 'text-red-600';
+                
+                return (
+                  <div
+                    key={product._id}
+                    onClick={() => addToCart(product)}
+                    className="bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-400 transition-all hover:shadow-md cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-800 text-sm break-words flex items-center">
+                          <span className="mr-2 text-lg">{getProductEmoji(product.category)}</span>
+                          {product.name}
+                        </p>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">SKU: {product.sku || 'N/A'}</span>
+                          <span className={`text-xs font-bold px-2 py-1 rounded ${stockStatus}`}>
+                            {stock > 10 ? '✓ Stock' : stock > 0 ? '⚠️ Low' : '❌ Out'}: {stock}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-green-600">{formatCurrency(product.price)}</p>
+                        <p className="text-xs text-gray-600 mt-1">{product.brand || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
             <div className="text-center py-12">
               <div className="h-24 w-24 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <FiPackage className="h-12 w-12 text-gray-400" />
@@ -859,35 +1020,39 @@ const POS = () => {
         saleData={lastSale}
       />
 
-      {/* Advanced Barcode Scanner Modal */}
-      <BarcodeScannerModal
-        isOpen={showBarcodeScanner}
-        onClose={() => setShowBarcodeScanner(false)}
-        onBarcodeScanned={handleBarcodeScanned}
-      />
+      {/* Dual Scanner Interface */}
+      {showBarcodeScanner && (
+        <DualScannerInterface
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
 
-      {/* Floating Scanner Quick Access */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setShowBarcodeScanner(true)}
-          className="group relative w-16 h-16 bg-gradient-to-br from-blue-500 via-purple-600 to-green-500 rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 animate-bounce"
-          title="Quick Scanner Access"
-        >
-          <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/30 to-orange-500/30 rounded-full animate-pulse"></div>
-          <div className="relative flex items-center justify-center h-full">
-            <FiCamera className="h-8 w-8 text-white" />
+      {/* Supplier Order Management Modal */}
+      {showOrderManagement && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white p-6 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <FiTruck className="h-8 w-8" />
+                <h2 className="text-2xl font-bold">📦 Supplier Order Management</h2>
+              </div>
+              <button
+                onClick={() => setShowOrderManagement(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-all"
+              >
+                <FiX className="h-6 w-6" />
+              </button>
+            </div>
+            
+            {/* Modal Content */}
+            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+              <SupplierOrderManagement />
+            </div>
           </div>
-          
-          {/* Pulse ring */}
-          <div className="absolute inset-0 rounded-full border-4 border-blue-400 animate-ping opacity-50"></div>
-          
-          {/* Floating label */}
-          <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-80 text-white text-xs px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            🔍 Hardware Scanner
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-black border-opacity-80"></div>
-          </div>
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

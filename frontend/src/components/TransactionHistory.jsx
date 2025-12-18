@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import transactionService from '../services/transactionService';
 import Receipt from './Receipt';
 
-const TransactionHistory = ({ cashierId = null, viewMode = 'cashier' }) => {
+const TransactionHistory = ({ cashierId = null, viewMode = 'cashier', savedReceipts = [] }) => {
   // viewMode: 'cashier' (own transactions), 'manager' (all transactions), 'admin' (all + analytics)
   const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
@@ -27,6 +27,8 @@ const TransactionHistory = ({ cashierId = null, viewMode = 'cashier' }) => {
     averageBasket: 0,
     totalItems: 0
   });
+  const [localReceiptsOnly, setLocalReceiptsOnly] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     loadTransactions();
@@ -36,6 +38,12 @@ const TransactionHistory = ({ cashierId = null, viewMode = 'cashier' }) => {
   useEffect(() => {
     filterTransactions();
   }, [transactions, searchTerm, paymentFilter]);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-UG', {
@@ -298,67 +306,100 @@ www.faredeal.ug
   return (
     <div className="space-y-6">
       {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform">
-          <FiShoppingCart className="h-8 w-8 mb-2 opacity-80" />
-          <p className="text-sm opacity-80">Transactions</p>
-          <p className="text-3xl font-bold">{statsData.totalTransactions}</p>
-          <p className="text-xs opacity-60 mt-1">{dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : dateFilter === 'month' ? 'This Month' : 'This Year'}</p>
+      <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4'}`}>
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-transform">
+          <FiShoppingCart className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} mb-2 opacity-80`} />
+          <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Transactions</p>
+          <p className={`font-bold ${isMobile ? 'text-xl' : 'text-3xl'}`}>{statsData.totalTransactions}</p>
+          <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>{dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : dateFilter === 'month' ? 'This Month' : 'This Year'}</p>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform">
-          <FiDollarSign className="h-8 w-8 mb-2 opacity-80" />
-          <p className="text-sm opacity-80">Total Sales</p>
-          <p className="text-2xl font-bold">{formatCurrency(statsData.totalSales)}</p>
-          <p className="text-xs opacity-60 mt-1">Revenue Generated</p>
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-transform">
+          <FiDollarSign className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} mb-2 opacity-80`} />
+          <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Total Sales</p>
+          <p className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatCurrency(statsData.totalSales)}</p>
+          <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>Revenue</p>
         </div>
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform">
-          <FiTrendingUp className="h-8 w-8 mb-2 opacity-80" />
-          <p className="text-sm opacity-80">Avg Basket</p>
-          <p className="text-2xl font-bold">{formatCurrency(statsData.averageBasket)}</p>
-          <p className="text-xs opacity-60 mt-1">Per Transaction</p>
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-transform">
+          <FiTrendingUp className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} mb-2 opacity-80`} />
+          <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Avg Basket</p>
+          <p className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatCurrency(statsData.averageBasket)}</p>
+          <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>Per Tx</p>
         </div>
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg transform hover:scale-105 transition-transform">
-          <FiShoppingCart className="h-8 w-8 mb-2 opacity-80" />
-          <p className="text-sm opacity-80">Items Sold</p>
-          <p className="text-3xl font-bold">{statsData.totalItems}</p>
-          <p className="text-xs opacity-60 mt-1">Total Products</p>
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-4 text-white shadow-lg transform hover:scale-105 transition-transform">
+          <FiShoppingCart className={`${isMobile ? 'h-6 w-6' : 'h-8 w-8'} mb-2 opacity-80`} />
+          <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Items Sold</p>
+          <p className={`font-bold ${isMobile ? 'text-xl' : 'text-3xl'}`}>{statsData.totalItems}</p>
+          <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>Total Products</p>
         </div>
       </div>
 
+      {/* Daily Report Insights */}
+      {dailyReport && (
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+          {/* Tax Collected */}
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-4 text-white shadow-lg">
+            <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>💰 Tax Collected</p>
+            <p className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatCurrency(dailyReport.total_tax_collected || 0)}</p>
+            <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>18% VAT</p>
+          </div>
+
+          {/* Payment Methods Summary */}
+          <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-xl p-4 text-white shadow-lg">
+            <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>📊 Payment Methods</p>
+            <div className={`${isMobile ? 'text-xs' : 'text-sm'} mt-2 space-y-1`}>
+              {dailyReport.cash_transactions > 0 && <p>💵 Cash: {dailyReport.cash_transactions} (${formatCurrency(dailyReport.cash_amount)})</p>}
+              {dailyReport.momo_transactions > 0 && <p>📱 MTN: {dailyReport.momo_transactions} (${formatCurrency(dailyReport.momo_amount)})</p>}
+              {dailyReport.airtel_transactions > 0 && <p>📱 Airtel: {dailyReport.airtel_transactions} (${formatCurrency(dailyReport.airtel_amount)})</p>}
+              {dailyReport.card_transactions > 0 && <p>💳 Card: {dailyReport.card_transactions} (${formatCurrency(dailyReport.card_amount)})</p>}
+            </div>
+          </div>
+
+          {/* Performance Metrics */}
+          <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl p-4 text-white shadow-lg">
+            <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>📈 Performance</p>
+            <div className={`${isMobile ? 'text-xs' : 'text-sm'} mt-2 space-y-1`}>
+              <p>🏆 Largest: {formatCurrency(dailyReport.largest_transaction || 0)}</p>
+              <p>🔻 Smallest: {formatCurrency(dailyReport.smallest_transaction || 0)}</p>
+              <p>📦 Avg Size: {formatCurrency(dailyReport.average_basket_size || 0)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters & Actions */}
-      <div className="bg-white rounded-xl p-6 shadow-lg">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0 gap-4">
+      <div className={`bg-white rounded-xl shadow-lg ${isMobile ? 'p-3' : 'p-6'}`}>
+        <div className={`flex flex-col ${isMobile ? 'space-y-2' : 'md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0'} gap-2 ${!isMobile && 'md:gap-4'}`}>
           {/* Search */}
-          <div className="flex-1 max-w-md">
+          <div className={`${isMobile ? 'w-full' : 'flex-1 max-w-md'}`}>
             <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search receipt, customer, phone..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={isMobile ? "Search..." : "Search receipt, customer, phone..."}
+                className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isMobile ? 'text-sm' : ''}`}
               />
             </div>
           </div>
 
           {/* Filters */}
-          <div className="flex items-center space-x-3">
+          <div className={`flex items-center ${isMobile ? 'gap-2 w-full' : 'space-x-3'}`}>
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white flex-1 ${isMobile ? 'text-xs' : ''}`}
             >
               <option value="today">📅 Today</option>
-              <option value="week">📆 Last 7 Days</option>
-              <option value="month">📊 This Month</option>
-              <option value="year">🗓️ This Year</option>
+              <option value="week">📆 Week</option>
+              <option value="month">📊 Month</option>
+              <option value="year">🗓️ Year</option>
             </select>
 
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 ${isMobile ? 'text-xs' : ''}`}
             >
               <option value="all">All Payments</option>
               <option value="cash">Cash</option>
@@ -370,58 +411,173 @@ www.faredeal.ug
             <button
               onClick={loadTransactions}
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'}`}
             >
-              <FiRefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
+              <FiRefreshCw className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} ${loading ? 'animate-spin' : ''}`} />
+              <span>{isMobile ? 'Refresh' : 'Refresh'}</span>
             </button>
           </div>
         </div>
 
-        {/* Report Actions */}
-        <div className="mt-4 flex items-center space-x-3">
-          <button
-            onClick={handleDownloadReport}
-            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <FiDownload className="h-4 w-4" />
-            <span>Download Report</span>
-          </button>
-          
-          <button
-            onClick={handlePrintReport}
-            className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            <FiPrinter className="h-4 w-4" />
-            <span>Print Report</span>
-          </button>
+        {/* Report Actions & Toggle */}
+        <div className={`mt-4 flex flex-col ${isMobile ? 'space-y-2' : 'md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0'} gap-2 ${!isMobile && 'md:gap-3'}`}>
+          <div className={`flex items-center ${isMobile ? 'gap-2 w-full' : 'space-x-3'}`}>
+            <button
+              onClick={handleDownloadReport}
+              className={`flex items-center space-x-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex-1 justify-center ${isMobile ? 'px-2 py-2 text-xs' : 'px-4 py-2'}`}
+            >
+              <FiDownload className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
+              <span>{isMobile ? 'Download' : 'Download Report'}</span>
+            </button>
+            
+            <button
+              onClick={handlePrintReport}
+              className={`flex items-center space-x-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex-1 justify-center ${isMobile ? 'px-2 py-2 text-xs' : 'px-4 py-2'}`}
+            >
+              <FiPrinter className={isMobile ? 'h-3 w-3' : 'h-4 w-4'} />
+              <span>{isMobile ? 'Print' : 'Print Report'}</span>
+            </button>
+          </div>
+
+          {/* Show Local Receipts Toggle */}
+          {savedReceipts && savedReceipts.length > 0 && (
+            <button
+              onClick={() => setLocalReceiptsOnly(!localReceiptsOnly)}
+              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors font-medium ${
+                localReceiptsOnly
+                  ? 'bg-orange-600 text-white hover:bg-orange-700'
+                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+              }`}
+            >
+              <span>⚠️ Unsaved Receipts</span>
+              <span className="bg-white text-orange-600 px-2 py-1 rounded font-bold text-sm">{savedReceipts.length}</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* Transactions Table */}
       <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Receipt #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date & Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Payment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Items
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
+        {/* Show indicator when viewing unsaved receipts */}
+        {localReceiptsOnly && (
+          <div className={`bg-orange-50 border-b-2 border-orange-200 ${isMobile ? 'px-3 py-2' : 'px-6 py-3'}`}>
+            <p className={`text-orange-800 flex items-start ${isMobile ? 'text-xs' : 'text-sm'} space-x-2`}>
+              <span>⚠️</span>
+              <span><strong>Viewing {savedReceipts.length} unsaved</strong> {isMobile ? 'receipt(s)' : 'receipt(s) - These are stored locally and may not be synced to the system yet'}</span>
+            </p>
+          </div>
+        )}
+        
+        {/* Mobile Card View */}
+        {isMobile ? (
+          <div className="p-3 space-y-2">
+            {(localReceiptsOnly ? savedReceipts : filteredTransactions).length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {localReceiptsOnly ? 'No unsaved receipts' : 'No transactions found'}
+              </div>
+            ) : (
+              (localReceiptsOnly ? savedReceipts : filteredTransactions).map((item) => (
+                <div key={localReceiptsOnly ? item.receiptNumber : item.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-blue-300 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className={`font-semibold ${localReceiptsOnly ? 'text-orange-600' : 'text-gray-900'} text-sm`}>
+                        {localReceiptsOnly ? item.receiptNumber : item.receipt_number}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {localReceiptsOnly
+                          ? new Date(item.timestamp).toLocaleDateString('en-UG')
+                          : new Date(item.transaction_date).toLocaleDateString('en-UG')}
+                        {' '}
+                        {localReceiptsOnly
+                          ? new Date(item.timestamp).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' })
+                          : new Date(item.transaction_date).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (localReceiptsOnly) {
+                          setSelectedTransaction({
+                            receiptNumber: item.receiptNumber,
+                            transactionId: item.transactionId,
+                            timestamp: item.timestamp,
+                            amount: item.total,
+                            paymentMethod: item.paymentMethod,
+                            receipt: {
+                              items: item.items || [],
+                              subtotal: item.subtotal,
+                              tax: item.tax,
+                              total: item.total,
+                              cashier: item.cashier || 'Unknown',
+                              register: item.register || 'N/A'
+                            }
+                          });
+                        } else {
+                          handleViewReceipt(item);
+                        }
+                        setShowReceipt(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-900 text-xs font-medium"
+                    >
+                      View
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-500">Payment</p>
+                      <p className="font-semibold text-gray-900">{localReceiptsOnly ? item.paymentMethod : item.payment_provider}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Items</p>
+                      <p className="font-semibold text-gray-900">{localReceiptsOnly ? item.items?.length || 0 : item.items_count}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-end mt-2 pt-2 border-t border-gray-200">
+                    <p className="text-xs text-gray-600">Total</p>
+                    <p className="font-bold text-green-600">{formatCurrency(localReceiptsOnly ? item.total : item.total_amount)}</p>
+                  </div>
+                  {localReceiptsOnly && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded inline-block ${
+                        item.syncStatus === 'synced'
+                          ? 'bg-green-100 text-green-800'
+                          : item.syncStatus === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {item.syncStatus === 'synced' ? '✓ Synced' : item.syncStatus === 'pending' ? '⏳ Pending' : '✗ Failed'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Receipt #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Payment Method
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Total
+                  </th>
+                  {localReceiptsOnly && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -430,60 +586,92 @@ www.faredeal.ug
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center">
+                  <td colSpan={localReceiptsOnly ? "7" : "7"} className="px-6 py-8 text-center">
                     <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <p className="text-gray-500 mt-2">Loading transactions...</p>
+                    <p className="text-gray-500 mt-2">Loading {localReceiptsOnly ? 'local receipts' : 'transactions'}...</p>
                   </td>
                 </tr>
-              ) : filteredTransactions.length === 0 ? (
+              ) : (localReceiptsOnly ? savedReceipts : filteredTransactions).length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
-                    No transactions found
+                  <td colSpan={localReceiptsOnly ? "7" : "7"} className="px-6 py-8 text-center text-gray-500">
+                    {localReceiptsOnly ? 'No unsaved receipts' : 'No transactions found'}
                   </td>
                 </tr>
               ) : (
-                filteredTransactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
+                (localReceiptsOnly ? savedReceipts : filteredTransactions).map((item) => (
+                  <tr key={localReceiptsOnly ? item.receiptNumber : item.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm font-medium text-gray-900">
-                        {transaction.receipt_number}
+                      <span className={`text-sm font-medium ${localReceiptsOnly ? 'text-orange-600' : 'text-gray-900'}`}>
+                        {localReceiptsOnly ? item.receiptNumber : item.receipt_number}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {new Date(transaction.transaction_date).toLocaleDateString('en-UG')}
+                        {localReceiptsOnly
+                          ? new Date(item.timestamp).toLocaleDateString('en-UG')
+                          : new Date(item.transaction_date).toLocaleDateString('en-UG')}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {new Date(transaction.transaction_date).toLocaleTimeString('en-UG')}
+                        {localReceiptsOnly
+                          ? new Date(item.timestamp).toLocaleTimeString('en-UG')
+                          : new Date(item.transaction_date).toLocaleTimeString('en-UG')}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{transaction.customer_name || 'Walk-in'}</div>
-                      {transaction.customer_phone && (
-                        <div className="text-xs text-gray-500">{transaction.customer_phone}</div>
-                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        transaction.payment_method === 'cash' ? 'bg-green-100 text-green-800' :
-                        transaction.payment_method === 'momo' ? 'bg-yellow-100 text-yellow-800' :
-                        transaction.payment_method === 'airtel' ? 'bg-red-100 text-red-800' :
+                        (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'cash' || (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'Cash' ? 'bg-green-100 text-green-800' :
+                        (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'momo' || (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'MTN Mobile Money' ? 'bg-yellow-100 text-yellow-800' :
+                        (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'airtel' || (localReceiptsOnly ? item.paymentMethod : item.payment_method) === 'Airtel Money' ? 'bg-red-100 text-red-800' :
                         'bg-blue-100 text-blue-800'
                       }`}>
-                        {transaction.payment_provider}
+                        {localReceiptsOnly ? item.paymentMethod : item.payment_provider}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {transaction.items_count}
+                      {localReceiptsOnly ? item.items?.length || 0 : item.items_count}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-bold text-gray-900">
-                        {formatCurrency(transaction.total_amount)}
+                        {formatCurrency(localReceiptsOnly ? item.total : item.total_amount)}
                       </span>
                     </td>
+                    {localReceiptsOnly && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          item.syncStatus === 'synced'
+                            ? 'bg-green-100 text-green-800'
+                            : item.syncStatus === 'pending'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {item.syncStatus === 'synced' ? '✓ Synced' : item.syncStatus === 'pending' ? '⏳ Pending' : '✗ Failed'}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => handleViewReceipt(transaction)}
+                        onClick={() => {
+                          if (localReceiptsOnly) {
+                            setSelectedTransaction({
+                              receiptNumber: item.receiptNumber,
+                              transactionId: item.transactionId,
+                              timestamp: item.timestamp,
+                              amount: item.total,
+                              paymentMethod: item.paymentMethod,
+                              receipt: {
+                                items: item.items || [],
+                                subtotal: item.subtotal,
+                                tax: item.tax,
+                                total: item.total,
+                                cashier: item.cashier || 'Unknown',
+                                register: item.register || 'N/A'
+                              }
+                            });
+                          } else {
+                            handleViewReceipt(item);
+                          }
+                          setShowReceipt(true);
+                        }}
                         className="text-blue-600 hover:text-blue-900 flex items-center space-x-1"
                       >
                         <FiEye className="h-4 w-4" />
@@ -495,7 +683,8 @@ www.faredeal.ug
               )}
             </tbody>
           </table>
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Receipt Modal */}

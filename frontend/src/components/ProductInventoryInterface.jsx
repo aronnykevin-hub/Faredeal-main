@@ -3,7 +3,7 @@ import { toast } from 'react-toastify';
 import { FiPackage, FiShoppingCart, FiSettings, FiTrendingUp, FiAlertTriangle, FiPlus, FiTruck, FiZap } from 'react-icons/fi';
 import { supabase } from '../services/supabase';
 import AddProductModal from './AddProductModal';
-import PurchaseOrderManager from './PurchaseOrderManager';
+// import PurchaseOrderManager from './PurchaseOrderManager'; // COMMENTED OUT - Using order system instead
 
 const ProductInventoryInterface = () => {
   const [products, setProducts] = useState([]);
@@ -11,7 +11,7 @@ const ProductInventoryInterface = () => {
   const [showAdjustModal, setShowAdjustModal] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
-  const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false);
+  // const [showPurchaseOrderModal, setShowPurchaseOrderModal] = useState(false); // COMMENTED OUT
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [adjustmentAmount, setAdjustmentAmount] = useState(0);
   const [adjustmentReason, setAdjustmentReason] = useState('');
@@ -46,11 +46,11 @@ const ProductInventoryInterface = () => {
         name: p.name,
         sku: p.sku,
         price: parseFloat(p.selling_price || p.price || 0),
-        stock: p.quantity || p.stock || p.current_stock || 0,
+        stock: p.quantity || p.stock || 0,
         minStock: p.low_stock_threshold || p.minimum_stock || p.min_stock || 10,
         maxStock: p.maximum_stock || p.max_stock || 100,
         status: calculateStatus(
-          p.quantity || p.stock || p.current_stock || 0,
+          p.quantity || p.stock || 0,
           p.low_stock_threshold || p.minimum_stock || p.min_stock || 10
         ),
         location: p.location || 'Not assigned',
@@ -269,11 +269,11 @@ const ProductInventoryInterface = () => {
       try {
         const newStock = Math.max(0, selectedProduct.stock + adjustmentAmount);
         
-        // Update inventory in Supabase (only current_stock - no status column)
+        // Update inventory in Supabase
         const { error: updateError } = await supabase
           .from('inventory')
           .update({
-            current_stock: newStock
+            quantity: newStock
           })
           .eq('product_id', selectedProduct.productId);
 
@@ -323,46 +323,44 @@ const ProductInventoryInterface = () => {
   };
 
   return (
-    <div className="bg-white">
-      {/* Header */}
-      <div className="p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
-              <FiPackage className="h-6 w-6 text-white" />
+    <div className="bg-white min-h-screen">
+      {/* Header - Mobile Optimized */}
+      <div className="p-4 md:p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+        <div className="max-w-7xl mx-auto">
+          {/* Title Section */}
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="p-2.5 md:p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+              <FiPackage className="h-5 w-5 md:h-6 md:w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
-                Complete Inventory Management
+              <h2 className="text-lg md:text-xl font-bold text-gray-900">
+                Inventory Management
               </h2>
-              <p className="text-sm text-gray-600">
-                {loading ? 'Loading...' : `${products.length} products available`}
+              <p className="text-xs md:text-sm text-gray-600">
+                {loading ? 'Loading...' : `${products.length} products`}
               </p>
             </div>
           </div>
-          <div className="flex space-x-2">
+          
+          {/* Action Buttons - Stacked on Mobile */}
+          <div className="grid grid-cols-2 md:flex md:space-x-2 gap-2">
             <button
               onClick={() => setShowAddProductModal(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-105 font-medium shadow-lg flex items-center space-x-2"
+              className="col-span-1 px-3 md:px-6 py-2 md:py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white text-xs md:text-sm rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all font-medium shadow-lg flex items-center justify-center md:justify-start space-x-1 md:space-x-2"
             >
-              <FiPlus className="h-5 w-5" />
-              <span>Add Product</span>
-            </button>
-            <button
-              onClick={() => setShowPurchaseOrderModal(true)}
-              className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 font-medium shadow-lg flex items-center space-x-2"
-            >
-              <FiTruck className="h-5 w-5" />
-              <span>Purchase Orders</span>
+              <FiPlus className="h-4 w-4 md:h-5 md:w-5" />
+              <span className="hidden md:inline">Add Product</span>
+              <span className="md:hidden">Add</span>
             </button>
             <button
               onClick={loadProducts}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-md"
+              className="col-span-1 px-3 md:px-4 py-2 md:py-2.5 bg-blue-600 text-white text-xs md:text-sm rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md flex items-center justify-center space-x-1"
               disabled={loading}
             >
-              {loading ? '🔄 Loading...' : '🔄 Refresh'}
+              <span className="text-lg">🔄</span>
+              <span className="hidden md:inline">{loading ? 'Loading...' : 'Refresh'}</span>
             </button>
-            <select className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white shadow-sm">
+            <select className="col-span-2 md:col-span-1 px-3 py-2 md:py-2.5 border border-gray-300 rounded-lg text-xs md:text-sm bg-white shadow-sm">
               <option>All Categories</option>
               <option>Electronics</option>
               <option>Food & Beverages</option>
@@ -380,84 +378,64 @@ const ProductInventoryInterface = () => {
         </div>
       )}
 
-      {/* No Products State */}
+      {/* No Products State - Mobile Optimized */}
       {!loading && products.length === 0 && (
         <div>
-          <div className="p-16 text-center bg-gradient-to-br from-gray-50 to-blue-50">
+          <div className="p-6 md:p-16 text-center bg-gradient-to-br from-gray-50 to-blue-50 min-h-[calc(100vh-200px)]">
             <div className="max-w-2xl mx-auto">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-6">
-                <FiPackage className="h-12 w-12 text-blue-600" />
+              <div className="inline-flex items-center justify-center w-16 md:w-24 h-16 md:h-24 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full mb-4 md:mb-6">
+                <FiPackage className="h-8 md:h-12 w-8 md:w-12 text-blue-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-3">No Products Found</h3>
-              <p className="text-gray-600 mb-8">Start building your inventory by adding products or creating purchase orders</p>
+              <h3 className="text-xl md:text-2xl font-bold text-gray-900 mb-2 md:mb-3">No Products Found</h3>
+              <p className="text-sm md:text-base text-gray-600 mb-6 md:mb-8">Start by adding products or creating purchase orders</p>
               
               {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+              <div className="grid grid-cols-1 gap-4 md:gap-6 max-w-2xl mx-auto">
                 {/* Add Product Card */}
                 <button
                   onClick={() => setShowAddProductModal(true)}
-                  className="group bg-white border-2 border-green-200 rounded-2xl p-8 hover:border-green-500 hover:shadow-2xl transition-all transform hover:scale-105"
+                  className="group bg-white border-2 border-green-200 rounded-xl md:rounded-2xl p-6 md:p-8 hover:border-green-500 hover:shadow-2xl transition-all transform hover:scale-105"
                 >
                   <div className="flex flex-col items-center text-center">
-                    <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <FiPlus className="h-10 w-10 text-white" />
+                    <div className="w-14 md:w-20 h-14 md:h-20 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-transform">
+                      <FiPlus className="h-7 md:h-10 w-7 md:w-10 text-white" />
                     </div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-2">Add Product Manually</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Create a new product with full details including pricing, stock levels, and categories
+                    <h4 className="text-lg md:text-xl font-bold text-gray-900 mb-1 md:mb-2">Add Product</h4>
+                    <p className="text-xs md:text-sm text-gray-600 mb-3 md:mb-4">
+                      Create a new product with pricing and stock details
                     </p>
-                    <div className="flex items-center space-x-2 text-green-600 font-semibold">
+                    <div className="flex items-center space-x-2 text-green-600 font-semibold text-sm">
                       <span>Add Now</span>
                       <FiPlus className="h-4 w-4" />
-                    </div>
-                  </div>
-                </button>
-
-                {/* Purchase Order Card */}
-                <button
-                  onClick={() => setShowPurchaseOrderModal(true)}
-                  className="group bg-white border-2 border-purple-200 rounded-2xl p-8 hover:border-purple-500 hover:shadow-2xl transition-all transform hover:scale-105"
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                      <FiTruck className="h-10 w-10 text-white" />
-                    </div>
-                    <h4 className="text-xl font-bold text-gray-900 mb-2">Create Purchase Order</h4>
-                    <p className="text-sm text-gray-600 mb-4">
-                      Order from suppliers with auto-approval and automatic product creation
-                    </p>
-                    <div className="flex items-center space-x-2 text-purple-600 font-semibold">
-                      <span>Create Order</span>
-                      <FiTruck className="h-4 w-4" />
                     </div>
                   </div>
                 </button>
               </div>
 
               {/* Features List */}
-              <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className="mt-8 md:mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
-                    <FiZap className="h-6 w-6 text-blue-600" />
+                  <div className="w-10 md:w-12 h-10 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-2 md:mb-3">
+                    <FiZap className="h-5 md:h-6 w-5 md:w-6 text-blue-600" />
                   </div>
-                  <h5 className="font-semibold text-gray-900 mb-1">Auto-Approval</h5>
-                  <p className="text-sm text-gray-600">Trusted suppliers get automatic order approval</p>
+                  <h5 className="font-semibold text-gray-900 mb-1 text-sm md:text-base">Auto-Approval</h5>
+                  <p className="text-xs md:text-sm text-gray-600">Trusted suppliers get automatic approval</p>
                 </div>
                 
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-3">
-                    <FiPackage className="h-6 w-6 text-green-600" />
+                  <div className="w-10 md:w-12 h-10 md:h-12 bg-green-100 rounded-lg flex items-center justify-center mb-2 md:mb-3">
+                    <FiPackage className="h-5 md:h-6 w-5 md:w-6 text-green-600" />
                   </div>
-                  <h5 className="font-semibold text-gray-900 mb-1">Auto-Create Products</h5>
-                  <p className="text-sm text-gray-600">Products created automatically from orders</p>
+                  <h5 className="font-semibold text-gray-900 mb-1 text-sm md:text-base">Auto-Create</h5>
+                  <p className="text-xs md:text-sm text-gray-600">Products created from orders</p>
                 </div>
                 
                 <div className="flex flex-col items-center text-center">
-                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-3">
-                    <FiTrendingUp className="h-6 w-6 text-purple-600" />
+                  <div className="w-10 md:w-12 h-10 md:h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-2 md:mb-3">
+                    <FiTrendingUp className="h-5 md:h-6 w-5 md:w-6 text-purple-600" />
                   </div>
-                  <h5 className="font-semibold text-gray-900 mb-1">Real-Time Sync</h5>
-                  <p className="text-sm text-gray-600">All changes sync instantly across portals</p>
+                  <h5 className="font-semibold text-gray-900 mb-1 text-sm md:text-base">Real-Time</h5>
+                  <p className="text-xs md:text-sm text-gray-600">Changes sync instantly</p>
                 </div>
               </div>
             </div>
@@ -465,32 +443,32 @@ const ProductInventoryInterface = () => {
         </div>
       )}
 
-      {/* Products Grid */}
+      {/* Products Grid - Mobile Optimized */}
       {!loading && products.length > 0 && (
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 max-w-7xl mx-auto">
             {products.map((product) => (
-            <div key={product.id} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow">
+            <div key={product.id} className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-4 md:p-6 hover:shadow-lg transition-shadow">
               {/* Product Header */}
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-lg">{product.name}</h3>
-                  <p className="text-sm text-gray-600">SKU: {product.sku}</p>
+              <div className="flex items-start justify-between mb-3 md:mb-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-gray-900 text-sm md:text-lg line-clamp-2">{product.name}</h3>
+                  <p className="text-xs md:text-sm text-gray-600">SKU: {product.sku}</p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(product.status)}`}>
+                <span className={`ml-2 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs md:text-sm font-medium border whitespace-nowrap ${getStatusColor(product.status)}`}>
                   {product.status}
                 </span>
               </div>
 
               {/* Price */}
-              <div className="mb-4">
-                <div className="text-2xl font-bold text-gray-900">{formatCurrency(product.price)}</div>
+              <div className="mb-3 md:mb-4">
+                <div className="text-xl md:text-2xl font-bold text-gray-900">{formatCurrency(product.price)}</div>
               </div>
 
-              {/* Stock Info */}
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Stock: {product.stock}</span>
+              {/* Stock Info - Compact */}
+              <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
+                <div className="flex justify-between text-xs md:text-sm">
+                  <span className="text-gray-600">Stock: <strong>{product.stock}</strong></span>
                   <span className="text-gray-600">Min: {product.minStock}</span>
                 </div>
                 
@@ -505,24 +483,24 @@ const ProductInventoryInterface = () => {
                   ></div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-gray-500">
-                  <span>📍 {product.location}</span>
-                  <span>🏢 {product.supplier}</span>
+                <div className="flex items-center justify-between text-xs text-gray-500 gap-2">
+                  <span className="truncate">📍 {product.location}</span>
+                  <span className="truncate">🏢 {product.supplier}</span>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex space-x-3">
+              {/* Action Buttons - Full Width on Mobile */}
+              <div className="flex flex-col md:flex-row gap-2 md:space-x-3">
                 <button
                   onClick={() => handleReorder(product)}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                  className="flex-1 bg-blue-600 text-white py-2 md:py-2.5 px-3 md:px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center space-x-1.5"
                 >
                   <FiShoppingCart className="h-4 w-4" />
                   <span>Reorder</span>
                 </button>
                 <button
                   onClick={() => handleAdjust(product)}
-                  className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                  className="flex-1 bg-green-600 text-white py-2 md:py-2.5 px-3 md:px-4 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center space-x-1.5"
                 >
                   <FiSettings className="h-4 w-4" />
                   <span>Adjust</span>
@@ -534,60 +512,60 @@ const ProductInventoryInterface = () => {
         </div>
       )}
 
-      {/* Reorder Modal */}
+      {/* Reorder Modal - Mobile Optimized */}
       {showReorderModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
-              🔄 Reorder Product
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-4 md:p-0">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto md:max-h-none">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">
+              🔄 Reorder
             </h3>
             
-            <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-              <div className="font-medium text-gray-900">{selectedProduct.name}</div>
-              <div className="text-sm text-gray-600">Current Stock: {selectedProduct.stock} units</div>
-              <div className="text-sm text-gray-600">Supplier: {selectedProduct.supplier}</div>
+            <div className="mb-4 p-3 md:p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="font-semibold text-gray-900 text-sm md:text-base">{selectedProduct.name}</div>
+              <div className="text-xs md:text-sm text-gray-600 mt-1">Current Stock: <strong>{selectedProduct.stock}</strong> units</div>
+              <div className="text-xs md:text-sm text-gray-600">Supplier: {selectedProduct.supplier}</div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Reorder Quantity
                 </label>
                 <input
                   type="number"
                   value={reorderQuantity}
                   onChange={(e) => setReorderQuantity(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-base"
                   min="1"
                 />
-                <div className="mt-2 text-sm text-gray-600">
+                <div className="mt-2 text-xs md:text-sm text-gray-600">
                   Suggested: {selectedProduct.maxStock - selectedProduct.stock} units
                 </div>
               </div>
 
               {reorderQuantity > 0 && (
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <div className="text-sm text-green-800">
-                    <strong>Estimated Cost:</strong> {formatCurrency(selectedProduct.price * reorderQuantity)}
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-xs md:text-sm text-green-800">
+                    <strong>Cost:</strong> {formatCurrency(selectedProduct.price * reorderQuantity)}
                   </div>
-                  <div className="text-sm text-green-800">
-                    <strong>New Stock Level:</strong> {selectedProduct.stock + reorderQuantity} units
+                  <div className="text-xs md:text-sm text-green-800 mt-1">
+                    <strong>New Level:</strong> {selectedProduct.stock + reorderQuantity} units
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col md:flex-row gap-3 mt-6 md:space-x-3">
               <button
                 onClick={processReorder}
                 disabled={reorderQuantity <= 0}
-                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-sm md:text-base"
               >
-                Confirm Reorder
+                Confirm
               </button>
               <button
                 onClick={() => setShowReorderModal(false)}
-                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-sm md:text-base"
               >
                 Cancel
               </button>
@@ -596,67 +574,73 @@ const ProductInventoryInterface = () => {
         </div>
       )}
 
-      {/* Adjust Stock Modal */}
+      {/* Adjust Stock Modal - Mobile Optimized */}
       {showAdjustModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end md:items-center justify-center z-50 p-4 md:p-0">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl p-6 w-full md:max-w-md max-h-[90vh] overflow-y-auto md:max-h-none">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4">
               📦 Adjust Stock
             </h3>
             
-            <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <div className="font-medium text-gray-900">{selectedProduct.name}</div>
-              <div className="text-sm text-gray-600">Current Stock: {selectedProduct.stock} units</div>
+            <div className="mb-4 p-3 md:p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="font-semibold text-gray-900 text-sm md:text-base">{selectedProduct.name}</div>
+              <div className="text-xs md:text-sm text-gray-600 mt-1">Current Stock: <strong>{selectedProduct.stock}</strong> units</div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Adjustment Amount
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Quick Adjust
                 </label>
-                <div className="flex space-x-2 mb-2">
+                <div className="grid grid-cols-4 gap-2">
                   <button
                     onClick={() => setAdjustmentAmount(-10)}
-                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
+                    className="px-2 py-2 md:py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs md:text-sm font-medium transition-colors"
                   >
                     -10
                   </button>
                   <button
                     onClick={() => setAdjustmentAmount(-5)}
-                    className="px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm"
+                    className="px-2 py-2 md:py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-xs md:text-sm font-medium transition-colors"
                   >
                     -5
                   </button>
                   <button
                     onClick={() => setAdjustmentAmount(5)}
-                    className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
+                    className="px-2 py-2 md:py-2.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs md:text-sm font-medium transition-colors"
                   >
                     +5
                   </button>
                   <button
                     onClick={() => setAdjustmentAmount(10)}
-                    className="px-3 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-sm"
+                    className="px-2 py-2 md:py-2.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 text-xs md:text-sm font-medium transition-colors"
                   >
                     +10
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Custom Amount
+                </label>
                 <input
                   type="number"
                   value={adjustmentAmount}
                   onChange={(e) => setAdjustmentAmount(parseInt(e.target.value) || 0)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  placeholder="Enter adjustment amount"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-base"
+                  placeholder="Enter adjustment"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason for Adjustment
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Reason
                 </label>
                 <select
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 text-sm md:text-base"
                 >
                   <option value="">Select reason...</option>
                   <option value="Stock count correction">Stock count correction</option>
@@ -669,25 +653,25 @@ const ProductInventoryInterface = () => {
               </div>
 
               {adjustmentAmount !== 0 && (
-                <div className={`p-3 rounded-lg ${adjustmentAmount > 0 ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-                  <div className={`text-sm ${adjustmentAmount > 0 ? 'text-green-800' : 'text-red-800'}`}>
-                    <strong>Preview:</strong> Stock will change from {selectedProduct.stock} to {Math.max(0, selectedProduct.stock + adjustmentAmount)} units
+                <div className={`p-3 rounded-lg border ${adjustmentAmount > 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <div className={`text-xs md:text-sm ${adjustmentAmount > 0 ? 'text-green-800' : 'text-red-800'}`}>
+                    <strong>Update:</strong> {selectedProduct.stock} → {Math.max(0, selectedProduct.stock + adjustmentAmount)} units
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col md:flex-row gap-3 mt-6 md:space-x-3">
               <button
                 onClick={processAdjustment}
                 disabled={adjustmentAmount === 0 || !adjustmentReason.trim()}
-                className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+                className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold text-sm md:text-base"
               >
-                Apply Adjustment
+                Apply
               </button>
               <button
                 onClick={() => setShowAdjustModal(false)}
-                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                className="flex-1 bg-gray-200 text-gray-700 py-3 rounded-lg hover:bg-gray-300 transition-colors font-semibold text-sm md:text-base"
               >
                 Cancel
               </button>
@@ -709,11 +693,11 @@ const ProductInventoryInterface = () => {
         }}
       />
 
-      {/* Purchase Order Manager Modal */}
-      <PurchaseOrderManager
+      {/* Purchase Order Manager Modal - COMMENTED OUT */}
+      {/* <PurchaseOrderManager
         isOpen={showPurchaseOrderModal}
         onClose={() => setShowPurchaseOrderModal(false)}
-      />
+      /> */}
     </div>
   );
 };

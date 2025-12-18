@@ -540,6 +540,75 @@ export const createPurchaseOrder = async (orderData) => {
       total: data.total_amount_ugx
     });
 
+    // Update inventory to reflect order (deduct from stock if it's a POS order)
+    try {
+      for (const item of items) {
+        const orderedQty = parseFloat(item.quantity) || 0;
+        
+        if (orderedQty > 0) {
+          console.log(`🔄 Processing inventory for product_id ${item.product_id}, qty: ${orderedQty}`);
+          
+          // Try to find existing inventory record (don't require .single() to succeed)
+          const { data: invList, error: listError } = await supabase
+            .from('inventory')
+            .select('id, quantity')
+            .eq('product_id', item.product_id)
+            .eq('is_active', true);
+
+          let existingInv = invList && invList.length > 0 ? invList[0] : null;
+
+          if (existingInv) {
+            // Deduct ordered quantity from existing stock
+            const newQuantity = (existingInv.quantity || 0) - orderedQty;
+            const { error: updateError } = await supabase
+              .from('inventory')
+              .update({
+                quantity: newQuantity,
+                last_updated: new Date().toISOString()
+              })
+              .eq('id', existingInv.id);
+            
+            if (updateError) {
+              console.error('❌ Error updating inventory:', updateError);
+            } else {
+              console.log(`📉 Inventory deducted for product ${item.product_id}: ${existingInv.quantity} → ${newQuantity} units (Order: ${data.po_number})`);
+            }
+          } else {
+            // No inventory record exists - create one with deducted balance
+            // This happens for newly added POS products
+            const { data: product } = await supabase
+              .from('products')
+              .select('id, name')
+              .eq('id', item.product_id)
+              .single();
+            
+            if (product) {
+              const { data: newInv, error: insertError } = await supabase
+                .from('inventory')
+                .insert({
+                  product_id: item.product_id,
+                  quantity: -orderedQty, // Negative quantity to reflect backorder
+                  minimum_stock: 10,
+                  reorder_point: 20,
+                  is_active: true,
+                  last_updated: new Date().toISOString()
+                })
+                .select('id');
+              
+              if (insertError) {
+                console.error('❌ Error creating inventory record:', insertError);
+              } else {
+                console.log(`📝 ✅ New inventory record created for product "${product.name}" (ID: ${product.id}), quantity: -${orderedQty} units (Order: ${data.po_number})`);
+              }
+            }
+          }
+        }
+      }
+    } catch (invError) {
+      console.error('❌ Error processing inventory:', invError);
+      // Don't fail order creation if inventory update fails
+    }
+
     // Notify the supplier about new order (don't block on this)
     try {
       await notifySupplier(supplierId, {
@@ -828,6 +897,54 @@ export const recordDelivery = async (deliveryData) => {
         updated_at: new Date().toISOString()
       })
       .eq('id', purchaseOrderId);
+
+    // Update inventory for each delivered item
+    try {
+      for (const item of items) {
+        const acceptedQty = item.acceptedQty || 0;
+        
+        if (acceptedQty > 0) {
+          // Try to update existing inventory record
+          const { data: existingInv, error: existingError } = await supabase
+            .from('inventory')
+            .select('id, quantity')
+            .eq('product_id', item.product_id || item.productId)
+            .eq('is_active', true)
+            .single();
+
+          if (existingInv) {
+            // Update existing inventory
+            const newQuantity = (existingInv.quantity || 0) + acceptedQty;
+            await supabase
+              .from('inventory')
+              .update({
+                quantity: newQuantity,
+                last_updated: new Date().toISOString()
+              })
+              .eq('id', existingInv.id);
+            
+            console.log(`✅ Updated inventory for product ${item.product_id}: +${acceptedQty} units`);
+          } else {
+            // Create new inventory record if not exists
+            await supabase
+              .from('inventory')
+              .insert({
+                product_id: item.product_id || item.productId,
+                quantity: acceptedQty,
+                minimum_stock: 10,
+                reorder_point: 20,
+                is_active: true,
+                last_updated: new Date().toISOString()
+              });
+            
+            console.log(`✅ Created new inventory record for product ${item.product_id}: ${acceptedQty} units`);
+          }
+        }
+      }
+    } catch (invError) {
+      console.warn('⚠️ Warning: Inventory update failed (table may not exist):', invError.message);
+      // Don't fail the delivery if inventory update fails
+    }
 
     return {
       success: true,

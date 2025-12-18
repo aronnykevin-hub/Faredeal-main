@@ -96,60 +96,84 @@ const ManagerAuth = () => {
         console.log('✅ User authenticated:', user.email);
         setCurrentUser(user);
         
-        // Check if user exists in database
+        // Check if user exists in database - ONLY filter by auth_id (avoid RLS issues)
         let { data: userData, error: fetchError } = await supabase
           .from('users')
           .select('*')
           .eq('auth_id', user.id)
-          .eq('role', 'manager')
           .single();
 
         console.log('👤 User data from database:', userData);
 
         // If user doesn't exist (OAuth first-time sign-in), create them
-        if (fetchError || !userData) {
-          console.log('📝 Creating new manager user in database...');
-          const { data: newUser, error: createError } = await supabase
-            .from('users')
-            .insert([{
-              auth_id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-              role: 'manager',
-              is_active: false,
-              profile_completed: false,
-              created_at: new Date().toISOString()
-            }])
-            .select()
-            .single();
+        if (fetchError) {
+          // Check if error is because record doesn't exist (PGRST116)
+          if (fetchError.code === 'PGRST116') {
+            console.log('📝 Creating new manager user in database...');
+            const { data: newUser, error: createError } = await supabase
+              .from('users')
+              .insert([{
+                auth_id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+                role: 'manager',
+                is_active: false,
+                metadata: {}
+              }])
+              .select()
+              .single();
 
-          if (createError) {
-            console.error('❌ Error creating user:', createError);
-            throw createError;
+            if (createError) {
+              console.error('❌ Error creating user:', createError);
+              // If duplicate, fetch existing user
+              if (createError.code === '23505') {
+                console.log('ℹ️ User already exists, fetching...');
+                const { data: existing } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('auth_id', user.id)
+                  .single();
+                userData = existing;
+              } else {
+                throw createError;
+              }
+            } else {
+              console.log('✅ User created:', newUser);
+              userData = newUser;
+              notificationService.show('Welcome! Please complete your manager profile.', 'info');
+            }
+          } else {
+            console.error('❌ Database error:', fetchError);
+            throw fetchError;
           }
-
-          console.log('✅ User created:', newUser);
-          userData = newUser;
-          notificationService.show('Welcome! Please complete your manager profile.', 'info');
         }
 
-        // Priority flow: approved → profile incomplete → pending
-        console.log('🔀 Checking user status - Active:', userData.is_active, 'Profile Complete:', userData.profile_completed);
+        // Verify user has manager role
+        if (userData && userData.role !== 'manager') {
+          console.warn('⚠️ User role is not manager:', userData.role);
+          notificationService.show('❌ This login is for managers only.', 'error');
+          await supabase.auth.signOut();
+          return;
+        }
+
+        // Check profile completion
+        const profileComplete = userData?.full_name && userData?.phone && userData?.department;
+        console.log('🔀 Checking user status - Active:', userData?.is_active, 'Profile Complete:', profileComplete);
         
-        if (userData.is_active && userData.profile_completed) {
+        if (userData?.is_active && profileComplete) {
           // Approved and profile complete → Go to Manager Portal
           console.log('✅ User approved and profile complete - Redirecting to Manager Portal');
           notificationService.show('✅ Welcome back!', 'success');
           navigate('/manager');
-        } else if (!userData.profile_completed) {
+        } else if (!profileComplete) {
           // Profile not completed → Show profile form
           console.log('📋 Profile not complete - Showing profile form');
           setShowProfileCompletion(true);
           setFormData(prev => ({
             ...prev,
-            fullName: userData.full_name || '',
-            phone: userData.phone || '',
-            department: userData.department || ''
+            fullName: userData?.full_name || '',
+            phone: userData?.phone || '',
+            department: userData?.department || ''
           }));
         } else {
           // Profile complete but not active → Pending approval

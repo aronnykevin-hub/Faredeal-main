@@ -6,6 +6,7 @@ import { portalConfigService } from '../services/portalConfigService';
 import { supabase } from '../services/supabase';
 import ProductInventoryInterface from '../components/ProductInventoryInterface';
 import TransactionHistory from '../components/TransactionHistory';
+import OrderInventoryPOSControl from '../components/OrderInventoryPOSControl';
 import { 
   FiUsers, FiUser, FiShield, FiSettings, FiBarChart, FiActivity,
   FiGlobe, FiServer, FiDatabase, FiLock, FiAlertTriangle,
@@ -260,34 +261,77 @@ const AdminPortal = () => {
   // Load order statistics from Supabase
   const loadOrderStats = useCallback(async () => {
     try {
+      console.log('📊 Loading order statistics...');
+      
       // Get total orders count
-      const { count: totalCount } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true });
+      let totalCount = 0;
+      try {
+        const result = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true });
+        totalCount = result.count || 0;
+        if (result.error) {
+          console.error('❌ Error getting total count:', result.error);
+        }
+      } catch (e) {
+        console.error('❌ Table does not exist:', e);
+        totalCount = 0;
+      }
 
       // Get today's orders
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const { data: todayOrders, count: todayCount } = await supabase
-        .from('transactions')
-        .select('*, total_amount', { count: 'exact' })
-        .gte('created_at', today.toISOString());
+      const todayISO = today.toISOString();
+      console.log('📅 Today ISO:', todayISO);
+      
+      let todayOrders = [];
+      let todayCount = 0;
+      try {
+        const result = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact' })
+          .gte('created_at', todayISO);
+        todayOrders = result.data || [];
+        todayCount = result.count || 0;
+        if (result.error) {
+          console.error('❌ Error getting today orders:', result.error);
+        }
+      } catch (e) {
+        console.error('❌ Table does not exist:', e);
+        todayOrders = [];
+        todayCount = 0;
+      }
+      console.log(`📈 Today's orders: ${todayCount}, data:`, todayOrders);
 
       // Get pending orders (from purchase_orders table)
-      const { count: pendingCount } = await supabase
+      const { count: pendingCount, error: pendingError } = await supabase
         .from('purchase_orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['pending_approval', 'sent_to_supplier']);
 
+      if (pendingError) {
+        console.error('❌ Error getting pending orders:', pendingError);
+      }
+
       // Get completed orders
-      const { count: completedCount } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed');
+      let completedCount = 0;
+      try {
+        const result = await supabase
+          .from('transactions')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'completed');
+        completedCount = result.count || 0;
+        if (result.error) {
+          console.error('❌ Error getting completed orders:', result.error);
+        }
+      } catch (e) {
+        console.error('❌ Table does not exist:', e);
+        completedCount = 0;
+      }
 
       // Calculate today's revenue
       const todayRevenue = todayOrders?.reduce((sum, order) => 
-        sum + (parseFloat(order.total_amount) || 0), 0) || 0;
+        sum + (parseFloat(order.amount || order.total_amount || 0)), 0) || 0;
 
       setOrderStats({
         total: totalCount || 0,
@@ -311,6 +355,75 @@ const AdminPortal = () => {
     }
   }, []);
 
+  // Load detailed orders from Supabase (real data from manager portal)
+  const loadDetailedOrders = useCallback(async () => {
+    try {
+      setLoadingDetailedOrders(true);
+      console.log('📥 Loading detailed orders from database...');
+      
+      // Load recent sales transactions
+      let transactions = [];
+      try {
+        const result = await supabase
+          .from('transactions')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        transactions = result.data || [];
+        if (result.error) {
+          console.error('❌ Error loading transactions:', result.error);
+        } else {
+          console.log(`✅ Loaded ${transactions?.length || 0} transactions:`, transactions);
+        }
+      } catch (e) {
+        console.error('❌ Table does not exist:', e);
+        transactions = [];
+      }
+
+      // Load purchase orders
+      const { data: purchaseOrders, error: poError } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (poError) {
+        console.error('❌ Error loading purchase orders:', poError);
+      } else {
+        console.log(`✅ Loaded ${purchaseOrders?.length || 0} purchase orders:`, purchaseOrders);
+      }
+
+      // Combine and format orders
+      const allOrders = [
+        ...(transactions || []).map(t => ({
+          id: t.id,
+          type: 'sale',
+          status: t.status || 'completed',
+          amount: t.amount || t.total_amount || 0,
+          created_at: t.created_at,
+          items: t.items_count || 1,
+          customer: t.customer_name || 'Customer'
+        })),
+        ...(purchaseOrders || []).map(po => ({
+          id: po.id,
+          type: 'purchase',
+          status: po.status || 'pending',
+          amount: po.total_amount || 0,
+          created_at: po.created_at,
+          items: po.line_items?.length || 0,
+          supplier: po.supplier_name || 'Supplier'
+        }))
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 50);
+
+      setDetailedOrders(allOrders);
+      console.log(`✅ Total formatted orders: ${allOrders.length}`, allOrders);
+    } catch (error) {
+      console.error('❌ Error loading detailed orders:', error);
+    } finally {
+      setLoadingDetailedOrders(false);
+    }
+  }, []);
+
   // Load users when accessing user management or approvals
   useEffect(() => {
     if (activeSection === 'users') {
@@ -323,8 +436,18 @@ const AdminPortal = () => {
       loadPendingUsers();
     } else if (activeSection === 'orders') {
       loadOrderStats();
+      loadDetailedOrders();
+      
+      // Auto-refresh orders every 5 seconds
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing order stats...');
+        loadOrderStats();
+        loadDetailedOrders();
+      }, 5000);
+      
+      return () => clearInterval(refreshInterval);
     }
-  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers, loadOrderStats]);
+  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers, loadOrderStats, loadDetailedOrders]);
 
   // Real-time subscription for new user registrations
   useEffect(() => {
@@ -936,7 +1059,7 @@ const AdminPortal = () => {
   // Fetch inventory data from Supabase
   const fetchInventoryData = async () => {
     try {
-      // Fetch products from inventory
+      // Fetch products from products table
       const { data: products, error: productsError } = await supabase
         .from('products')
         .select('*');
@@ -946,19 +1069,48 @@ const AdminPortal = () => {
         throw productsError;
       }
       
+      // Fetch real inventory data from POS inventory table
+      let inventoryMap = {};
+      try {
+        const { data: inventoryData, error: invError } = await supabase
+          .from('inventory')
+          .select('product_id, quantity, minimum_stock, reorder_point')
+          .eq('is_active', true);
+        
+        if (!invError && inventoryData) {
+          inventoryData.forEach(inv => {
+            inventoryMap[inv.product_id] = inv;
+          });
+        }
+      } catch (e) {
+        console.warn('⚠️ Inventory table not available, using products table quantities');
+      }
+      
       console.log('Fetched products for inventory:', products);
 
-      // Calculate inventory metrics - handle various column names
+      // Calculate inventory metrics - use real inventory data from POS
       const totalProducts = products?.length || 0;
       const lowStockItems = products?.filter(product => {
-        const qty = product.quantity || product.stock || product.current_stock || 0;
-        const threshold = product.low_stock_threshold || product.minimum_stock || product.min_stock || 10;
+        const invData = inventoryMap[product.id];
+        let qty = 0;
+        let threshold = 10;
+        
+        if (invData) {
+          // Use real inventory data
+          qty = invData.quantity || 0;
+          threshold = invData.minimum_stock || 10;
+        } else {
+          // Fallback to products table
+          qty = product.quantity || product.stock || product.current_stock || 0;
+          threshold = product.low_stock_threshold || product.minimum_stock || product.min_stock || 10;
+        }
         return qty <= threshold;
       }).length || 0;
 
-      // Calculate total inventory value - handle various column names
+      // Calculate total inventory value - use real quantities
       const totalValue = products?.reduce((sum, product) => {
-        const qty = product.quantity || product.stock || product.current_stock || 0;
+        const invData = inventoryMap[product.id];
+        const qty = invData ? (invData.quantity || 0) : (product.quantity || product.stock || product.current_stock || 0);
         const price = parseFloat(product.price || product.selling_price || product.cost_price || 0);
         return sum + (qty * price);
       }, 0) || 0;
@@ -4296,6 +4448,8 @@ const AdminPortal = () => {
     revenue: 0,
     loading: true
   });
+  const [detailedOrders, setDetailedOrders] = useState([]);
+  const [loadingDetailedOrders, setLoadingDetailedOrders] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
 
   const renderOrderManagement = () => {
@@ -4475,6 +4629,99 @@ const AdminPortal = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Detailed Orders List - Real data from database */}
+      <div className="bg-white rounded-2xl shadow-xl p-8">
+        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+          <span className="mr-3 text-3xl">📜</span>
+          Recent Orders (Real Data from Database)
+        </h3>
+        
+        {loadingDetailedOrders ? (
+          <div className="text-center py-8">
+            <div className="animate-spin text-4xl mb-3">⏳</div>
+            <p className="text-gray-600">Loading orders from database...</p>
+          </div>
+        ) : detailedOrders.length === 0 ? (
+          <div className="text-center py-8 bg-gray-50 rounded-lg">
+            <p className="text-gray-500">No orders found in database</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-gray-300 bg-gray-50">
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Order ID</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Type</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Status</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Customer/Supplier</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Amount</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Items</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Date</th>
+                  <th className="px-4 py-3 text-left font-bold text-gray-900">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detailedOrders.slice(0, 10).map((order, index) => (
+                  <tr key={order.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-blue-600">{order.id.slice(0, 8)}...</td>
+                    <td className="px-4 py-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        order.type === 'sale' 
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {order.type === 'sale' ? '💰 Sale' : '📦 Purchase'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        order.status === 'completed' 
+                          ? 'bg-green-100 text-green-800'
+                          : order.status === 'pending' || order.status === 'pending_approval'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {order.status === 'completed' && '✅ Completed'}
+                        {order.status === 'pending' && '⏳ Pending'}
+                        {order.status === 'pending_approval' && '⏳ Pending Approval'}
+                        {order.status === 'sent_to_supplier' && '🚚 Sent'}
+                        {!['completed', 'pending', 'pending_approval', 'sent_to_supplier'].includes(order.status) && order.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {order.customer || order.supplier || 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 font-bold text-gray-900">
+                      UGX {(order.amount || 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-center font-semibold text-gray-700">
+                      {order.items}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">
+                      {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button className="text-blue-600 hover:text-blue-800 font-semibold text-xs px-3 py-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-4 flex justify-between items-center">
+              <p className="text-sm text-gray-600">
+                Showing 1-{Math.min(10, detailedOrders.length)} of {detailedOrders.length} orders
+              </p>
+              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-sm flex items-center">
+                <FiDownload className="mr-2" />
+                Export All Orders
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
     );
@@ -6362,10 +6609,10 @@ const AdminPortal = () => {
               { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
               // { id: 'approvals', label: 'Pending Approvals', icon: FiUserCheck },
               { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
-              { id: 'inventory', label: 'Inventory Control', icon: FiShoppingBag },
-              { id: 'orders', label: 'Order Management', icon: FiCalendar },
-              { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
-              { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
+              { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
+              // { id: 'orders', label: 'Order Management', icon: FiCalendar },
+              // { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
+              // { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
               { id: 'users', label: 'User Management', icon: FiUsers },
               { id: 'analytics', label: 'Business Analytics', icon: FiPieChart },
               // { id: 'operations', label: 'System Operations', icon: FiCpu },
@@ -6435,10 +6682,10 @@ const AdminPortal = () => {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
               { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
-              { id: 'inventory', label: 'Inventory Control', icon: FiShoppingBag },
-              { id: 'orders', label: 'Order Management', icon: FiCalendar },
-              { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
-              { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
+              { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
+              // { id: 'orders', label: 'Order Management', icon: FiCalendar },
+              // { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
+              // { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
               { id: 'users', label: 'User Management', icon: FiUsers },
               { id: 'analytics', label: 'Business Analytics', icon: FiPieChart },
             ].map((item) => (
@@ -6471,8 +6718,8 @@ const AdminPortal = () => {
         <div className="container-glass rounded-2xl shadow-lg p-6 mb-8 animate-fadeInUp">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{portalConfig.adminPortal} - System Administration</h1>
-              <p className="text-gray-600">Welcome back to {portalConfig.companyName}, {user?.email}</p>
+              <h1 className="text-3xl font-bold text-gray-900">Admin Portal - System Administration</h1>
+              <p className="text-gray-600">Welcome back to FareDeal Uganda, admin</p>
             </div>
             <div className="flex items-center space-x-4">
               <button 
@@ -6624,18 +6871,25 @@ const AdminPortal = () => {
             {activeSection === 'operations' && renderSystemOperations()}
             {activeSection === 'settings' && renderSystemSettings()}
             
+            {/* 📦 ORDER INVENTORY POS CONTROL */}
+            {activeSection === 'inventory-pos' && (
+              <OrderInventoryPOSControl />
+            )}
+            
             {/* 🧾 TRANSACTION HISTORY - Admin View */}
             {activeSection === 'transactions' && (
               <div>
-                <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl p-6 text-white shadow-xl mb-6">
-                  <h2 className="text-3xl font-bold flex items-center">
+                <div className={`bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl ${isMobile ? 'p-4' : 'p-6'} text-white shadow-xl mb-6`}>
+                  <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold flex items-center`}>
                     🧾 All Transactions & Financial Reports 🇺🇬
                   </h2>
-                  <p className="text-yellow-100 mt-2">
+                  <p className={`text-yellow-100 mt-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
                     Complete transaction history with advanced analytics and financial insights
                   </p>
                 </div>
-                <TransactionHistory viewMode="admin" />
+                <div className={isMobile ? 'space-y-4' : ''}>
+                  <TransactionHistory viewMode="admin" />
+                </div>
               </div>
             )}
             

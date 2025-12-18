@@ -9,7 +9,7 @@ import {
   FiWifi, FiActivity, FiTrendingUp, FiAward, FiSettings,
   FiEye, FiPercent
 } from 'react-icons/fi';
-import QRScanner from '../components/QRScanner';
+import DualScannerInterface from '../components/DualScannerInterface';
 import BiometricAuth from '../components/BiometricAuth';
 import PaymentMethods from '../components/PaymentMethods';
 import PaymentSecurity from '../components/PaymentSecurity';
@@ -1033,13 +1033,6 @@ const CustomerPayment = () => {
       </div>
 
       {/* Modals */}
-      <QRScanner
-        isOpen={showQRScanner}
-        onClose={() => setShowQRScanner(false)}
-        onQRScanned={handleQRScanned}
-        expectedData={generatePaymentQR()}
-      />
-
       <BiometricAuth
         isOpen={showBiometric}
         onClose={() => setShowBiometric(false)}

@@ -10,17 +10,21 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FiTruck, FiCheckCircle, FiXCircle, FiSend, FiEdit, FiPlus,
   FiPackage, FiDollarSign, FiClock, FiAlertTriangle, FiSearch,
-  FiDownload, FiMail, FiPhone, FiMapPin, FiCalendar, FiUser, FiChevronDown
+  FiDownload, FiMail, FiPhone, FiMapPin, FiCalendar, FiUser, FiChevronDown,
+  FiX, FiCheck
 } from 'react-icons/fi';
+import { toast } from 'react-toastify';
 import supplierOrdersService from '../services/supplierOrdersService';
 import { supabase } from '../services/supabase';
 import OrderPaymentTracker from './OrderPaymentTracker';
+import OrderItemsSelector from './OrderItemsSelector';
 
 const SupplierOrderManagement = () => {
   // State Management
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [stats, setStats] = useState({});
+  const [products, setProducts] = useState([]); // Products in POS inventory
 
   /**
    * Get current manager ID from localStorage or Supabase auth
@@ -49,6 +53,8 @@ const SupplierOrderManagement = () => {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showApprovalModal, setShowApprovalModal] = useState(false); // NEW: Approval with payment modal
   const [approvalOrderId, setApprovalOrderId] = useState(null); // NEW: Order being approved
+  const [showAddProductModal, setShowAddProductModal] = useState(false); // 🆕 Add Product modal state
+  const [selectedOrderForProduct, setSelectedOrderForProduct] = useState(null); // 🆕 Track which order we're adding product to
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -71,7 +77,65 @@ const SupplierOrderManagement = () => {
   // Load data on component mount
   useEffect(() => {
     loadAllData();
+    loadProducts();
   }, [statusFilter, priorityFilter, paymentFilter, viewMode]);
+
+  // Real-time subscription to products
+  useEffect(() => {
+    const subscription = supabase
+      .channel('products_manager_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products'
+        },
+        (payload) => {
+          console.log('🔄 Manager Portal - Real-time product update:', payload);
+          loadProducts(); // Refresh products list
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
+  }, []);
+
+  /**
+   * Load products from Supabase
+   */
+  const loadProducts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          id,
+          name,
+          price,
+          selling_price,
+          cost_price,
+          barcode,
+          sku,
+          category_id,
+          inventory (
+            id,
+            current_stock,
+            minimum_stock
+          )
+        `);
+
+      if (error) throw error;
+
+      setProducts(data || []);
+      console.log('✅ Manager Portal - Products loaded:', data?.length);
+    } catch (err) {
+      console.error('Error loading products:', err);
+    }
+  };
 
   /**
    * Load all supplier order data from Supabase
@@ -410,6 +474,207 @@ const SupplierOrderManagement = () => {
     } catch (err) {
       console.error('Error marking order as received:', err);
       alert('Failed to mark order as received');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Handle adding order products to POS inventory
+   */
+  const handleAddOrderProductsToPOS = async (order) => {
+    console.log('📦 handleAddOrderProductsToPOS called with order:', order);
+    console.log('Order items:', order.items);
+    
+    // Check if order already added to POS
+    if (order.added_to_pos) {
+      toast.warning('⚠️ This order has already been added to POS');
+      return;
+    }
+    
+    if (!order.items || order.items.length === 0) {
+      alert('❌ No products in this order to add to POS');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      let successCount = 0;
+      let failedCount = 0;
+      const results = [];
+
+      // Add each product from the order to POS
+      for (const item of order.items) {
+        try {
+          // Get product name - check all possible field names
+          const productName = item.product_name || item.productName || item.name;
+          const quantity = item.quantity || 0;
+          const unitPrice = item.unit_price || item.unitPrice || 0;
+          
+          console.log(`🛒 Processing item:`, { productName, quantity, unitPrice, item });
+          
+          if (!productName) {
+            console.warn('⚠️ No product name found in item:', item);
+            failedCount++;
+            results.push({
+              name: 'Unknown',
+              action: 'failed',
+              error: 'No product name in order item'
+            });
+            continue;
+          }
+
+          // Try to find existing product - use exact match on name
+          const { data: existingProducts, error: searchError } = await supabase
+            .from('products')
+            .select(`
+              id,
+              name,
+              inventory (
+                id,
+                current_stock,
+                minimum_stock
+              )
+            `)
+            .eq('name', productName);
+
+          console.log(`🔍 Search result for "${productName}":`, { existingProducts, searchError });
+
+          if (searchError) {
+            throw searchError;
+          }
+
+          if (existingProducts && existingProducts.length > 0) {
+            // Product exists - update stock in inventory table
+            const existingProduct = existingProducts[0];
+            const inventoryRecord = existingProduct.inventory?.[0];
+            let newStock = 0;
+            
+            if (!inventoryRecord) {
+              console.warn(`⚠️ No inventory record for ${productName}, creating one`);
+              // Create inventory record if it doesn't exist
+              newStock = quantity;
+              const { error: invError } = await supabase
+                .from('inventory')
+                .insert({
+                  product_id: existingProduct.id,
+                  current_stock: quantity,
+                  minimum_stock: 10
+                });
+              if (invError) throw invError;
+            } else {
+              newStock = (inventoryRecord.current_stock || 0) + quantity;
+              
+              console.log(`✅ Updating existing product "${productName}": stock ${inventoryRecord.current_stock} -> ${newStock}`);
+
+              const { error: updateError } = await supabase
+                .from('inventory')
+                .update({
+                  current_stock: newStock
+                })
+                .eq('id', inventoryRecord.id);
+
+              if (updateError) throw updateError;
+            }
+
+            results.push({
+              name: productName,
+              action: 'updated',
+              quantity: quantity,
+              newStock: newStock
+            });
+            successCount++;
+          } else {
+            // Create new product in POS
+            console.log(`🆕 Creating new product in POS: "${productName}" x ${quantity} @ ${unitPrice}`);
+
+            const { data: newProduct, error: insertError } = await supabase
+              .from('products')
+              .insert({
+                name: productName,
+                price: unitPrice,
+                selling_price: unitPrice,
+                cost_price: unitPrice,
+                description: `Added from supplier order ${order.po_number}`,
+                barcode: `AUTO-${Date.now()}`,
+                markup_percentage: 0
+              })
+              .select('id');
+
+            if (insertError) throw insertError;
+
+            // Create inventory record
+            if (newProduct && newProduct.length > 0) {
+              const { error: invError } = await supabase
+                .from('inventory')
+                .insert({
+                  product_id: newProduct[0].id,
+                  current_stock: quantity,
+                  minimum_stock: 10
+                });
+
+              if (invError) throw invError;
+            }
+
+            results.push({
+              name: productName,
+              action: 'created',
+              quantity: quantity
+            });
+            successCount++;
+          }
+        } catch (itemErr) {
+          console.error(`❌ Error adding ${item.product_name || item.productName}:`, itemErr);
+          failedCount++;
+          results.push({
+            name: item.product_name || item.productName || 'Unknown',
+            action: 'failed',
+            error: itemErr.message
+          });
+        }
+      }
+
+      // Show summary
+      let message = `✅ POS Inventory Updated!\n\n`;
+      message += `Order: ${order.po_number}\n`;
+      message += `Successfully added/updated: ${successCount}/${order.items.length} products\n\n`;
+      
+      results.forEach(r => {
+        if (r.action === 'updated') {
+          message += `✅ ${r.name} - Updated (+ ${r.quantity} units, new stock: ${r.newStock})\n`;
+        } else if (r.action === 'created') {
+          message += `🆕 ${r.name} - Created (${r.quantity} units)\n`;
+        } else if (r.action === 'failed') {
+          message += `❌ ${r.name} - Failed: ${r.error}\n`;
+        }
+      });
+
+      if (failedCount > 0) {
+        message += `\n⚠️ ${failedCount} product(s) failed to add.`;
+      }
+
+      toast.success(message, {
+        autoClose: 5000
+      });
+
+      // Mark order as added to POS to prevent duplicate additions
+      if (successCount > 0) {
+        try {
+          await supabase
+            .from('supplier_orders')
+            .update({ added_to_pos: true })
+            .eq('id', order.id);
+          console.log('✅ Order marked as added_to_pos');
+        } catch (err) {
+          console.warn('Could not update order added_to_pos flag:', err);
+        }
+      }
+
+      // Reload data to refresh
+      loadAllData();
+    } catch (err) {
+      console.error('Error adding products to POS:', err);
+      toast.error(`❌ Failed to add products to POS: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -987,6 +1252,7 @@ const SupplierOrderManagement = () => {
 
                   {/* Action Buttons */}
                   <div className="flex items-center flex-wrap gap-3 pt-4 border-t border-gray-200">
+                    {/* ❌ COMMENTED OUT: Approve/Reject buttons disabled
                     {order.status === 'pending_approval' && (
                       <>
                         <button
@@ -1011,6 +1277,7 @@ const SupplierOrderManagement = () => {
                         </button>
                       </>
                     )}
+                    */}
                     
                     {order.status === 'approved' && (
                       <button
@@ -1073,6 +1340,27 @@ const SupplierOrderManagement = () => {
                       </button>
                     )}
 
+                    {/* 🆕 ADD PRODUCT BUTTON - Add order products to POS inventory */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('✅ Add to POS button clicked for order:', order?.id, order?.po_number);
+                        handleAddOrderProductsToPOS(order);
+                      }}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      className="flex-1 min-w-[180px] bg-gradient-to-r from-indigo-600 to-blue-600 text-white px-4 py-3 rounded-lg hover:from-indigo-700 hover:to-blue-700 active:from-indigo-800 active:to-blue-800 transition-all duration-300 flex items-center justify-center space-x-2 font-bold shadow-lg cursor-pointer hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={order.added_to_pos ? "This order has already been added to POS" : "Add all order products to POS inventory"}
+                      disabled={!order.items || order.items.length === 0 || order.added_to_pos}
+                    >
+                      <FiPlus className="h-5 w-5" />
+                      <span>➕ {order.added_to_pos ? 'Added to POS ✓' : 'Add to POS'}</span>
+                    </button>
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1099,6 +1387,69 @@ const SupplierOrderManagement = () => {
         )}
       </div>
 
+      {/* 🛒 POS INVENTORY SECTION - Products Added to POS */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 shadow-lg">
+        <h3 className="text-xl font-bold text-gray-800 mb-3 flex items-center">
+          <span className="mr-2 text-2xl">🛒</span>
+          POS Inventory
+        </h3>
+        <p className="text-gray-600 text-sm mb-4">Products available for sale in POS system</p>
+        
+        {products && products.length > 0 ? (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {products.map((product) => {
+              const stock = product.inventory?.[0]?.quantity || 0;
+              const stockStatus = stock > 10 ? 'text-green-600' : stock > 0 ? 'text-yellow-600' : 'text-red-600';
+              
+              return (
+                <div key={product.id} className="bg-white rounded-lg p-3 border border-gray-200 hover:border-blue-400 transition-all hover:shadow-md">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-800 text-sm break-words">{product.name}</p>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">SKU: {product.sku || 'N/A'}</span>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${stockStatus} bg-opacity-10`}>
+                          📦 {stock} units
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-green-600">UGX {(product.price || 0).toLocaleString()}</p>
+                      <p className={`text-xs font-semibold mt-1 ${stockStatus}`}>
+                        {stock > 10 ? '✅ Good' : stock > 0 ? '⚠️ Low' : '❌ Out'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="text-center py-6 text-gray-500">
+            <p className="text-sm">📭 No products in POS inventory</p>
+            <p className="text-xs text-gray-400 mt-1">Add from supplier orders to populate</p>
+          </div>
+        )}
+        
+        {/* Summary Stats */}
+        {products && products.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="bg-white rounded p-2">
+              <p className="font-bold text-gray-800">{products.length}</p>
+              <p className="text-gray-600">Total Products</p>
+            </div>
+            <div className="bg-white rounded p-2">
+              <p className="font-bold text-gray-800">{products.reduce((sum, p) => sum + (p.inventory?.[0]?.quantity || 0), 0)}</p>
+              <p className="text-gray-600">Total Stock</p>
+            </div>
+            <div className="bg-white rounded p-2">
+              <p className="font-bold text-green-600">UGX {(products.reduce((sum, p) => sum + (p.price || 0), 0)).toLocaleString()}</p>
+              <p className="text-gray-600">Total Value</p>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Create Order Modal */}
       {showCreateModal && (
         <CreateOrderModal
@@ -1113,48 +1464,48 @@ const SupplierOrderManagement = () => {
 
       {/* Order Detail Modal */}
       {selectedOrder && !showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-xl">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Purchase Order Details</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50 p-4 sm:p-0">
+          <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-4xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 sm:p-6 rounded-t-2xl sm:rounded-t-xl">
+              <div className="flex items-center justify-between gap-3 mb-4 sm:mb-4">
+                <h2 className="text-lg sm:text-2xl font-bold">Purchase Order Details</h2>
                 <button
                   onClick={() => {
                     setSelectedOrder(null);
                     setActiveTab('details');
                   }}
-                  className="text-white hover:text-gray-200 text-2xl font-bold"
+                  className="text-white hover:text-gray-200 text-2xl sm:text-3xl font-bold flex-shrink-0"
                 >
                   ×
                 </button>
               </div>
               
-              {/* Tabs */}
-              <div className="flex gap-4 mt-4 border-b border-white/20">
+              {/* Tabs - Mobile Optimized */}
+              <div className="flex gap-2 sm:gap-4 border-b border-white/20 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('details')}
-                  className={`pb-2 px-4 font-semibold transition-all ${
+                  className={`pb-2 px-3 sm:px-4 font-semibold text-xs sm:text-base transition-all whitespace-nowrap ${
                     activeTab === 'details'
                       ? 'border-b-2 border-white text-white'
                       : 'text-white/70 hover:text-white'
                   }`}
                 >
-                  📋 Order Details
+                  📋 Details
                 </button>
                 <button
                   onClick={() => setActiveTab('payment')}
-                  className={`pb-2 px-4 font-semibold transition-all ${
+                  className={`pb-2 px-3 sm:px-4 font-semibold text-xs sm:text-base transition-all whitespace-nowrap ${
                     activeTab === 'payment'
                       ? 'border-b-2 border-white text-white'
                       : 'text-white/70 hover:text-white'
                   }`}
                 >
-                  💰 Payment Progress
+                  💰 Payment
                 </button>
               </div>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
               {/* Order Details Tab */}
               {activeTab === 'details' && (
                 <>
@@ -1193,7 +1544,20 @@ const SupplierOrderManagement = () => {
                   {/* Items Table */}
                   {selectedOrder.items && Array.isArray(selectedOrder.items) && (
                     <div>
-                      <h3 className="font-bold text-lg mb-3">Order Items</h3>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold text-lg">Order Items</h3>
+                        <button
+                          onClick={() => {
+                            console.log('Add Product modal clicked for order:', selectedOrder);
+                            setSelectedOrderForProduct(selectedOrder);
+                            setShowAddProductModal(true);
+                          }}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-2 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 flex items-center space-x-2 font-semibold text-sm"
+                        >
+                          <FiPlus className="h-4 w-4" />
+                          <span>Add Product</span>
+                        </button>
+                      </div>
                       <div className="border rounded-lg overflow-hidden">
                         <table className="w-full">
                           <thead className="bg-gray-50">
@@ -1257,6 +1621,23 @@ const SupplierOrderManagement = () => {
           }}
         />
       )}
+
+      {/* 🆕 ADD PRODUCT TO ORDER MODAL */}
+      {showAddProductModal && selectedOrderForProduct && (
+        <AddProductToOrderModal
+          isOpen={showAddProductModal}
+          onClose={() => {
+            setShowAddProductModal(false);
+            setSelectedOrderForProduct(null);
+          }}
+          order={selectedOrderForProduct}
+          onProductAdded={() => {
+            loadAllData();
+            setShowAddProductModal(false);
+            setSelectedOrderForProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -1314,6 +1695,11 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
       tax,
       total: subtotal + tax
     };
+  };
+
+  const setTotals = (newTotals) => {
+    // No-op: totals is calculated directly from orderItems
+    // This satisfies the OrderItemsSelector callback requirement
   };
 
   const handleSubmit = async (e) => {
@@ -1471,118 +1857,13 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
             </select>
           </div>
 
-          {/* Order Items */}
-          <div className="border-2 border-gray-200 rounded-lg p-4">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">📦 Order Items</h3>
-            
-            {/* Add Item Form */}
-            <div className="bg-gray-50 rounded-lg p-4 mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Product Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newItem.productName}
-                    onChange={(e) => setNewItem({...newItem, productName: e.target.value})}
-                    placeholder="Enter product name"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    value={newItem.quantity}
-                    onChange={(e) => setNewItem({...newItem, quantity: e.target.value})}
-                    min="1"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Unit Price (UGX)
-                  </label>
-                  <input
-                    type="number"
-                    value={newItem.unitPrice}
-                    onChange={(e) => setNewItem({...newItem, unitPrice: e.target.value})}
-                    min="0"
-                    step="100"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="mt-3 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-all duration-300 flex items-center space-x-2 font-semibold"
-              >
-                <FiPlus className="h-5 w-5" />
-                <span>Add Item</span>
-              </button>
-            </div>
-
-            {/* Items List */}
-            {orderItems.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">Product</th>
-                      <th className="px-4 py-3 text-center text-sm font-bold text-gray-700">Quantity</th>
-                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">Unit Price</th>
-                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">Total</th>
-                      <th className="px-4 py-3 text-center text-sm font-bold text-gray-700">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orderItems.map((item, index) => (
-                      <tr key={index} className="border-t border-gray-200">
-                        <td className="px-4 py-3">{item.product_name}</td>
-                        <td className="px-4 py-3 text-center">{item.quantity}</td>
-                        <td className="px-4 py-3 text-right">{formatUGX(item.unit_price)}</td>
-                        <td className="px-4 py-3 text-right font-semibold">{formatUGX(item.total)}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(index)}
-                            className="text-red-600 hover:text-red-800 font-bold"
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="bg-green-50 border-t-2 border-green-200">
-                    <tr>
-                      <td colSpan="3" className="px-4 py-3 text-right font-bold">Subtotal:</td>
-                      <td className="px-4 py-3 text-right font-bold">{formatUGX(totals.subtotal)}</td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td colSpan="3" className="px-4 py-2 text-right font-semibold">VAT (18%):</td>
-                      <td className="px-4 py-2 text-right font-semibold">{formatUGX(totals.tax)}</td>
-                      <td></td>
-                    </tr>
-                    <tr>
-                      <td colSpan="3" className="px-4 py-3 text-right font-bold text-lg">TOTAL:</td>
-                      <td className="px-4 py-3 text-right font-bold text-lg text-green-600">{formatUGX(totals.total)}</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No items added yet. Add your first item above.
-              </div>
-            )}
-          </div>
+          {/* Order Items - Using New Enhanced Selector */}
+          <OrderItemsSelector
+            orderItems={orderItems}
+            onItemsChange={setOrderItems}
+            totals={totals}
+            onTotalsChange={setTotals}
+          />
 
           {/* Delivery Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2013,9 +2294,10 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
       </div>
     </div>
   );
+};
 
-  // =============================================
-  // APPROVAL WITH PAYMENT MODAL
+// =============================================
+// APPROVAL WITH PAYMENT MODAL
   // =============================================
   const ApprovalModal = () => {
     if (!showApprovalModal || !selectedOrder) return null;
@@ -2304,6 +2586,7 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
               >
                 Cancel
               </button>
+              {/* ❌ COMMENTED OUT: Approve Order button disabled
               <button
                 type="button"
                 onClick={submitOrderApproval}
@@ -2312,6 +2595,7 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
                 <FiCheckCircle className="h-5 w-5" />
                 <span>Approve Order</span>
               </button>
+              */}
             </div>
           </div>
         </div>
@@ -2319,15 +2603,436 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
     );
   };
 
-  return (
-    <>
-      {/* Main Component Content - keeping existing JSX */}
-      {mainComponentContent}
+/**
+ * 🆕 ADD PRODUCT TO ORDER MODAL
+ * Modal for adding additional products to an existing purchase order
+ * Allows managers to dynamically add items to pending/approved orders
+ */
+const AddProductToOrderModal = ({ isOpen, onClose, order, onProductAdded }) => {
+  const [formData, setFormData] = React.useState({
+    productName: '',
+    quantity: 1,
+    unitPrice: '',
+    notes: ''
+  });
+
+  const [loading, setLoading] = React.useState(false);
+  const [errors, setErrors] = React.useState({});
+  const productNameRef = React.useRef(null);
+
+  // Auto-focus on product name input when modal opens
+  React.useEffect(() => {
+    if (isOpen && productNameRef.current) {
+      setTimeout(() => productNameRef.current?.focus(), 100);
+    }
+  }, [isOpen]);
+
+  // Handle Escape key to close modal
+  React.useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.productName.trim()) {
+      newErrors.productName = 'Product name is required';
+    }
+    if (formData.quantity <= 0) {
+      newErrors.quantity = 'Quantity must be greater than 0';
+    }
+    if (!formData.unitPrice || parseFloat(formData.unitPrice) <= 0) {
+      newErrors.unitPrice = 'Unit price must be greater than 0';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const newLineTotal = formData.quantity * parseFloat(formData.unitPrice);
       
-      {/* Approval Modal */}
-      <ApprovalModal />
-    </>
+      // Add the product to the order in Supabase
+      const { data, error } = await supabase
+        .from('purchase_order_items')
+        .insert({
+          purchase_order_id: order.id,
+          product_name: formData.productName,
+          quantity: formData.quantity,
+          unit_price: parseFloat(formData.unitPrice),
+          line_total: newLineTotal,
+          notes: formData.notes,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      // Update the order total
+      const { error: updateError } = await supabase
+        .from('purchase_orders')
+        .update({
+          total_amount_ugx: (order.total_amount_ugx || 0) + newLineTotal,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', order.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // 🆕 UPDATE POS INVENTORY - Add the product to products table
+      try {
+        console.log('🛒 Adding product to POS inventory:', formData.productName);
+        
+        // First, try to find existing product - use exact match on name
+        const { data: existingProducts, error: searchError } = await supabase
+          .from('products')
+          .select('id, stock')
+          .eq('name', formData.productName);
+
+        let posUpdateResult;
+
+        if (existingProducts && existingProducts.length > 0) {
+          // Product exists - update stock
+          const existingProduct = existingProducts[0];
+          console.log('✅ Product exists in POS:', existingProduct.id, 'Current stock:', existingProduct.stock);
+          
+          const newStock = (existingProduct.stock || 0) + formData.quantity;
+          const { error: updateError } = await supabase
+            .from('products')
+            .update({
+              stock: newStock,
+              price: parseFloat(formData.unitPrice), // Update price too
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingProduct.id);
+
+          if (updateError) {
+            console.error('⚠️ Error updating product stock:', updateError);
+          } else {
+            console.log('✅ Product stock updated in POS. New stock:', newStock);
+            posUpdateResult = { success: true, action: 'updated', stock: newStock };
+          }
+        } else {
+          // Product doesn't exist - create new
+          console.log('🆕 Creating new product in POS inventory');
+          
+          const { data: newProduct, error: insertError } = await supabase
+            .from('products')
+            .insert({
+              name: formData.productName,
+              price: parseFloat(formData.unitPrice),
+              stock: formData.quantity,
+              category: 'Imported',
+              brand: 'Supplier Order',
+              unit: 'piece',
+              description: formData.notes || `Added from supplier order - ${new Date().toLocaleDateString()}`,
+              created_at: new Date().toISOString()
+            })
+            .select();
+
+          if (insertError) {
+            console.error('⚠️ Error creating product in POS:', insertError);
+          } else {
+            console.log('✅ New product created in POS:', newProduct);
+            posUpdateResult = { success: true, action: 'created', stock: formData.quantity };
+          }
+        }
+
+        // Log the result
+        if (posUpdateResult?.success) {
+          console.log('🎉 POS inventory updated successfully!');
+        }
+      } catch (posErr) {
+        console.error('⚠️ Error updating POS inventory:', posErr);
+      }
+
+      // Show success with animation
+      toast.success(`✅ ${formData.productName} added!\n📦 Product quantity: ${formData.quantity}\n🛒 Added to POS inventory`, {
+        autoClose: 4000,
+        style: { animation: 'slideInRight 0.3s ease-out' }
+      });
+
+      // Reset form with smooth animation
+      setFormData({
+        productName: '',
+        quantity: 1,
+        unitPrice: '',
+        notes: ''
+      });
+
+      // Trigger callback to refresh data
+      setTimeout(() => {
+        onProductAdded();
+      }, 300);
+    } catch (err) {
+      console.error('Error adding product:', err);
+      toast.error(`❌ Failed to add product: ${err.message}\n\nPlease check console for details.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isOpen || !order) return null;
+
+  const totalLineAmount = formData.quantity * (parseFloat(formData.unitPrice) || 0);
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm transition-opacity duration-300">
+      <style>{`
+        @keyframes slideInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideOutDown {
+          from {
+            opacity: 1;
+            transform: translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        @keyframes bounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+        .animate-slideInUp {
+          animation: slideInUp 0.4s ease-out;
+        }
+        .animate-slideOutDown {
+          animation: slideOutDown 0.3s ease-in;
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .animate-pulse {
+          animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        .animate-bounce {
+          animation: bounce 1s infinite;
+        }
+      `}</style>
+      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full animate-slideInUp">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 rounded-t-xl flex items-center justify-between shadow-lg">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+            <FiPlus className="h-6 w-6 animate-bounce" />
+            Add Product to Order
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition-all duration-200 hover:rotate-90"
+          >
+            <FiX className="h-6 w-6" />
+          </button>
+        </div>
+
+        {/* Order Info */}
+        <div className="px-6 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Order Number</p>
+              <p className="font-bold text-gray-900">{order.po_number}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-600">Current Total</p>
+              <p className="font-bold text-green-600">UGX {(order.total_amount_ugx || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleAddProduct} className="p-6 space-y-4">
+          {/* Product Name */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              📦 Product Name *
+            </label>
+            <input
+              ref={productNameRef}
+              type="text"
+              placeholder="e.g., Sugar - 1kg, Rice - 10kg"
+              value={formData.productName}
+              onChange={(e) => {
+                setFormData({ ...formData, productName: e.target.value });
+                if (errors.productName) setErrors({ ...errors, productName: '' });
+              }}
+              className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-all duration-200 ${
+                errors.productName ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-indigo-500'
+              }`}
+            />
+            {errors.productName && (
+              <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                <FiAlertTriangle className="h-4 w-4" />
+                {errors.productName}
+              </p>
+            )}
+          </div>
+
+          {/* Quantity and Unit Price */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                📊 Quantity *
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={formData.quantity}
+                onChange={(e) => {
+                  setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 });
+                  if (errors.quantity) setErrors({ ...errors, quantity: '' });
+                }}
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-all ${
+                  errors.quantity ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-indigo-500'
+                }`}
+              />
+              {errors.quantity && (
+                <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                  <FiAlertTriangle className="h-4 w-4" />
+                  {errors.quantity}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">
+                💰 Unit Price (UGX) *
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="100"
+                placeholder="0"
+                value={formData.unitPrice}
+                onChange={(e) => {
+                  setFormData({ ...formData, unitPrice: e.target.value });
+                  if (errors.unitPrice) setErrors({ ...errors, unitPrice: '' });
+                }}
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none transition-all ${
+                  errors.unitPrice ? 'border-red-500 focus:border-red-600' : 'border-gray-300 focus:border-indigo-500'
+                }`}
+              />
+              {errors.unitPrice && (
+                <p className="text-red-600 text-xs mt-1 flex items-center gap-1">
+                  <FiAlertTriangle className="h-4 w-4" />
+                  {errors.unitPrice}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Line Total Preview */}
+          {formData.quantity > 0 && formData.unitPrice && (
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-lg border-2 border-indigo-200 shadow-md">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-700 font-semibold">Line Total:</span>
+                <span className="text-xl font-bold text-indigo-600 animate-pulse">
+                  UGX {totalLineAmount.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-indigo-200">
+                <span className="text-gray-700 font-semibold">New Order Total:</span>
+                <span className="text-xl font-bold text-green-600 animate-pulse">
+                  UGX {((order.total_amount_ugx || 0) + totalLineAmount).toLocaleString()}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              📝 Notes (Optional)
+            </label>
+            <textarea
+              placeholder="Add any special notes about this product..."
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              rows="2"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-all"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-4 pt-4 border-t-2 border-gray-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-all font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 px-4 py-3 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-lg hover:from-indigo-700 hover:to-blue-700 transition-all font-bold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <FiCheck className="h-5 w-5" />
+                  Add Product
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 };
 
+// =====================================================================
+// EXPORT
+// =====================================================================
 export default SupplierOrderManagement;

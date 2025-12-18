@@ -17,10 +17,10 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
 import { toast } from 'react-toastify';
-import BarcodeScannerModal from '../components/BarcodeScannerModal';
+import DualScannerInterface from '../components/DualScannerInterface';
 import ProductInventoryInterface from '../components/ProductInventoryInterface';
 import AddProductModal from '../components/AddProductModal';
-import Receipt from '../components/Receipt';
+import Receipt from '../components/Receipt'; 
 import TransactionHistory from '../components/TransactionHistory';
 import TillSuppliesSection from '../components/TillSuppliesSection';
 import OrderSuppliesModal from '../components/OrderSuppliesModal';
@@ -60,10 +60,24 @@ const CashierPortal = () => {
   const [quickCashAmounts, setQuickCashAmounts] = useState([]);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [lastScannedBarcode, setLastScannedBarcode] = useState(null); // Track missing barcode for adding
   
   // 🧾 RECEIPT & TRANSACTION HISTORY
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [receiptData, setReceiptData] = useState(null);
+  const [savedReceipts, setSavedReceipts] = useState([]);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
+  
+  // Load saved receipts from localStorage on mount
+  useEffect(() => {
+    try {
+      const receipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+      setSavedReceipts(receipts);
+      console.log(`✅ Loaded ${receipts.length} saved receipts from localStorage`);
+    } catch (error) {
+      console.warn('⚠️ Could not load saved receipts:', error);
+    }
+  }, []);
   
   // � CASHIER ORDERS & TILL SUPPLIES
   const [showOrderModal, setShowOrderModal] = useState(false);
@@ -79,6 +93,7 @@ const CashierPortal = () => {
   // �🔥 SUPABASE REAL-TIME PRODUCTS - Loaded from Database
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [refreshingProducts, setRefreshingProducts] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Sample products as fallback (if Supabase fails)
@@ -252,7 +267,7 @@ const CashierPortal = () => {
   // Function to load products from Supabase
   const loadProductsFromSupabase = async () => {
     try {
-      setProductsLoading(true);
+      setRefreshingProducts(true);
       
       // Load products with inventory data only
       const { data: productsData, error } = await supabase
@@ -296,7 +311,7 @@ const CashierPortal = () => {
       toast.error('Failed to load products from inventory');
       setProducts([]);
     } finally {
-      setProductsLoading(false);
+      setRefreshingProducts(false);
     }
   };
 
@@ -1162,31 +1177,65 @@ const CashierPortal = () => {
   };
 
   const handleBarcodeScanned = (barcode) => {
-    // Find product by barcode
-    const product = sampleProducts.find(p => 
-      p.barcode === barcode || 
-      p.id === barcode ||
-      p.name.toLowerCase().includes(barcode.toLowerCase())
-    );
+    console.log(`🔍 Searching for barcode: ${barcode}`);
+    console.log(`📦 Total products in system: ${products.length}`);
+    
+    // Normalize barcode for better matching
+    const normalizedBarcode = barcode.trim().toLowerCase();
+    
+    // Search in real products from Supabase with multiple matching strategies
+    let product = products.find(p => {
+      const barcodeMatch = p.barcode?.toLowerCase().trim() === normalizedBarcode;
+      const idMatch = p.id?.toString().toLowerCase() === normalizedBarcode;
+      const nameMatch = p.name?.toLowerCase().includes(normalizedBarcode);
+      
+      if (barcodeMatch || idMatch || nameMatch) {
+        console.log(`✅ Found product: ${p.name} (Barcode: ${p.barcode})`);
+        return true;
+      }
+      return false;
+    });
+
+    if (!product) {
+      // Fallback to sample products
+      product = sampleProducts.find(p => 
+        p.barcode === barcode || 
+        p.id === barcode ||
+        p.name.toLowerCase().includes(barcode.toLowerCase())
+      );
+    }
     
     if (product) {
+      // Product found - add to transaction
       addItemToTransaction(product);
       setShowBarcodeScanner(false);
-      // Add success notification or toast here
-      console.log(`✅ Product ${product.name} scanned and added!`);
+      toast.success(`✅ ${product.name} (${product.barcode}) scanned and added!`);
+      console.log(`✅ Product ${product.name} scanned and added to transaction!`);
     } else {
-      // Create demo product for unrecognized barcode
-      const demoProduct = {
-        id: `SCAN_${Date.now()}`,
-        name: `Scanned Item ${barcode.slice(-4)}`,
-        price: Math.floor(Math.random() * 10000) + 2000, // Random price 2k-12k UGX
-        barcode: barcode,
-        category: 'Scanned Items',
-        stock: 50
-      };
-      addItemToTransaction(demoProduct);
-      setShowBarcodeScanner(false);
-      console.log(`📦 New item ${demoProduct.name} created and added!`);
+      // Product NOT found - store barcode and show notification
+      console.log(`❌ Product NOT found for barcode: ${barcode}`);
+      console.log(`📊 Searched ${products.length} products in inventory`);
+      
+      // Store the missing barcode for quick product addition
+      setLastScannedBarcode(barcode);
+      
+      // Show warning notification with clear instructions
+      toast.warning(
+        <div className="space-y-3">
+          <div>
+            <p className="font-bold text-lg">⚠️ Product Not in System</p>
+            <p className="text-sm mt-1">Barcode: <span className="font-mono font-bold text-yellow-300">{barcode}</span></p>
+          </div>
+          <p className="text-sm">This barcode is not registered in the inventory yet.</p>
+          <div className="pt-2 border-t border-yellow-300">
+            <p className="text-sm font-semibold text-yellow-100">📦 Action Required:</p>
+            <p className="text-xs text-gray-200 mt-1">Please add this product to the system using the "Add Product" button to proceed with sales.</p>
+          </div>
+        </div>,
+        { autoClose: 7000, pauseOnHover: true }
+      );
+      
+      // Scanner stays open for user to try again or scan different product
     }
   };
 
@@ -1295,6 +1344,9 @@ const CashierPortal = () => {
       setPaymentResult(result);
       
       // 🔥 NEW: Save transaction to database
+      let receiptSaved = false;
+      let savedReceiptNumber = null;
+      
       try {
         const saveResult = await transactionService.saveTransaction({
           items: currentTransaction.items,
@@ -1312,31 +1364,135 @@ const CashierPortal = () => {
           location: cashierProfile.location || 'Kampala Main Branch'
         });
         
-        if (saveResult.success) {
+        if (saveResult && saveResult.success) {
           console.log('✅ Transaction saved:', saveResult.receiptNumber);
+          receiptSaved = true;
+          savedReceiptNumber = saveResult.receiptNumber || `RCP-${Date.now()}`;
           
           // Set receipt data for display
           setReceiptData({
             ...result,
-            receiptNumber: saveResult.receiptNumber,
-            transactionId: saveResult.transactionId,
+            receiptNumber: savedReceiptNumber,
+            transactionId: saveResult.transactionId || result.transactionId,
             amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
             changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0
           });
+          
+          // 💾 Save receipt to localStorage as backup
+          try {
+            const existingReceipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            existingReceipts.unshift({
+              receiptNumber: savedReceiptNumber,
+              transactionId: saveResult.transactionId || result.transactionId,
+              timestamp: new Date().toISOString(),
+              items: currentTransaction.items,
+              subtotal: currentTransaction.subtotal,
+              tax: currentTransaction.tax,
+              total: currentTransaction.total,
+              paymentMethod: paymentMethod.name,
+              amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+              changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0,
+              cashier: cashierProfile.name
+            });
+            localStorage.setItem('receipts', JSON.stringify(existingReceipts.slice(0, 100))); // Keep last 100
+            console.log('💾 Receipt saved to local storage');
+          } catch (storageError) {
+            console.warn('⚠️ Could not save to localStorage:', storageError);
+          }
           
           // Show receipt modal after a brief delay
           setTimeout(() => {
             setShowReceiptModal(true);
           }, 500);
           
-          toast.success(`✅ Payment successful! Receipt: ${saveResult.receiptNumber}`);
+          toast.success(`✅ Payment successful! Receipt: ${savedReceiptNumber}`);
         } else {
-          console.error('❌ Failed to save transaction:', saveResult.error);
-          toast.warning('⚠️ Payment successful but receipt not saved');
+          console.error('❌ Failed to save transaction:', saveResult?.error);
+          
+          // Fallback: Create receipt with temporary number
+          savedReceiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+          console.warn('⚠️ Using fallback receipt number:', savedReceiptNumber);
+          
+          setReceiptData({
+            ...result,
+            receiptNumber: savedReceiptNumber,
+            transactionId: result.transactionId,
+            amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+            changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0
+          });
+          
+          // 💾 Save fallback receipt to localStorage
+          try {
+            const existingReceipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            existingReceipts.unshift({
+              receiptNumber: savedReceiptNumber,
+              transactionId: result.transactionId,
+              timestamp: new Date().toISOString(),
+              items: currentTransaction.items,
+              subtotal: currentTransaction.subtotal,
+              tax: currentTransaction.tax,
+              total: currentTransaction.total,
+              paymentMethod: paymentMethod.name,
+              amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+              changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0,
+              cashier: cashierProfile.name,
+              syncStatus: 'pending' // Mark for sync later
+            });
+            localStorage.setItem('receipts', JSON.stringify(existingReceipts.slice(0, 100)));
+            console.log('💾 Fallback receipt saved to local storage');
+            receiptSaved = true;
+          } catch (storageError) {
+            console.warn('⚠️ Could not save to localStorage:', storageError);
+          }
+          
+          setTimeout(() => {
+            setShowReceiptModal(true);
+          }, 500);
+          
+          toast.warning('⚠️ Receipt saved locally - syncing with server...');
         }
       } catch (saveError) {
         console.error('❌ Error saving transaction:', saveError);
-        toast.warning('⚠️ Payment successful but receipt not saved');
+        
+        // Fallback: Save to localStorage
+        savedReceiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+        
+        setReceiptData({
+          ...result,
+          receiptNumber: savedReceiptNumber,
+          transactionId: result.transactionId,
+          amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+          changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0
+        });
+        
+        try {
+          const existingReceipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+          existingReceipts.unshift({
+            receiptNumber: savedReceiptNumber,
+            transactionId: result.transactionId,
+            timestamp: new Date().toISOString(),
+            items: currentTransaction.items,
+            subtotal: currentTransaction.subtotal,
+            tax: currentTransaction.tax,
+            total: currentTransaction.total,
+            paymentMethod: paymentMethod.name,
+            amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+            changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0,
+            cashier: cashierProfile.name,
+            syncStatus: 'pending'
+          });
+          localStorage.setItem('receipts', JSON.stringify(existingReceipts.slice(0, 100)));
+          receiptSaved = true;
+          console.log('💾 Receipt saved to local storage (error fallback)');
+        } catch (storageError) {
+          console.warn('⚠️ Could not save to localStorage:', storageError);
+        }
+        
+        setTimeout(() => {
+          setShowReceiptModal(true);
+        }, 500);
+        
+        toast.warning('⚠️ Receipt saved locally - will sync when online');
       }
       
       // 🔥 Update stock in Supabase after successful payment
@@ -1481,6 +1637,15 @@ const CashierPortal = () => {
               🛒 Product Selection
             </h3>
             <div className="flex items-center space-x-2">
+              <button
+                onClick={loadProductsFromSupabase}
+                disabled={refreshingProducts}
+                className={`px-3 py-2 ${refreshingProducts ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700'} text-white rounded-lg font-bold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg`}
+                title="Refresh products from Manager Portal"
+              >
+                <FiRefreshCw className={`h-5 w-5 ${refreshingProducts ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{refreshingProducts ? 'Loading...' : 'Load POS'}</span>
+              </button>
               <button
                 onClick={() => setShowAddProductModal(true)}
                 className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
@@ -2468,43 +2633,53 @@ const CashierPortal = () => {
       </div>
 
 
-      {/* Till Supplies - Simple Request Button for Cashiers */}
-      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6 shadow-lg border-2 border-blue-200">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-xl font-bold text-gray-900 flex items-center mb-2">
-              <span className="mr-3 text-2xl">🏪</span>
-              Till & Station Supplies
-            </h4>
-            <p className="text-sm text-gray-600">Need supplies? Click to submit your request to management</p>
-          </div>
-          <button
-            onClick={() => setShowOrderModal(true)}
-            className="px-8 py-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-cyan-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
-          >
-            <FiShoppingCart className="h-6 w-6" />
-            <span>Request Supplies</span>
-          </button>
-        </div>
+      {/* 
+        COMMENTED OUT - TILL SUPPLIES ORDERING DISABLED FOR CASHIERS
         
-        {/* My Requests Status - Simple View */}
-        {orderStats.myOrders > 0 && (
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-600 mb-1">My Requests</p>
-              <p className="text-2xl font-bold text-blue-600">{orderStats.myOrders}</p>
+        Till supplies are now managed exclusively through the Manager Portal's
+        🇺🇬 Supplier Order Verification & Management system.
+        
+        Cashiers no longer need to request supplies directly.
+        All supply chain management is handled by management layer.
+        
+        {/* Till Supplies - Simple Request Button for Cashiers *\/}
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6 shadow-lg border-2 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xl font-bold text-gray-900 flex items-center mb-2">
+                <span className="mr-3 text-2xl">🏪</span>
+                Till & Station Supplies
+              </h4>
+              <p className="text-sm text-gray-600">⛔ Cashiers are not allowed to create orders. Contact management for supply requests.</p>
             </div>
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-600 mb-1">✅ Approved</p>
-              <p className="text-2xl font-bold text-green-600">{orderStats.approved}</p>
-            </div>
-            <div className="bg-white rounded-lg p-3 text-center">
-              <p className="text-xs text-gray-600 mb-1">⏳ Pending</p>
-              <p className="text-2xl font-bold text-orange-600">{orderStats.pending}</p>
-            </div>
+            <button
+              disabled
+              className="px-8 py-4 bg-gray-400 text-white rounded-lg font-bold cursor-not-allowed opacity-60 flex items-center space-x-2 shadow-lg"
+            >
+              <FiShoppingCart className="h-6 w-6" />
+              <span>Order Creation Disabled</span>
+            </button>
           </div>
-        )}
-      </div>
+          
+          {/* My Requests Status - Simple View *\/}
+          {orderStats.myOrders > 0 && (
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-600 mb-1">My Requests</p>
+                <p className="text-2xl font-bold text-blue-600">{orderStats.myOrders}</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-600 mb-1">✅ Approved</p>
+                <p className="text-2xl font-bold text-green-600">{orderStats.approved}</p>
+              </div>
+              <div className="bg-white rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-600 mb-1">⏳ Pending</p>
+                <p className="text-2xl font-bold text-orange-600">{orderStats.pending}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      */}
 
       {/* Full Product Inventory Interface */}
       <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-200">
@@ -2633,7 +2808,7 @@ const CashierPortal = () => {
     { id: 'transactions', label: 'My Receipts', icon: FiPrinter },
     { id: 'profile', label: 'My Profile', icon: FiUser },
     { id: 'performance', label: 'Performance', icon: FiTrendingUp },
-    { id: 'inventory', label: 'Till Supplies', icon: FiPackage },
+    // { id: 'inventory', label: 'Till Supplies', icon: FiPackage }, // DISABLED - Supply ordering removed from cashier portal
     { id: 'notifications', label: 'Notifications', icon: FiBell }
   ];
 
@@ -2858,9 +3033,9 @@ const CashierPortal = () => {
               <h2 className="text-3xl font-bold text-gray-900 mb-2 flex items-center">
                 🧾 My Transaction History
               </h2>
-              <p className="text-gray-600">View and reprint your receipts</p>
+              <p className="text-gray-600">View and reprint your receipts (includes unsaved receipts)</p>
             </div>
-            <TransactionHistory />
+            <TransactionHistory savedReceipts={savedReceipts} />
           </div>
         )}
         {activeTab === 'profile' && renderProfile()}
@@ -2961,18 +3136,15 @@ const CashierPortal = () => {
         </div>
       )}
 
-      {/* Advanced Barcode Scanner Modal */}
-      <BarcodeScannerModal
-        isOpen={showBarcodeScanner}
-        onClose={() => setShowBarcodeScanner(false)}
-        onBarcodeScanned={handleBarcodeScanned}
-      />
-
       {/* Add Product Modal - Supabase Connected */}
       <AddProductModal
         isOpen={showAddProductModal}
-        onClose={() => setShowAddProductModal(false)}
+        onClose={() => {
+          setShowAddProductModal(false);
+          setLastScannedBarcode(null);
+        }}
         onProductAdded={handleProductAdded}
+        prefilledData={lastScannedBarcode ? { barcode: lastScannedBarcode, sku: lastScannedBarcode } : {}}
       />
 
       {/* 🧾 Receipt Modal - Show after successful payment */}
@@ -3014,6 +3186,15 @@ const CashierPortal = () => {
         onSubmitOrder={submitSupplyOrder}
         submitting={submittingOrder}
       />
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <DualScannerInterface
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowBarcodeScanner(false)}
+          inventoryProducts={products}
+        />
+      )}
 
       {/* Edit Profile Modal */}
       {showEditProfileModal && (

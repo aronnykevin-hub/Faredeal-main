@@ -5,11 +5,11 @@ import {
   FiPackage, FiAlertTriangle, FiTrendingUp, FiSearch, FiFilter, FiPlus, 
   FiEdit3, FiTrash2, FiDownload, FiUpload, FiBarChart2, FiRefreshCw,
   FiEye, FiShoppingCart, FiCamera, FiGrid, FiList, FiSettings,
-  FiZap, FiClock, FiDollarSign, FiTruck, FiMapPin, FiStar
+  FiZap, FiClock, FiDollarSign, FiTruck, FiMapPin, FiStar, FiX
 } from 'react-icons/fi';
 import inventoryService from '../services/inventoryApiService';
+import DualScannerInterface from '../components/DualScannerInterface';
 import ProductModal from '../components/ProductModal';
-import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
 
 const Inventory = () => {
@@ -878,18 +878,20 @@ const Inventory = () => {
         onSave={handleProductSave}
       />
 
-      <BarcodeScannerModal
-        isOpen={showBarcodeScanner}
-        onClose={() => setShowBarcodeScanner(false)}
-        onBarcodeScanned={handleBarcodeScanned}
-      />
-
       <StockAdjustmentModal
         isOpen={showStockModal}
         onClose={() => setShowStockModal(false)}
         products={products.filter(p => selectedProducts.includes(p.id))}
         onAdjustmentComplete={handleStockAdjustmentComplete}
       />
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <DualScannerInterface
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
 
       {/* Keyboard Shortcuts Help Modal */}
       {showKeyboardHelp && (

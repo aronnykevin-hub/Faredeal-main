@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import supabase, { testConnection } from '../assets/configsupabase'
+import { testConnection } from '../services/supabase'
 
 const SupabaseConnectionTest = () => {
   const [connectionStatus, setConnectionStatus] = useState('Testing...')

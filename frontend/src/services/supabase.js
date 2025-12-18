@@ -12,22 +12,31 @@ if (!supabaseAnonKey) {
   console.error('⚠️ Missing Supabase Anon Key. Please check your environment variables.')
 }
 
-// Create Supabase client as singleton
+// Create Supabase client as singleton - Fixed pattern
 let supabaseInstance = null
 
-export const supabase = supabaseInstance || (supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce'
-  },
-  realtime: {
-    params: {
-      eventsPerSecond: 10,
-    },
-  },
-}))
+function initSupabase() {
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
+    })
+    console.log('✅ Supabase client initialized')
+  }
+  return supabaseInstance
+}
+
+// Initialize immediately on module load
+export const supabase = initSupabase()
 
 // Authentication helpers
 export const auth = {
@@ -186,6 +195,33 @@ export const utils = {
     }
     
     return error?.message || 'An unexpected error occurred'
+  }
+}
+
+// Test connection function
+export const testConnection = async () => {
+  try {
+    // Try to query a non-existent table to test connection
+    const { error } = await supabase.from('_connection_test').select('*').limit(1)
+    
+    // If we get error codes PGRST116 or PGRST205, it means connection is working but table doesn't exist (which is expected)
+    if (error && (error.code === 'PGRST116' || error.code === 'PGRST205')) {
+      console.log('✅ Supabase connected successfully! (Table not found error is expected)')
+      return true
+    }
+    
+    // If we get other errors, there might be a real connection issue
+    if (error) {
+      console.error('❌ Supabase connection error:', error)
+      return false
+    }
+    
+    // If no error at all, connection is definitely working
+    console.log('✅ Supabase connected successfully!')
+    return true
+  } catch (err) {
+    console.error('❌ Supabase connection failed:', err)
+    return false
   }
 }
 

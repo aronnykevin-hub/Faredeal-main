@@ -1,4 +1,4 @@
-import supabase from '../assets/configsupabase';
+import { supabase } from './supabase';
 
 /**
  * Payment Service for handling payment-related operations

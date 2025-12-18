@@ -1,3 +1,15 @@
+/*
+==============================================================================
+PURCHASE ORDER & PRODUCT AUTOMATION SERVICE - COMMENTED OUT
+==============================================================================
+
+THIS FEATURE HAS BEEN DISABLED:
+- Auto-approval workflow for trusted suppliers
+- Automatic product creation upon approval
+- Purchase order management system
+
+To re-enable: Remove comment markers and restart the application
+
 /**
  * Purchase Order & Product Automation Service
  * 
@@ -229,6 +241,7 @@ class PurchaseOrderService {
       throw error;
     }
   }
+*/
 
   /**
    * Mark order as delivered and update stock
@@ -305,82 +318,33 @@ class PurchaseOrderService {
    * @param {Object} filters - Filter options
    * @returns {Promise<Array>} Purchase orders
    */
-  async getPurchaseOrders(filters = {}) {
-    try {
-      let query = supabase
-        .from('purchase_orders')
-        .select(`
-          *,
-          supplier:suppliers(company_name, contact_person, rating),
-          purchase_order_items(*)
-        `)
-        .order('created_at', { ascending: false });
-
-      // Apply filters
-      if (filters.status) {
-        query = query.eq('status', filters.status);
-      }
-
-      if (filters.approval_status) {
-        query = query.eq('approval_status', filters.approval_status);
-      }
-
-      if (filters.supplier_id) {
-        query = query.eq('supplier_id', filters.supplier_id);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      return data || [];
-
-    } catch (error) {
-      console.error('Error fetching purchase orders:', error);
-      toast.error('Failed to load purchase orders');
-      return [];
-    }
-  }
+  // DISABLED: getPurchaseOrders - Feature commented out
+  // async getPurchaseOrders(filters = {}) { ... }
 
   /**
    * Get pending purchase orders awaiting approval
    * @returns {Promise<Array>} Pending orders
    */
-  async getPendingOrders() {
-    return this.getPurchaseOrders({ 
-      approval_status: 'pending',
-      status: 'pending'
-    });
-  }
+  // DISABLED: getPendingOrders - Feature commented out
+  // async getPendingOrders() { ... }
 
   /**
    * Subscribe to purchase order changes
    * @param {Function} callback - Callback when orders change
    * @returns {Function} Unsubscribe function
    */
-  subscribeToPurchaseOrders(callback) {
-    const subscription = supabase
-      .channel('purchase_orders_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_orders'
-        },
-        (payload) => {
-          console.log('📦 Purchase order changed:', payload);
-          callback(payload);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }
+  // DISABLED: subscribeToPurchaseOrders - Feature commented out
+  // subscribeToPurchaseOrders(callback) { ... }
 }
 
-// Export singleton instance
-const purchaseOrderService = new PurchaseOrderService();
+// Export stub instance - Service Disabled
+const purchaseOrderService = {
+  createPurchaseOrder: () => console.warn('⚠️ Purchase Order Service is disabled'),
+  approvePurchaseOrder: () => console.warn('⚠️ Purchase Order Service is disabled'),
+  markOrderDelivered: () => console.warn('⚠️ Purchase Order Service is disabled'),
+  getPurchaseOrders: () => [],
+  getPendingOrders: () => [],
+  subscribeToPurchaseOrders: () => () => {}
+};
+
 export default purchaseOrderService;
