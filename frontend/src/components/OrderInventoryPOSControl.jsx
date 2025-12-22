@@ -354,6 +354,7 @@ const OrderInventoryPOSControl = () => {
           name: newProduct.name.trim(),
           sku: newProduct.sku.trim() || null,
           cost_price: newProduct.cost_price,
+          price: newProduct.selling_price,
           selling_price: newProduct.selling_price,
           tax_rate: newProduct.tax_rate,
           category_id: newProduct.category_id,
@@ -567,17 +568,17 @@ const OrderInventoryPOSControl = () => {
             <button
               onClick={() => {
                 if (!isAdmin) {
-                  toast.error('❌ Only Admins can add products');
+                  toast.error('❌ Admin access required to add products');
                   return;
                 }
                 setShowAddProductModal(true);
               }}
-              disabled={!isAdmin}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-semibold ${
                 isAdmin 
-                  ? 'bg-green-500 text-white hover:bg-green-600' 
-                  : 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg hover:shadow-xl' 
+                  : 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300 cursor-default'
               }`}
+              title={!isAdmin ? 'Admin access required' : 'Add new product to inventory'}
             >
               <FiPlus className="h-4 w-4" />
               Add Product {!isAdmin && '(Admin Only)'}

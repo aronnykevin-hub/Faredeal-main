@@ -37,33 +37,27 @@ import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   // Validate if current URL is allowed for admin access
-  const isAllowedAdminURL = () => {
-    const currentURL = window.location.href.toLowerCase();
-    const allowedURLs = [
-      'http://localhost:5173/#admin',
-      'https://faredeal-main.vercel.app/#admin'
-    ];
+  // Only allow admin routes from hash-based navigation: /#admin
+  const isAdminAccessAllowed = () => {
+    const hash = window.location.hash;
+    const pathname = window.location.pathname;
     
-    // Check if current URL matches any allowed URL pattern
-    return allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+    // Only allow admin if:
+    // 1. Hash is #admin or #/admin (hash routing for admin)
+    // 2. OR pathname includes /admin (direct navigation to /admin-login, /admin-portal, etc.)
+    return hash === '#admin' || hash === '#/admin' || pathname.includes('/admin');
   };
 
-  // Simple admin access check using #admin hash or localStorage
-  const checkAdminAccess = () => {
-    // First check if URL is allowed for admin access
-    if (!isAllowedAdminURL() && window.location.hash === '#admin') {
-      // Redirect to unauthorized page or show error
-      alert('Admin access is only allowed from:\n- http://localhost:5173/#admin\n- https://faredeal-main.vercel.app/#admin');
-      window.location.href = '/';
-      return false;
+  // Redirect if hash is #admin to proper admin login route
+  useEffect(() => {
+    if (window.location.hash === '#admin') {
+      window.location.hash = '#/admin-login';
     }
-    
-    // Check for #admin in URL or stored admin access or admin-related paths
-    const isAdminRoute = 
-      window.location.hash === '#admin' || 
-      window.location.pathname.includes('/admin') ||
-      localStorage.getItem('adminKey') === 'true';
-    
+  }, []);
+
+  // Simple admin access check
+  const checkAdminAccess = () => {
+    const isAdminRoute = isAdminAccessAllowed();
     return isAdminRoute;
   };
 
@@ -74,14 +68,11 @@ function App() {
         const isAdmin = checkAdminAccess();
         
         if (isAdmin) {
-          // Just set admin flag, don't auto-create user data
-          // Let Supabase handle authentication
+          // Set admin flag only if on actual admin routes
           localStorage.setItem('adminKey', 'true');
         } else {
-          // Don't clear admin access if on admin routes
-          if (!window.location.pathname.includes('/admin')) {
-            localStorage.removeItem('adminKey');
-          }
+          // Clear admin flag when not on admin routes
+          localStorage.removeItem('adminKey');
         }
       } catch (error) {
         console.log('Admin mode setup:', error);
@@ -98,11 +89,11 @@ function App() {
         <AppProvider>
           <div className={`app-container ${isAdmin ? 'admin-mode' : 'standard-mode'}`}>
             <Routes>
-              {/* Main landing with portal selection */}
+              {/* Main landing with portal selection - but check for admin hash */}
               <Route 
                 path="/" 
                 element={
-                  isAdmin 
+                  window.location.hash === '#admin' || window.location.hash === '#/admin' 
                     ? <Navigate to="/admin-login" replace /> 
                     : <Navigate to="/portal-selection" replace />
                 } 

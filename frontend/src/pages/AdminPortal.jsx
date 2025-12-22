@@ -820,13 +820,30 @@ const AdminPortal = () => {
   };
 
   // Approve a user
-  const approveUser = async (userId, userName, userEmail) => {
+  const approveUser = async (userId, userName, userEmail, userRole = null) => {
     try {
-      // Call the approve_user() database function (bypasses RLS with SECURITY DEFINER)
-      const { data, error } = await supabase.rpc('approve_user', { p_user_id: userId });
+      // Call the approve_user() database function with optional role parameter
+      // This sets is_active=true AND role='manager' for managers
+      let rpcCall;
+      
+      // If we have a user role from the pending list, pass it to the RPC function
+      if (userRole) {
+        rpcCall = supabase.rpc('approve_user', { 
+          p_user_id: userId,
+          p_role: userRole 
+        });
+      } else {
+        // Fallback to basic approval (for backward compatibility)
+        rpcCall = supabase.rpc('approve_user', { 
+          p_user_id: userId 
+        });
+      }
+      
+      const { data, error } = await rpcCall;
 
       if (error) throw error;
 
+      console.log('✅ User approved:', { userId, userName, userRole, data });
       notificationService.show(`✅ ${userName} has been approved!`, 'success');
       loadPendingUsers(); // Reload the list
     } catch (error) {
@@ -1074,8 +1091,7 @@ const AdminPortal = () => {
       try {
         const { data: inventoryData, error: invError } = await supabase
           .from('inventory')
-          .select('product_id, quantity, minimum_stock, reorder_point')
-          .eq('is_active', true);
+          .select('product_id, current_stock, minimum_stock, reorder_point');
         
         if (!invError && inventoryData) {
           inventoryData.forEach(inv => {
@@ -1097,7 +1113,7 @@ const AdminPortal = () => {
         
         if (invData) {
           // Use real inventory data
-          qty = invData.quantity || 0;
+          qty = invData.current_stock || 0;
           threshold = invData.minimum_stock || 10;
         } else {
           // Fallback to products table
@@ -1110,7 +1126,7 @@ const AdminPortal = () => {
       // Calculate total inventory value - use real quantities
       const totalValue = products?.reduce((sum, product) => {
         const invData = inventoryMap[product.id];
-        const qty = invData ? (invData.quantity || 0) : (product.quantity || product.stock || product.current_stock || 0);
+        const qty = invData ? (invData.current_stock || 0) : (product.quantity || product.stock || product.current_stock || 0);
         const price = parseFloat(product.price || product.selling_price || product.cost_price || 0);
         return sum + (qty * price);
       }, 0) || 0;
@@ -3187,7 +3203,7 @@ const AdminPortal = () => {
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-2 ml-4">
                       <button
-                        onClick={() => approveUser(user.id, user.full_name, user.email)}
+                        onClick={() => approveUser(user.id, user.full_name, user.email, user.role)}
                         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 font-medium"
                       >
                         <FiCheckCircle className="h-4 w-4" />
@@ -3658,7 +3674,7 @@ const AdminPortal = () => {
                       {viewMode === 'pending' ? (
                         <>
                           <button
-                            onClick={() => approveUser(user.id, user.full_name, user.email)}
+                            onClick={() => approveUser(user.id, user.full_name, user.email, user.role)}
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 font-bold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
                           >
                             <FiCheckCircle className="h-5 w-5" />

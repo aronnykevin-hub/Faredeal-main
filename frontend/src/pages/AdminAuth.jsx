@@ -73,6 +73,102 @@ const AdminAuth = () => {
     }
   };
 
+  // Handle OAuth callback and auto-create admin user record
+  useEffect(() => {
+    const handleAuthStateChange = async () => {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (user && user.provider === 'google') {
+          console.log('🔐 Google user authenticated, creating/verifying user record...');
+          
+          // Get user data from providers
+          const { email, user_metadata } = user;
+          
+          // Create user record in public.users if not exists (for Google OAuth)
+          const { data: existingUser, error: checkError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', user.id)
+            .single();
+          
+          if (checkError && checkError.code === 'PGRST116') {
+            // User doesn't exist, create it with admin role
+            const { error: createError } = await supabase
+              .from('users')
+              .insert([{
+                id: user.id,
+                auth_id: user.id,
+                email: email,
+                full_name: user_metadata?.full_name || user_metadata?.name || 'Admin User',
+                phone: user_metadata?.phone,
+                role: 'admin',
+                is_active: true,
+                status: 'active',
+                created_at: new Date().toISOString()
+              }]);
+            
+            if (createError) {
+              console.log('User record may have been created by trigger:', createError.message);
+            } else {
+              console.log('✅ Admin user record created for Google OAuth:', email);
+            }
+          } else if (!checkError) {
+            // User exists, ensure role is admin
+            const { error: updateError } = await supabase
+              .from('users')
+              .update({ role: 'admin', is_active: true })
+              .eq('id', user.id);
+            
+            if (!updateError) {
+              console.log('✅ Admin user record verified for Google OAuth:', email);
+            }
+          }
+          
+          // ✅ Set admin access and redirect to admin portal
+          localStorage.setItem('adminKey', 'true');
+          localStorage.setItem('supermarket_user', JSON.stringify({
+            id: user.id,
+            name: user_metadata?.full_name || user_metadata?.name || 'Admin',
+            role: 'admin',
+            email: email,
+            accessLevel: 'system',
+            timestamp: Date.now()
+          }));
+          
+          notificationService.show(
+            '✅ Welcome! Redirecting to admin portal...',
+            'success'
+          );
+          
+          // Redirect to admin portal after a short delay
+          setTimeout(() => {
+            navigate('/admin-portal');
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('OAuth callback error:', error);
+        notificationService.show(
+          'Error setting up admin access. Please try again.',
+          'error'
+        );
+      }
+    };
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user?.identities?.[0]?.provider === 'google') {
+          handleAuthStateChange();
+        }
+      }
+    );
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, [navigate]);
+
   // Calculate password strength
   useEffect(() => {
     if (!isLogin && formData.password) {
@@ -183,7 +279,13 @@ const AdminAuth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/admin-portal`
+          // Redirect back to this auth page (not admin-portal)
+          // The listener will handle the redirect after user record is created
+          redirectTo: `${window.location.origin}/admin-auth`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
         }
       });
 
@@ -232,6 +334,47 @@ const AdminAuth = () => {
           return;
         }
         throw error;
+      }
+
+      // ✅ ENSURE USER HAS ADMIN ROLE IN DATABASE
+      if (data.user) {
+        try {
+          // Check if user exists in users table
+          const { data: existingUser, error: checkError } = await supabase
+            .from('users')
+            .select('id, role')
+            .eq('id', data.user.id)
+            .single();
+
+          if (checkError || !existingUser) {
+            // User doesn't exist, create them with admin role
+            console.log('📝 Creating user record with admin role...');
+            await supabase
+              .from('users')
+              .insert({
+                id: data.user.id,
+                email: data.user.email,
+                full_name: data.user.user_metadata?.full_name || 'Admin',
+                phone: data.user.user_metadata?.phone || null,
+                role: 'admin', // ✅ Set role to admin
+                status: 'active',
+                is_active: true,
+                created_at: new Date().toISOString(),
+                auth_id: data.user.id
+              });
+            console.log('✅ User record created with role=admin');
+          } else if (existingUser.role !== 'admin') {
+            // User exists but role is not admin - update it
+            console.log('🔄 Updating user role to admin...');
+            await supabase
+              .from('users')
+              .update({ role: 'admin' })
+              .eq('id', data.user.id);
+            console.log('✅ User role updated to admin');
+          }
+        } catch (userError) {
+          console.log('Note: Could not ensure admin role:', userError.message);
+        }
       }
 
       // Set admin access flag
@@ -290,6 +433,53 @@ const AdminAuth = () => {
       });
 
       if (error) throw error;
+
+      // ✅ CREATE USER RECORD IN DATABASE WITH ROLE='ADMIN'
+      if (data.user) {
+        try {
+          console.log('📝 Creating user record with admin role...', data.user.id);
+          
+          // Try to insert user record with admin role
+          const { data: userRecord, error: userError } = await supabase
+            .from('users')
+            .insert([{
+              id: data.user.id,
+              email: formData.email,
+              full_name: formData.fullName,
+              phone: formData.phone || null,
+              role: 'admin', // ✅ Set role to admin
+              status: 'active',
+              is_active: true,
+              auth_id: data.user.id,
+              created_at: new Date().toISOString()
+            }])
+            .select();
+
+          if (userError) {
+            // Check if it's a duplicate error (already exists)
+            if (userError.code === '23505' || userError.message?.includes('duplicate')) {
+              console.log('ℹ️ User record already exists, updating role to admin...');
+              // Update existing record to ensure role is admin
+              const { error: updateError } = await supabase
+                .from('users')
+                .update({ role: 'admin', is_active: true, status: 'active' })
+                .eq('id', data.user.id);
+              
+              if (!updateError) {
+                console.log('✅ User role updated to admin');
+              }
+            } else {
+              console.warn('⚠️ Could not create user record:', userError.message);
+              // Don't fail signup if user record creation fails - auth user is created
+            }
+          } else {
+            console.log('✅ User record created with role=admin');
+          }
+        } catch (userCreateError) {
+          console.log('Note: User record creation error:', userCreateError.message);
+          // Continue even if user record creation fails
+        }
+      }
 
       // Log the signup activity
       if (data.user) {

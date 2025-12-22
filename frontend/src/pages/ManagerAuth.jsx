@@ -96,78 +96,97 @@ const ManagerAuth = () => {
         console.log('✅ User authenticated:', user.email);
         setCurrentUser(user);
         
-        // Check if user exists in database - ONLY filter by auth_id (avoid RLS issues)
+        // Check if user exists in database
+        // Try with assigned_admin_id first, fall back without it if column doesn't exist
         let { data: userData, error: fetchError } = await supabase
           .from('users')
-          .select('*')
+          .select('id, auth_id, email, full_name, role, is_active, phone, department, assigned_admin_id')
           .eq('auth_id', user.id)
           .single();
 
-        console.log('👤 User data from database:', userData);
-
-        // If user doesn't exist (OAuth first-time sign-in), create them
-        if (fetchError) {
-          // Check if error is because record doesn't exist (PGRST116)
-          if (fetchError.code === 'PGRST116') {
-            console.log('📝 Creating new manager user in database...');
-            const { data: newUser, error: createError } = await supabase
-              .from('users')
-              .insert([{
-                auth_id: user.id,
-                email: user.email,
-                full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-                role: 'manager',
-                is_active: false,
-                metadata: {}
-              }])
-              .select()
-              .single();
-
-            if (createError) {
-              console.error('❌ Error creating user:', createError);
-              // If duplicate, fetch existing user
-              if (createError.code === '23505') {
-                console.log('ℹ️ User already exists, fetching...');
-                const { data: existing } = await supabase
-                  .from('users')
-                  .select('*')
-                  .eq('auth_id', user.id)
-                  .single();
-                userData = existing;
-              } else {
-                throw createError;
-              }
-            } else {
-              console.log('✅ User created:', newUser);
-              userData = newUser;
-              notificationService.show('Welcome! Please complete your manager profile.', 'info');
-            }
+        // If error is "column does not exist", try without assigned_admin_id
+        if (fetchError?.code === '42703') {
+          console.warn('⚠️ assigned_admin_id column not found, querying without it...');
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('users')
+            .select('id, auth_id, email, full_name, role, is_active, phone, department')
+            .eq('auth_id', user.id)
+            .single();
+          
+          if (fallbackData) {
+            userData = { ...fallbackData, assigned_admin_id: null };
+            fetchError = null;
+            console.log('✅ User data retrieved without assigned_admin_id:', userData);
           } else {
-            console.error('❌ Database error:', fetchError);
-            throw fetchError;
+            fetchError = fallbackError;
           }
         }
 
-        // Verify user has manager role
-        if (userData && userData.role !== 'manager') {
-          console.warn('⚠️ User role is not manager:', userData.role);
-          notificationService.show('❌ This login is for managers only.', 'error');
-          await supabase.auth.signOut();
-          return;
+        console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
+
+        // If user doesn't exist, it means:
+        // 1. First time Google OAuth sign-in
+        // 2. Trigger didn't create record
+        // 3. Need to create it now or wait for trigger
+        if (fetchError && fetchError.code === 'PGRST116') {
+          console.log('📝 User record not found. Waiting for trigger or creating fallback...');
+          
+          // Wait a moment for the trigger to create the record
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Try again
+          const { data: retryData, error: retryError } = await supabase
+            .from('users')
+            .select('id, auth_id, email, full_name, role, is_active, phone, department, assigned_admin_id')
+            .eq('auth_id', user.id)
+            .single();
+          
+          if (retryData) {
+            console.log('✅ User record created by trigger:', retryData);
+            userData = retryData;
+          } else if (retryError) {
+            console.warn('⚠️ Trigger did not create record, using fallback...');
+            // Fallback: Create temporary user object
+            userData = {
+              id: null,
+              auth_id: user.id,
+              email: user.email,
+              full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+              role: 'customer',
+              is_active: false,
+              phone: null,
+              department: null,
+              assigned_admin_id: null
+            };
+            console.log('⚠️ Using fallback user object - record will be created on profile submission');
+            notificationService.show('Welcome! Please complete your manager profile.', 'info', 4000);
+          }
+        } else if (fetchError) {
+          console.error('❌ Database error:', fetchError);
+          throw fetchError;
+        }
+        
+        // Check admin assignment
+        if (userData?.assigned_admin_id) {
+          console.log('✅ Admin assigned:', userData.assigned_admin_id);
+        } else if (userData && !userData.is_active) {
+          console.warn('⚠️ No admin assigned yet - will be assigned on approval');
         }
 
-        // Check profile completion
+
+        // Check if user has manager role
+        const hasManagerRole = userData?.role === 'manager';
         const profileComplete = userData?.full_name && userData?.phone && userData?.department;
-        console.log('🔀 Checking user status - Active:', userData?.is_active, 'Profile Complete:', profileComplete);
+        console.log('🔀 User status - Manager Role:', hasManagerRole, 'Profile Complete:', profileComplete, 'Active:', userData?.is_active);
         
-        if (userData?.is_active && profileComplete) {
-          // Approved and profile complete → Go to Manager Portal
-          console.log('✅ User approved and profile complete - Redirecting to Manager Portal');
+        if (hasManagerRole && userData?.is_active && profileComplete) {
+          // Approved manager with complete profile → Go to Manager Portal
+          console.log('✅ Manager approved and profile complete - Redirecting to Manager Portal');
           notificationService.show('✅ Welcome back!', 'success');
           navigate('/manager');
-        } else if (!profileComplete) {
-          // Profile not completed → Show profile form
-          console.log('📋 Profile not complete - Showing profile form');
+        } else if (!hasManagerRole && !profileComplete) {
+          // New Google sign-in, no manager role yet → Show profile form for application
+          console.log('📋 New manager application - Showing profile form');
           setShowProfileCompletion(true);
           setFormData(prev => ({
             ...prev,
@@ -175,11 +194,21 @@ const ManagerAuth = () => {
             phone: userData?.phone || '',
             department: userData?.department || ''
           }));
-        } else {
-          // Profile complete but not active → Pending approval
-          console.log('⏳ Profile complete but not approved - Pending approval');
+        } else if (!hasManagerRole && profileComplete) {
+          // Profile submitted but waiting for admin approval → Show pending message
+          console.log('⏳ Application submitted - Waiting for admin approval');
           notificationService.show(
-            '⏳ Your manager application is pending admin approval.',
+            '📝 Your manager application has been submitted! An admin will review your request and grant you manager access.',
+            'info',
+            6000
+          );
+          await supabase.auth.signOut();
+          setShowProfileCompletion(false);
+        } else if (hasManagerRole && !userData?.is_active) {
+          // Approved but not activated yet
+          console.log('⏳ Manager role approved but not activated');
+          notificationService.show(
+            '⏳ Your manager account is being activated. Please try again in a moment.',
             'warning',
             5000
           );
@@ -240,35 +269,76 @@ const ManagerAuth = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          full_name: formData.fullName,
-          date_of_birth: formData.dateOfBirth,
-          gender: formData.gender,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          department: formData.department,
-          experience_years: formData.experienceYears,
-          education_level: formData.education,
-          certifications: formData.certifications,
-          previous_employer: formData.previousEmployer,
-          employee_count: formData.employeeCount,
-          emergency_contact: formData.emergencyContact,
-          emergency_phone: formData.emergencyPhone,
-          profile_completed: true,
-          submitted_at: new Date().toISOString()
-        })
-        .eq('auth_id', currentUser.id);
-
-      if (error) throw error;
-
-      notificationService.show(
-        '🎉 Manager profile completed! Your application is pending admin approval.',
-        'success',
-        5000
+      console.log('📝 Submitting manager profile via RPC function...');
+      
+      // Use RPC function to update profile and verify admin assignment
+      const { data: rpcResult, error: rpcError } = await supabase.rpc(
+        'update_manager_profile_on_submission',
+        {
+          p_auth_id: currentUser.id,
+          p_full_name: formData.fullName,
+          p_phone: formData.phone,
+          p_department: formData.department
+        }
       );
+
+      if (rpcError) {
+        console.error('❌ RPC error:', rpcError);
+        throw new Error(rpcError.message || 'Failed to submit profile');
+      }
+
+      if (!rpcResult?.success) {
+        throw new Error(rpcResult?.error || 'Profile submission failed');
+      }
+
+      console.log('✅ Profile submitted:', rpcResult);
+      console.log('👤 Assigned Admin:', {
+        admin_id: rpcResult.assigned_admin_id,
+        admin_email: rpcResult.assigned_admin_email,
+        admin_available: rpcResult.admin_available
+      });
+
+      // Show success notification with admin info
+      if (rpcResult.admin_available) {
+        notificationService.show(
+          `✅ Profile submitted! Your application is assigned to admin: ${rpcResult.assigned_admin_email || 'Unknown'}`,
+          'success',
+          6000
+        );
+      } else {
+        notificationService.show(
+          '⚠️ Profile submitted but no admin available. Your application will be reviewed when an admin is available.',
+          'warning',
+          6000
+        );
+      }
+
+      // Store additional profile data in metadata JSON (for other fields)
+      try {
+        const { error: metadataError } = await supabase
+          .from('users')
+          .update({
+            metadata: {
+              date_of_birth: formData.dateOfBirth,
+              gender: formData.gender,
+              address: formData.address,
+              city: formData.city,
+              experience_years: formData.experienceYears,
+              education_level: formData.education,
+              certifications: formData.certifications,
+              previous_employer: formData.previousEmployer,
+              employee_count: formData.employeeCount,
+              emergency_contact: formData.emergencyContact,
+              emergency_phone: formData.emergencyPhone,
+              submitted_at: new Date().toISOString()
+            }
+          })
+          .eq('auth_id', currentUser.id);
+
+        if (metadataError) console.warn('Metadata update warning:', metadataError);
+      } catch (metaError) {
+        console.warn('Metadata storage failed (non-critical):', metaError);
+      }
 
       setTimeout(async () => {
         await supabase.auth.signOut();
@@ -278,7 +348,7 @@ const ManagerAuth = () => {
       }, 2000);
 
     } catch (error) {
-      console.error('Profile completion error:', error);
+      console.error('❌ Profile completion error:', error);
       notificationService.show(
         error.message || 'Failed to complete profile',
         'error'

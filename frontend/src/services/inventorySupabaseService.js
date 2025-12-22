@@ -199,8 +199,8 @@ class InventorySupabaseService {
         category_id,
         supplier_id,
         brand,
-        cost_price,
-        selling_price,
+        cost_price = 0,
+        selling_price = 0,
         tax_rate = 18, // Uganda VAT
         initial_stock = 0,
         minimum_stock = 10,
@@ -210,9 +210,30 @@ class InventorySupabaseService {
         warehouse = 'Main Warehouse'
       } = productData;
 
+      // Ensure selling_price is a valid number
+      let finalSellingPrice = parseFloat(selling_price);
+      let finalCostPrice = parseFloat(cost_price);
+      
+      // Handle NaN values
+      if (isNaN(finalSellingPrice)) finalSellingPrice = 0;
+      if (isNaN(finalCostPrice)) finalCostPrice = 0;
+      
+      // If no selling price, use cost price
+      if (finalSellingPrice === 0 && finalCostPrice > 0) {
+        finalSellingPrice = finalCostPrice * 1.3; // 30% markup as default
+      }
+      
+      // Ensure we have at least a price
+      if (finalSellingPrice === 0 && finalCostPrice === 0) {
+        console.warn('⚠️ No price provided, using default price of 1000');
+        finalSellingPrice = 1000;
+      }
+      
+      console.log(`💰 Product pricing: cost=${finalCostPrice}, selling=${finalSellingPrice}`);
+
       // Calculate markup percentage
-      const markup_percentage = cost_price > 0 
-        ? ((selling_price - cost_price) / cost_price * 100).toFixed(2)
+      const markup_percentage = finalCostPrice > 0 
+        ? ((finalSellingPrice - finalCostPrice) / finalCostPrice * 100).toFixed(2)
         : 0;
 
       // Generate guaranteed unique identifiers
@@ -237,22 +258,24 @@ class InventorySupabaseService {
         uniqueSku = `SKU-${generateUniqueId()}`;
       }
       
-      // Insert product with required fields
+      // Insert product with required fields - ENSURE PRICE IS NEVER NULL
       const productInsert = {
-        name,
+        name: name || 'Unnamed Product',
         sku: uniqueSku,
         barcode: uniqueBarcode,
-        price: selling_price || 0,
-        selling_price: selling_price || 0
+        price: finalSellingPrice > 0 ? finalSellingPrice : 1000,  // CRITICAL: Never null or zero
+        selling_price: finalSellingPrice > 0 ? finalSellingPrice : 1000,
+        cost_price: finalCostPrice > 0 ? finalCostPrice : undefined
       };
       
+      console.log('📦 Inserting product:', productInsert);
+      
       // Add optional fields
-      if (description) productInsert.description = description;
+      if (description && String(description).trim()) productInsert.description = String(description).trim();
       if (category_id) productInsert.category_id = category_id;
-      // Skip supplier_id as it's not in the products table
       if (brand && String(brand).trim()) productInsert.brand = String(brand).trim();
-      if (cost_price) productInsert.cost_price = cost_price;
-      if (tax_rate) productInsert.tax_rate = tax_rate;
+      if (tax_rate) productInsert.tax_rate = parseFloat(tax_rate) || 18;
+      if (markup_percentage) productInsert.markup_percentage = parseFloat(markup_percentage);
       
       const { data: product, error: productError } = await supabase
         .from('products')
