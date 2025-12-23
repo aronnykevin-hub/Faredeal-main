@@ -633,7 +633,7 @@ const SupplierPortal = () => {
       // Get supplier ID from users table
       const { data: supplier } = await supabase
         .from('users')
-        .select('id')
+        .select('id, quality_rating')
         .eq('auth_id', user.id)
         .eq('role', 'supplier')
         .maybeSingle();
@@ -644,23 +644,22 @@ const SupplierPortal = () => {
         return;
       }
 
-      // Get total orders
-      const { count: totalOrders } = await supabase
+      // Get all orders in one query (SINGLE SOURCE OF TRUTH)
+      const { data: allOrders, count: totalOrders } = await supabase
         .from('purchase_orders')
-        .select('*', { count: 'exact', head: true })
+        .select('id, status, total_amount_ugx, amount_paid_ugx, balance_due_ugx, payment_status, order_date, expected_delivery_date, actual_delivery_date', { count: 'exact' })
         .eq('supplier_id', supplierId);
 
-      // Get pending orders (filter status in JavaScript instead of enum)
-      const { data: allOrders } = await supabase
-        .from('purchase_orders')
-        .select('id, status, total_amount_ugx, amount_paid_ugx, balance_due_ugx, payment_status, order_date, expected_delivery_date, actual_delivery_date')
-        .eq('supplier_id', supplierId);
+      if (!allOrders) {
+        console.log('No orders found for supplier');
+        setPerformanceMetrics({ totalOrders: 0 });
+        return;
+      }
 
       const pendingOrders = allOrders?.filter(o => 
         ['pending_approval', 'approved', 'sent_to_supplier', 'confirmed'].includes(o.status)
       ).length || 0;
 
-      // Calculate metrics from all orders (SINGLE SOURCE OF TRUTH)
       // Calculate total revenue (received and completed orders)
       const totalRevenue = allOrders
         ?.filter(o => ['received', 'completed'].includes(o.status))
@@ -681,15 +680,18 @@ const SupplierPortal = () => {
         ? Math.round((onTimeOrders.length / deliveredOrders.length) * 100)
         : 0;
 
-      // Get active products count from supplier_products
-      const { count: activeProducts } = await supabase
+      // Get active products count from supplier_products (async, no blocking)
+      supabase
         .from('supplier_products')
         .select('*', { count: 'exact', head: true })
         .eq('supplier_id', supplierId)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .then(({ count }) => {
+          setPerformanceMetrics(prev => ({ ...prev, activeProducts: count || 0 }));
+        })
+        .catch(err => console.log('Could not load active products count:', err));
 
-      // Use allOrders for payment statistics (SINGLE SOURCE OF TRUTH)
-      // This ensures Overview stats match the Orders list exactly
+      // Payment statistics (SINGLE SOURCE OF TRUTH - from allOrders)
       const paidOrders = allOrders?.filter(o => o.payment_status === 'paid').length || 0;
       const unpaidOrders = allOrders?.filter(o => o.payment_status === 'unpaid').length || 0;
       const partiallyPaidOrders = allOrders?.filter(o => o.payment_status === 'partially_paid').length || 0;
