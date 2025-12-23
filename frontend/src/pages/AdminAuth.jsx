@@ -17,6 +17,9 @@ const AdminAuth = () => {
   const [useMagicLink, setUseMagicLink] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [urlAllowed, setUrlAllowed] = useState(true);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -469,6 +472,95 @@ const AdminAuth = () => {
         error.message || 'Invalid email or password',
         'error'
       );
+    }
+  };
+
+  // Handle forgot password
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    
+    if (!forgotPasswordEmail.trim()) {
+      notificationService.show('Please enter your email address', 'error');
+      return;
+    }
+
+    setLoading(true);
+    console.log('🔐 [FORGOT] Sending password reset email to:', forgotPasswordEmail);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/admin-auth?reset=true`
+      });
+
+      if (error) throw error;
+
+      setResetEmailSent(true);
+      console.log('✅ Password reset email sent');
+      notificationService.show(
+        '✅ Password reset email sent! Check your inbox.',
+        'success',
+        6000
+      );
+
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setResetEmailSent(false);
+        setForgotPasswordEmail('');
+      }, 3000);
+
+    } catch (error) {
+      console.error('🔐 [FORGOT] Reset error:', error);
+      notificationService.show(
+        error.message || 'Failed to send reset email',
+        'error'
+      );
+      setLoading(false);
+    }
+  };
+
+  // Handle password reset after clicking email link
+  const handlePasswordReset = async (newPassword, confirmPassword) => {
+    if (newPassword !== confirmPassword) {
+      notificationService.show('Passwords do not match', 'error');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      notificationService.show('Password must be at least 8 characters', 'error');
+      return;
+    }
+
+    setLoading(true);
+    console.log('🔐 [RESET] Updating password...');
+
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      console.log('✅ Password updated successfully');
+      notificationService.show(
+        '✅ Password updated! You can now login with your new password.',
+        'success',
+        5000
+      );
+
+      setTimeout(() => {
+        setIsLogin(true);
+        setFormData({ ...formData, password: '', confirmPassword: '' });
+      }, 2000);
+
+    } catch (error) {
+      console.error('🔐 [RESET] Update error:', error);
+      notificationService.show(
+        error.message || 'Failed to update password',
+        'error'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -977,12 +1069,10 @@ const AdminAuth = () => {
               <div className="flex items-center justify-end">
                 <button
                   type="button"
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
                   onClick={() => {
-                    notificationService.show(
-                      'Password reset feature coming soon!',
-                      'info'
-                    );
+                    setShowForgotPassword(true);
+                    setResetEmailSent(false);
                   }}
                 >
                   Forgot password?
@@ -1079,6 +1169,89 @@ const AdminAuth = () => {
           </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-fadeIn">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-4">🔑</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
+              <p className="text-gray-600 text-sm">
+                {resetEmailSent 
+                  ? 'Check your email for the reset link'
+                  : 'Enter your email to receive a password reset link'}
+              </p>
+            </div>
+
+            {!resetEmailSent ? (
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <FiMail className="absolute left-3 top-3 text-gray-400" />
+                    <input
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      placeholder="abanabaasa2@gmail.com"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                  <p>💡 We'll send you an email with a link to reset your password. The link expires in 1 hour.</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition-colors"
+                  >
+                    {loading ? 'Sending...' : 'Send Reset Link'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotPasswordEmail('');
+                    }}
+                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <FiCheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-green-800 font-medium">Email sent successfully!</p>
+                  <p className="text-sm text-green-700 mt-2">
+                    Check your inbox for the reset link
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setResetEmailSent(false);
+                    setForgotPasswordEmail('');
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors"
+                >
+                  Back to Login
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Version info */}
       <div className="absolute bottom-4 right-4 text-white/70 text-sm">
