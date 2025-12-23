@@ -5990,7 +5990,7 @@ _Automated Business Report System_`)}`;
     try {
       console.log('📦 Loading pending orders from database...');
       
-      // Try to fetch from purchase_orders table
+      // Single optimized query with supplier name JOIN
       const { data: orders, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -5999,13 +5999,21 @@ _Automated Business Report System_`)}`;
           supplier_id,
           status,
           total_amount_ugx,
+          amount_paid_ugx,
+          balance_due_ugx,
           order_date,
           expected_delivery_date,
+          actual_delivery_date,
           notes,
           items,
           subtotal_ugx,
           tax_ugx,
-          approved_at
+          approved_at,
+          payment_status,
+          suppliers (
+            id,
+            name
+          )
         `)
         .not('status', 'eq', 'completed')
         .not('status', 'eq', 'received')
@@ -6022,15 +6030,17 @@ _Automated Business Report System_`)}`;
         const transformedOrders = orders.map(order => ({
           id: order.id,
           orderNumber: order.po_number || `PO-${order.id}`,
-          supplierName: 'Supplier',
+          supplierName: order.suppliers?.name || 'Unknown Supplier',
           supplierId: order.supplier_id,
           orderDate: order.order_date ? new Date(order.order_date).toLocaleDateString('en-UG') : 'N/A',
           expectedDelivery: order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString('en-UG') : 'N/A',
+          actualDelivery: order.actual_delivery_date ? new Date(order.actual_delivery_date).toLocaleDateString('en-UG') : null,
           totalValue: order.total_amount_ugx || 0,
+          amountPaid: order.amount_paid_ugx || 0,
+          balanceDue: order.balance_due_ugx || order.total_amount_ugx || 0,
           tax: order.tax_ugx || 0,
           status: order.status || 'pending_approval',
-          paymentStatus: 'unpaid',
-          balanceDue: order.total_amount_ugx || 0,
+          paymentStatus: order.payment_status || 'unpaid',
           priority: 'medium',
           items: order.items || [],
           documents: [],
@@ -6040,7 +6050,7 @@ _Automated Business Report System_`)}`;
           contactPhone: '+256-700-000000'
         }));
 
-        console.log('✅ Loaded', transformedOrders.length, 'orders from database');
+        console.log('✅ Loaded', transformedOrders.length, 'orders from database (optimized single query)');
         setPendingOrders(transformedOrders);
       } else {
         console.log('ℹ️ No pending orders found in database, keeping sample data');
@@ -11410,8 +11420,8 @@ FAREDEAL Uganda Management Team
       {/* Enhanced Inventory Overview */}
       <div className="bg-white rounded-xl shadow-xl overflow-hidden">
         <div className="p-6 border-b bg-gradient-to-r from-green-500 to-emerald-600 text-white">
-          <h2 className="text-2xl font-bold mb-2">🏪 Manager Inventory Control</h2>
-          <p className="text-green-100">Complete inventory management with advanced analytics and control features</p>
+          {/* <h2 className="text-2xl font-bold mb-2">🏪 Manager Inventory Control</h2> */}
+          {/* <p className="text-green-100">Complete inventory management with advanced analytics and control features</p> */}
         </div>
 
         {/* Manager Stats Dashboard */}
@@ -12002,7 +12012,7 @@ FAREDEAL Uganda Management Team
                 // { id: 'portal-control', icon: '🚀', label: 'Portal Control', desc: 'AI management', gradient: 'from-cyan-500 to-cyan-600' }, // DISABLED - Portal control feature removed
                 { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', gradient: 'from-green-500 to-green-600' },
                 { id: 'transactions', icon: '🧾', label: 'Transactions', desc: 'Sales & receipts', gradient: 'from-yellow-500 to-yellow-600' },
-                { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', gradient: 'from-purple-500 to-purple-600' },
+                // { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', gradient: 'from-purple-500 to-purple-600' }, // DISABLED - Team management removed
                 // { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Partner verification', gradient: 'from-orange-500 to-orange-600' }, // DISABLED - Supplier verification moved to Order Management
                 { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', gradient: 'from-cyan-500 to-cyan-600' },
                 { id: 'pos', icon: '🛒', label: 'POS Items', desc: 'Products for sale', gradient: 'from-emerald-500 to-emerald-600' },
@@ -13333,7 +13343,7 @@ FAREDEAL Uganda Management Team
               <TillSuppliesOrderManagement />
             </div>
           )}
-          {activeTab === 'inventory' && renderInventoryAccess()}
+          {/* {activeTab === 'inventory' && renderInventoryAccess()} */}
           {activeTab === 'reports' && renderReportAccess()}
           {activeTab === 'alerts' && renderAlerts()}
           
