@@ -19,7 +19,7 @@ import { supabase } from '../services/supabase';
 import OrderPaymentTracker from './OrderPaymentTracker';
 import OrderItemsSelector from './OrderItemsSelector';
 
-const SupplierOrderManagement = () => {
+const SupplierOrderManagement = ({ onPosUpdated }) => {
   // State Management
   const [orders, setOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -168,26 +168,35 @@ const SupplierOrderManagement = () => {
       ]);
 
       if (ordersResponse.success) {
-        // Fetch unconfirmed payment counts for each order
-        const ordersWithUnconfirmed = await Promise.all(
-          ordersResponse.orders.map(async (order) => {
-            try {
-              const { data, error } = await supabase
-                .from('payment_transactions')
-                .select('id', { count: 'exact', head: false })
-                .eq('purchase_order_id', order.id)
-                .eq('confirmed_by_supplier', false);
-              
-              return {
-                ...order,
-                unconfirmedPaymentsCount: error ? 0 : (data?.length || 0)
-              };
-            } catch (err) {
-              console.error(`Error fetching unconfirmed payments for order ${order.id}:`, err);
-              return { ...order, unconfirmedPaymentsCount: 0 };
+        // OPTIMIZED: Fetch all unconfirmed payments in single query instead of N+1
+        const orderIds = ordersResponse.orders.map(o => o.id);
+        
+        let unconfirmedMap = {};
+        if (orderIds.length > 0) {
+          try {
+            const { data, error } = await supabase
+              .from('payment_transactions')
+              .select('purchase_order_id', { count: 'exact', head: false })
+              .in('purchase_order_id', orderIds)
+              .eq('confirmed_by_supplier', false);
+            
+            // Group counts by order ID
+            if (!error && data) {
+              unconfirmedMap = data.reduce((acc, item) => {
+                acc[item.purchase_order_id] = (acc[item.purchase_order_id] || 0) + 1;
+                return acc;
+              }, {});
             }
-          })
-        );
+          } catch (err) {
+            console.error('Error fetching unconfirmed payments in batch:', err);
+          }
+        }
+        
+        // Add unconfirmed counts to orders
+        const ordersWithUnconfirmed = ordersResponse.orders.map(order => ({
+          ...order,
+          unconfirmedPaymentsCount: unconfirmedMap[order.id] || 0
+        }));
         
         setOrders(ordersWithUnconfirmed);
       } else {
@@ -672,8 +681,28 @@ const SupplierOrderManagement = () => {
         }
       }
 
-      // Reload data to refresh
-      loadAllData();
+      // OPTIMIZED: Only refresh the current orders list, don't reload everything
+      // Update the order in the orders array instead of reloading all data
+      setOrders(prevOrders => 
+        prevOrders.map(o => 
+          o.id === order.id 
+            ? { ...o, added_to_pos: true }
+            : o
+        )
+      );
+      
+      // TRIGGER POS REFRESH with added products data (for parent components to update POS inventory)
+      if (onPosUpdated && typeof onPosUpdated === 'function') {
+        // Pass the successfully added products so parent can update state immediately
+        const addedProducts = results.filter(r => r.action === 'created' || r.action === 'updated').map(r => ({
+          name: r.name,
+          quantity: r.quantity,
+          newStock: r.newStock
+        }));
+        onPosUpdated(addedProducts);
+      }
+      
+      console.log('✅ Orders list updated without full reload');
     } catch (err) {
       console.error('Error adding products to POS:', err);
       toast.error(`❌ Failed to add products to POS: ${err.message}`);

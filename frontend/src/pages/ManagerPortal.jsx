@@ -877,6 +877,8 @@ const ManagerPortal = () => {
   // 🚀 REAL-TIME PORTAL CONTROL FUNCTIONS
 
   // Initialize WebSocket connections for portal control
+  // COMMENTED OUT: WebSocket server not available, using simulated mode instead
+  /*
   const initializePortalControl = useCallback(() => {
     // Clear any existing timeout
     if (wsReconnectTimeoutRef.current) {
@@ -984,6 +986,7 @@ const ManagerPortal = () => {
       }
     }
   }, [wsReconnectAttempts, managerProfile]);
+  */
 
   // Fallback simulation mode for development
   const initializeSimulatedPortalControl = useCallback(() => {
@@ -1335,6 +1338,8 @@ const ManagerPortal = () => {
   }, [availableCommands, sendPortalCommand]);
 
   // Initialize portal control on component mount
+  // COMMENTED OUT: WebSocket server not available
+  /*
   useEffect(() => {
     const cleanup = initializePortalControl();
     
@@ -1345,8 +1350,17 @@ const ManagerPortal = () => {
       if (cleanup && typeof cleanup === 'function') {
         cleanup();
       }
+  */
+  // Using simulated mode instead
+  useEffect(() => {
+    initializeSimulatedPortalControl();
+    
+    return () => {
+      if (webSocketManager) {
+        webSocketManager.close();
+      }
     };
-  }, [initializePortalControl]);
+  }, []); // Only run on mount, no dependencies needed for simulated mode
 
   // � ADVANCED PORTAL CONTROL FUNCTIONS
 
@@ -5990,7 +6004,7 @@ _Automated Business Report System_`)}`;
     try {
       console.log('📦 Loading pending orders from database...');
       
-      // Single optimized query with supplier name JOIN
+      // Optimized single query - only needed fields
       const { data: orders, error } = await supabase
         .from('purchase_orders')
         .select(`
@@ -6005,19 +6019,12 @@ _Automated Business Report System_`)}`;
           expected_delivery_date,
           actual_delivery_date,
           notes,
-          items,
-          subtotal_ugx,
-          tax_ugx,
-          approved_at,
-          payment_status,
-          suppliers (
-            id,
-            name
-          )
+          payment_status
         `)
         .not('status', 'eq', 'completed')
         .not('status', 'eq', 'received')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to prevent huge queries
 
       if (error) {
         console.warn('⚠️ Error loading from purchase_orders:', error);
@@ -6030,7 +6037,7 @@ _Automated Business Report System_`)}`;
         const transformedOrders = orders.map(order => ({
           id: order.id,
           orderNumber: order.po_number || `PO-${order.id}`,
-          supplierName: order.suppliers?.name || 'Unknown Supplier',
+          supplierName: 'Supplier', // Will be shown as generic
           supplierId: order.supplier_id,
           orderDate: order.order_date ? new Date(order.order_date).toLocaleDateString('en-UG') : 'N/A',
           expectedDelivery: order.expected_delivery_date ? new Date(order.expected_delivery_date).toLocaleDateString('en-UG') : 'N/A',
@@ -6038,11 +6045,10 @@ _Automated Business Report System_`)}`;
           totalValue: order.total_amount_ugx || 0,
           amountPaid: order.amount_paid_ugx || 0,
           balanceDue: order.balance_due_ugx || order.total_amount_ugx || 0,
-          tax: order.tax_ugx || 0,
           status: order.status || 'pending_approval',
           paymentStatus: order.payment_status || 'unpaid',
           priority: 'medium',
-          items: order.items || [],
+          items: [],
           documents: [],
           requestedBy: 'Manager',
           department: 'Procurement',
@@ -6050,7 +6056,7 @@ _Automated Business Report System_`)}`;
           contactPhone: '+256-700-000000'
         }));
 
-        console.log('✅ Loaded', transformedOrders.length, 'orders from database (optimized single query)');
+        console.log('✅ Loaded', transformedOrders.length, 'orders from database');
         setPendingOrders(transformedOrders);
       } else {
         console.log('ℹ️ No pending orders found in database, keeping sample data');
@@ -6062,101 +6068,70 @@ _Automated Business Report System_`)}`;
     }
   };
 
-  // Load POS items from database - DUAL SOURCE (Admin Inventory + Supplier Orders)
+  // Load POS items from database - Products + Inventory data
   const loadPosItems = async () => {
     try {
       setLoadingPosItems(true);
-      console.log('🛒 Loading POS items from DUAL sources (Admin inventory + supplier orders)...');
+      console.log('🛒 Loading POS items...');
 
-      // SOURCE 1: Load products with inventory data from Admin Portal
-      const { data: productsData, error: productsError } = await supabase
-        .from('products')
-        .select(`
-          *,
-          inventory (
-            current_stock
+      // Load products and inventory in parallel
+      const [productsResult, inventoryResult] = await Promise.all([
+        // Load products
+        Promise.race([
+          supabase
+            .from('products')
+            .select('id, name, sku, selling_price, price, cost_price, category, is_active')
+            .eq('is_active', true)
+            .limit(50),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
           )
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+        ]).catch(err => ({ data: [], error: err })),
+        
+        // Load inventory data
+        Promise.race([
+          supabase
+            .from('inventory')
+            .select('product_id, current_stock'),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err }))
+      ]);
 
-      if (productsError) {
-        console.warn('⚠️ Error loading products:', productsError);
+      // Create stock map
+      const stockMap = {};
+      if (inventoryResult.data) {
+        (inventoryResult.data || []).forEach(inv => {
+          stockMap[inv.product_id] = inv.current_stock;
+        });
       }
 
-      // Filter products with inventory
-      const adminInventoryItems = (productsData || [])
-        .filter(p => p.inventory && p.inventory.length > 0 && p.inventory[0]?.current_stock > 0)
-        .map(p => ({
-          id: p.id,
-          product_name: p.name,
-          name: p.name,
-          barcode: p.sku || `SKU-${p.id.substring(0, 8)}`,
-          sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
-          selling_price: p.selling_price || p.price || 0,
-          price: p.selling_price || p.price || 0,
-          cost_price: p.cost_price || 0,
-          quantity: p.inventory[0]?.current_stock || 0,
-          available_stock: p.inventory[0]?.current_stock || 0,
-          category: p.category || 'General',
-          categoryName: p.category || 'General',
-          status: 'available',
-          is_active: p.is_active,
-          source: 'admin'
-        }));
+      // Transform products with stock data
+      const posItems = ((productsResult.data || []).map(p => ({
+        id: p.id,
+        product_name: p.name,
+        name: p.name,
+        barcode: p.sku || `SKU-${p.id.substring(0, 8)}`,
+        sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
+        selling_price: p.selling_price || p.price || 0,
+        price: p.selling_price || p.price || 0,
+        cost_price: p.cost_price || 0,
+        quantity: stockMap[p.id] || 0, // Get from stock map
+        available_stock: stockMap[p.id] || 0,
+        category: p.category || 'General',
+        categoryName: p.category || 'General',
+        status: 'available',
+        is_active: p.is_active,
+        source: 'admin'
+      }))).sort((a, b) => a.name.localeCompare(b.name));
 
-      console.log(`✅ Loaded ${adminInventoryItems.length} items from Admin inventory`);
-
-      // SOURCE 2: Load products_inventory table (supplier orders added to POS)
-      const { data: posInventoryData, error: posError } = await supabase
-        .from('products_inventory')
-        .select('*')
-        .gt('quantity', 0)
-        .order('product_name', { ascending: true });
-
-      if (posError) {
-        console.warn('⚠️ Error loading POS inventory:', posError);
-      }
-
-      const supplierOrderItems = (posInventoryData || [])
-        .map(p => ({
-          id: p.id,
-          product_name: p.product_name,
-          name: p.product_name,
-          barcode: p.barcode || `SKU-${p.id.substring(0, 8)}`,
-          sku: p.barcode || `SKU-${p.id.substring(0, 8)}`,
-          selling_price: p.selling_price || 0,
-          price: p.selling_price || 0,
-          cost_price: p.cost_price || 0,
-          quantity: p.quantity || 0,
-          available_stock: p.quantity || 0,
-          category: p.category || 'Supplier',
-          categoryName: p.category || 'Supplier',
-          status: p.quantity <= 0 ? 'out_of_stock' : p.quantity <= 5 ? 'low_stock' : 'available',
-          is_active: true,
-          source: 'supplier'
-        }));
-
-      console.log(`✅ Loaded ${supplierOrderItems.length} items from supplier orders`);
-
-      // COMBINE both sources and deduplicate by product name
-      const combinedItems = [...adminInventoryItems, ...supplierOrderItems];
-      const deduplicatedItems = Array.from(
-        new Map(
-          combinedItems.map(item => [item.product_name, item])
-        ).values()
-      );
-
-      if (deduplicatedItems && deduplicatedItems.length > 0) {
-        console.log('✅ Total POS items loaded:', deduplicatedItems.length);
-        setPosItems(deduplicatedItems);
-      } else {
-        console.log('ℹ️ No POS items found from either source');
-        setPosItems([]);
-      }
+      console.log(`✅ Loaded ${posItems.length} products for POS with stock data`);
+      setPosItems(posItems.length > 0 ? posItems : []);
+      
     } catch (error) {
       console.error('Error loading POS items:', error);
-      console.log('ℹ️ Could not connect to database, using empty POS');
+      console.log('ℹ️ Could not load POS items:', error.message);
       setPosItems([]);
     } finally {
       setLoadingPosItems(false);
@@ -12360,6 +12335,7 @@ FAREDEAL Uganda Management Team
                         {portalControlSystem.isConnected ? 'Connected' : 'Disconnected'}
                       </span>
                     </div>
+                    {/* COMMENTED OUT: WebSocket connection disabled
                     <button
                       onClick={() => initializePortalControl()}
                       className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors duration-200 flex items-center space-x-2"
@@ -12367,6 +12343,7 @@ FAREDEAL Uganda Management Team
                       <FiRefreshCw className="w-4 h-4" />
                       <span>Refresh</span>
                     </button>
+                    */}
                   </div>
                 </div>
               </div>
@@ -13191,12 +13168,68 @@ FAREDEAL Uganda Management Team
           {activeTab === 'team' && renderTeamManagement()}
           {activeTab === 'suppliers' && (
             <div className="animate-fadeInUp">
-              <SupplierOrderManagement />
+              <SupplierOrderManagement onPosUpdated={(addedProducts) => {
+                if (addedProducts && addedProducts.length > 0) {
+                  setPosItems(prevItems => {
+                    const itemMap = new Map(prevItems.map(i => [i.name, i]));
+                    addedProducts.forEach(added => {
+                      const existing = itemMap.get(added.name);
+                      if (existing) {
+                        existing.quantity = added.newStock || added.quantity;
+                        existing.available_stock = added.newStock || added.quantity;
+                      } else {
+                        itemMap.set(added.name, {
+                          id: `temp-${Date.now()}`,
+                          name: added.name,
+                          product_name: added.name,
+                          price: 0,
+                          selling_price: 0,
+                          cost_price: 0,
+                          quantity: added.newStock || added.quantity,
+                          available_stock: added.newStock || added.quantity,
+                          category: 'General',
+                          is_active: true,
+                          source: 'admin'
+                        });
+                      }
+                    });
+                    return Array.from(itemMap.values());
+                  });
+                }
+              }} />
             </div>
           )}
           {activeTab === 'orders' && (
             <div className="animate-fadeInUp">
-              <SupplierOrderManagement />
+              <SupplierOrderManagement onPosUpdated={(addedProducts) => {
+                if (addedProducts && addedProducts.length > 0) {
+                  setPosItems(prevItems => {
+                    const itemMap = new Map(prevItems.map(i => [i.name, i]));
+                    addedProducts.forEach(added => {
+                      const existing = itemMap.get(added.name);
+                      if (existing) {
+                        existing.quantity = added.newStock || added.quantity;
+                        existing.available_stock = added.newStock || added.quantity;
+                      } else {
+                        itemMap.set(added.name, {
+                          id: `temp-${Date.now()}`,
+                          name: added.name,
+                          product_name: added.name,
+                          price: 0,
+                          selling_price: 0,
+                          cost_price: 0,
+                          quantity: added.newStock || added.quantity,
+                          available_stock: added.newStock || added.quantity,
+                          category: 'General',
+                          is_active: true,
+                          source: 'admin'
+                        });
+                      }
+                    });
+                    return Array.from(itemMap.values());
+                  });
+                }
+              }} />
             </div>
           )}
           {activeTab === 'pos' && (

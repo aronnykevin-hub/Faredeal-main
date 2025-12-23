@@ -163,119 +163,63 @@ const POS = () => {
 
   const fetchProducts = async () => {
     try {
-      // Step 1: Fetch from Admin Portal's main inventory (products table with inventory relation)
-      const { data: adminProducts, error: adminError } = await supabase
-        .from('products')
-        .select(`
-          id,
-          name,
-          price,
-          selling_price,
-          cost_price,
-          tax_rate,
-          barcode,
-          sku,
-          category_id,
-          is_active,
-          inventory (
-            id,
-            current_stock,
-            minimum_stock,
-            maximum_stock,
-            status
+      // OPTIMIZED: Load products and inventory in parallel
+      const [productsResult, inventoryResult] = await Promise.all([
+        // Load products with timeout
+        Promise.race([
+          supabase
+            .from('products')
+            .select('id, name, price, selling_price, cost_price, tax_rate, barcode, sku, category_id, is_active')
+            .eq('is_active', true)
+            .limit(100),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
           )
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+        ]).catch(err => ({ data: [], error: err })),
+        
+        // Load inventory data with timeout
+        Promise.race([
+          supabase
+            .from('inventory')
+            .select('product_id, current_stock'),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err }))
+      ]);
 
-      if (adminError) {
-        console.error('❌ Admin inventory fetch error:', adminError);
-      }
-
-      console.log('📦 Products from Admin Portal inventory:', adminProducts?.length || 0);
-
-      // Step 2: Also fetch from POS inventory table (products added via supplier orders)
-      const { data: posInventory, error: posError } = await supabase
-        .from('products_inventory')
-        .select('*')
-        .eq('status', 'available')
-        .order('product_name', { ascending: true });
-
-      if (posError) {
-        console.warn('⚠️ POS inventory fetch warning:', posError);
-      }
-
-      console.log('📦 Products from POS inventory:', posInventory?.length || 0);
-
-      // Combine and transform products from both sources
-      const allProducts = [];
-      const productNames = new Set();
-
-      // Add products from Admin Portal inventory
-      if (adminProducts && adminProducts.length > 0) {
-        adminProducts.forEach(product => {
-          const inventoryData = product.inventory?.[0];
-          if (inventoryData && inventoryData.current_stock > 0) {
-            allProducts.push({
-              _id: product.id,
-              id: product.id,
-              name: product.name,
-              price: product.price || product.selling_price || 0,
-              selling_price: product.selling_price,
-              cost_price: product.cost_price,
-              tax_rate: product.tax_rate,
-              barcode: product.barcode,
-              sku: product.sku,
-              stock: inventoryData?.current_stock || 0,
-              minimum_stock: inventoryData?.minimum_stock || 0,
-              maximum_stock: inventoryData?.maximum_stock || 1000,
-              category_id: product.category_id,
-              isActive: product.is_active,
-              inventoryStatus: inventoryData?.status || 'in_stock',
-              sourcePortal: 'Admin Portal',
-              source: 'admin'
-            });
-            productNames.add(product.name);
-          }
+      // Create stock map from inventory
+      const stockMap = {};
+      if (productsResult.data) {
+        (inventoryResult.data || []).forEach(inv => {
+          stockMap[inv.product_id] = inv.current_stock;
         });
       }
 
-      // Add products from POS inventory (supplier orders) - avoid duplicates
-      if (posInventory && posInventory.length > 0) {
-        posInventory.forEach(item => {
-          if (!productNames.has(item.product_name) && item.quantity > 0) {
-            allProducts.push({
-              _id: item.id,
-              id: item.id,
-              name: item.product_name,
-              price: item.selling_price || item.cost_price || 0,
-              selling_price: item.selling_price,
-              cost_price: item.cost_price,
-              tax_rate: 18, // Default tax rate
-              barcode: item.barcode,
-              sku: item.barcode,
-              stock: item.quantity,
-              minimum_stock: item.reorder_level || 5,
-              category_id: null,
-              isActive: true,
-              inventoryStatus: item.status || 'available',
-              sourcePortal: 'POS Inventory',
-              source: 'pos'
-            });
-            productNames.add(item.product_name);
-          }
-        });
-      }
-
-      // Sort by name
-      allProducts.sort((a, b) => a.name.localeCompare(b.name));
+      // Transform products with stock data
+      const allProducts = ((productsResult.data || []).map(product => ({
+        _id: product.id,
+        id: product.id,
+        name: product.name,
+        price: product.price || product.selling_price || 0,
+        selling_price: product.selling_price,
+        cost_price: product.cost_price,
+        tax_rate: product.tax_rate || 18,
+        barcode: product.barcode,
+        sku: product.sku,
+        stock: stockMap[product.id] || 0, // Get from inventory map
+        minimum_stock: 0,
+        maximum_stock: 1000,
+        category_id: product.category_id,
+        isActive: product.is_active,
+        inventoryStatus: 'available',
+        sourcePortal: 'Admin Portal',
+        source: 'admin'
+      }))).sort((a, b) => a.name.localeCompare(b.name));
 
       setProducts(allProducts);
-      console.log(`✅ Total products loaded: ${allProducts.length} (Admin: ${adminProducts?.length || 0}, POS: ${posInventory?.length || 0})`);
+      console.log(`✅ Products loaded: ${allProducts.length}, Stock data available for ${Object.keys(stockMap).length} items`);
       
-      if (allProducts.length === 0) {
-        toast.info('📦 No products available. Add products through:\n1. Admin Portal inventory\n2. Or approve supplier orders');
-      }
     } catch (error) {
       console.error('❌ Failed to fetch products:', error);
       toast.error('Failed to load products');
@@ -1048,7 +992,32 @@ const POS = () => {
             
             {/* Modal Content */}
             <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
-              <SupplierOrderManagement />
+              <SupplierOrderManagement onPosUpdated={(addedProducts) => {
+                if (addedProducts && addedProducts.length > 0) {
+                  // Update POS items immediately with new products
+                  setProducts(prevProducts => {
+                    const productMap = new Map(prevProducts.map(p => [p.name, p]));
+                    addedProducts.forEach(added => {
+                      const existing = productMap.get(added.name);
+                      if (existing) {
+                        existing.stock = added.newStock || added.quantity;
+                      } else {
+                        productMap.set(added.name, {
+                          id: `temp-${Date.now()}`,
+                          name: added.name,
+                          price: 0,
+                          selling_price: 0,
+                          cost_price: 0,
+                          stock: added.newStock || added.quantity,
+                          isActive: true,
+                          source: 'admin'
+                        });
+                      }
+                    });
+                    return Array.from(productMap.values());
+                  });
+                }
+              }} />
             </div>
           </div>
         </div>

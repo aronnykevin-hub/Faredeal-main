@@ -86,14 +86,25 @@ const AdminAuth = () => {
   useEffect(() => {
     const handleAuthStateChange = async () => {
       try {
+        console.log('🔐 [OAUTH] Checking OAuth completion...');
         const { data: { user }, error: userError } = await supabase.auth.getUser();
         
-        if (user && user.provider === 'google') {
-          console.log('🔐 Google user authenticated, creating/verifying user record...');
+        if (!user) {
+          console.log('🔐 [OAUTH] No user found, OAuth may still be in progress');
+          return;
+        }
+
+        // Check if this is a Google OAuth user
+        const isGoogleUser = user.identities?.some(id => id.provider === 'google') || user.provider === 'google';
+        
+        if (isGoogleUser) {
+          console.log('🔐 [OAUTH] Google OAuth completed for:', user.email);
           
           // Get user data from providers
           const { email, user_metadata } = user;
           const fullName = user_metadata?.full_name || user_metadata?.name || 'Admin User';
+          
+          console.log('🔐 [OAUTH] Creating/updating user record in database...');
           
           // Try to insert user record (will fail if exists - that's ok)
           const { error: insertError } = await supabase
@@ -112,7 +123,7 @@ const AdminAuth = () => {
           
           if (insertError && insertError.code !== '23505') {
             // If error is not "unique violation", try update
-            console.log('Insert failed, updating user record...');
+            console.log('🔐 [OAUTH] User exists, updating record...');
             const { error: updateError } = await supabase
               .from('users')
               .update({ 
@@ -123,10 +134,12 @@ const AdminAuth = () => {
                 email_verified: true,
                 updated_at: new Date().toISOString()
               })
-              .eq('auth_id', user.id);
+              .eq('id', user.id);
             
             if (updateError) {
               console.warn('⚠️ Could not sync user to database:', updateError.message);
+            } else {
+              console.log('✅ Admin user record updated');
             }
           } else if (!insertError) {
             console.log('✅ Admin user record created for Google OAuth:', email);
@@ -135,6 +148,7 @@ const AdminAuth = () => {
           }
           
           // ✅ Set admin access and redirect to admin portal
+          console.log('🔐 [OAUTH] Setting localStorage and redirecting...');
           localStorage.setItem('adminKey', 'true');
           localStorage.setItem('supermarket_user', JSON.stringify({
             id: user.id,
@@ -152,11 +166,12 @@ const AdminAuth = () => {
           
           // Redirect to admin portal after a short delay
           setTimeout(() => {
+            console.log('🔐 [OAUTH] Redirecting to /admin-portal');
             navigate('/admin-portal');
-          }, 1000);
+          }, 1500);
         }
       } catch (error) {
-        console.error('OAuth callback error:', error);
+        console.error('🔐 [OAUTH] OAuth callback error:', error);
         notificationService.show(
           'Error setting up admin access. Please try again.',
           'error'
@@ -167,8 +182,14 @@ const AdminAuth = () => {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user?.identities?.[0]?.provider === 'google') {
-          handleAuthStateChange();
+        console.log('🔐 [OAUTH] Auth event:', event, 'Provider:', session?.user?.identities?.[0]?.provider);
+        
+        if (event === 'SIGNED_IN') {
+          const isGoogle = session?.user?.identities?.some(id => id.provider === 'google');
+          if (isGoogle) {
+            console.log('🔐 [OAUTH] Google sign-in detected, processing...');
+            await handleAuthStateChange();
+          }
         }
       }
     );
@@ -285,6 +306,8 @@ const AdminAuth = () => {
   const handleGoogleSignIn = async () => {
     try {
       setLoading(true);
+      console.log('🔐 [GOOGLE] Starting Google OAuth flow...');
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -298,20 +321,27 @@ const AdminAuth = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('🔐 [GOOGLE] OAuth error:', error);
+        throw error;
+      }
 
+      console.log('🔐 [GOOGLE] OAuth initiated, user will be redirected to Google...');
       notificationService.show(
-        '🔄 Redirecting to Google...',
+        '🔄 Opening Google sign-in window...',
         'info'
       );
+      
+      // Don't reset loading here - keep it until the redirect happens
+      // The redirect will cause a page navigation, so this code won't continue
 
     } catch (error) {
-      console.error('Google sign-in error:', error);
+      console.error('🔐 [GOOGLE] Google sign-in error:', error);
+      setLoading(false);
       notificationService.show(
         error.message || 'Failed to sign in with Google',
         'error'
       );
-      setLoading(false);
     }
   };
 

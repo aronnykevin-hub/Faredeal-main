@@ -68,7 +68,7 @@ const CashierPortal = () => {
   
   // �🔥 SUPABASE REAL-TIME PRODUCTS - Loaded from Database
   const [products, setProducts] = useState([]);
-  const [productsLoading, setProductsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false); // Start as false, set to true only when actively loading
   const [searchTerm, setSearchTerm] = useState('');
   
   // Sample products as fallback (if Supabase fails)
@@ -219,6 +219,10 @@ const CashierPortal = () => {
 
   // 🔥 Load products from Supabase on component mount
   useEffect(() => {
+    // Immediately show loading state
+    setProductsLoading(true);
+    
+    // Then load products
     loadProductsFromSupabase();
     
     // Subscribe to real-time product updates
@@ -243,38 +247,73 @@ const CashierPortal = () => {
   const loadProductsFromSupabase = async () => {
     try {
       setProductsLoading(true);
+      console.log('🛒 Loading products from Supabase...');
       
-      // Call secure RPC function that returns only available products
-      const { data: productsData, error } = await supabase
-        .rpc('get_available_products_for_pos');
+      // OPTIMIZED: Load products and inventory in parallel with timeouts
+      const [productsResult, inventoryResult] = await Promise.all([
+        // Load products
+        Promise.race([
+          supabase
+            .from('products')
+            .select('id, name, price, selling_price, cost_price, barcode, sku, is_active')
+            .eq('is_active', true)
+            .limit(100),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err })),
+        
+        // Load inventory data
+        Promise.race([
+          supabase
+            .from('inventory')
+            .select('product_id, current_stock'),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err }))
+      ]);
 
-      if (error) throw error;
-      
-      // Map RPC response to product format
-      const productsWithInventory = (productsData || []).map(p => ({
-        id: p.product_id,
-        name: p.product_name,
-        sku: p.sku || `SKU-${p.product_id.substring(0, 8)}`,
+      console.log(`📦 Products found: ${productsResult.data?.length || 0}`);
+      console.log(`📊 Inventory records: ${inventoryResult.data?.length || 0}`);
+
+      // Create stock map
+      const stockMap = {};
+      if (inventoryResult.data) {
+        (inventoryResult.data || []).forEach(inv => {
+          stockMap[inv.product_id] = inv.current_stock;
+        });
+      }
+
+      // Transform products with stock data (show ALL products, inventory is optional)
+      const productsWithInventory = ((productsResult.data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
         selling_price: parseFloat(p.selling_price) || 0,
         price: parseFloat(p.selling_price) || 0,
-        stock: p.available_stock || 0,
-        available_stock: p.available_stock || 0,
+        stock: stockMap[p.id] || 0,  // 0 if no inventory record
+        available_stock: stockMap[p.id] || 0,
         barcode: p.barcode,
         category: 'General',
         categoryName: 'General'
-      }));
+      }))).sort((a, b) => a.name.localeCompare(b.name));
+      
+      console.log(`✅ Total products to display: ${productsWithInventory.length}`);
       
       if (productsWithInventory.length > 0) {
         setProducts(productsWithInventory);
-        toast.success(`✅ Loaded ${productsWithInventory.length} products from inventory`);
-        console.log(`🎯 Loaded ${productsWithInventory.length} products with inventory`);
+        toast.success(`✅ Loaded ${productsWithInventory.length} products`);
+        console.log(`🎯 Loaded ${productsWithInventory.length} products from database`);
       } else {
+        // No products at all
         setProducts([]);
-        toast.info('No products in inventory. Please add products.');
+        console.log('⚠️ No products found in products table');
+        toast.info('No products in database. Go to Admin Portal to add products.');
       }
     } catch (error) {
       console.error('❌ Error loading products:', error);
-      toast.error('Failed to load products from inventory: ' + error.message);
+      toast.error('Failed to load products: ' + error.message);
       setProducts([]);
     } finally {
       setProductsLoading(false);

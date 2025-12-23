@@ -1140,35 +1140,42 @@ const AdminPortal = () => {
   // Fetch inventory data from Supabase
   const fetchInventoryData = async () => {
     try {
-      // Fetch products from products table
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('*');
-      
-      if (productsError) {
-        console.error('Products fetch error:', productsError);
-        throw productsError;
-      }
-      
-      // Fetch real inventory data from POS inventory table
-      let inventoryMap = {};
-      try {
-        const { data: inventoryData, error: invError } = await supabase
-          .from('inventory')
-          .select('product_id, current_stock, minimum_stock, reorder_point');
+      // OPTIMIZED: Load products and inventory in parallel with timeouts
+      const [productsResult, inventoryResult] = await Promise.all([
+        // Load products with specific columns
+        Promise.race([
+          supabase
+            .from('products')
+            .select('id, name, price, selling_price, cost_price, category, barcode, sku, is_active')
+            .limit(100),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err })),
         
-        if (!invError && inventoryData) {
-          inventoryData.forEach(inv => {
-            inventoryMap[inv.product_id] = inv;
-          });
-        }
-      } catch (e) {
-        console.warn('⚠️ Inventory table not available, using products table quantities');
-      }
-      
-      console.log('Fetched products for inventory:', products);
+        // Load inventory data
+        Promise.race([
+          supabase
+            .from('inventory')
+            .select('product_id, current_stock, minimum_stock, reorder_point'),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Timeout')), 2000)
+          )
+        ]).catch(err => ({ data: [], error: err }))
+      ]);
 
-      // Calculate inventory metrics - use real inventory data from POS
+      // Create inventory map
+      const inventoryMap = {};
+      if (inventoryResult.data) {
+        inventoryResult.data.forEach(inv => {
+          inventoryMap[inv.product_id] = inv;
+        });
+      }
+
+      const products = productsResult.data || [];
+      console.log('Fetched products for inventory:', products?.length);
+
+      // Calculate inventory metrics - use real inventory data from inventory table
       const totalProducts = products?.length || 0;
       const lowStockItems = products?.filter(product => {
         const invData = inventoryMap[product.id];
