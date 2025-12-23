@@ -49,9 +49,17 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
     }
   };
 
+  // Calculate total paid from confirmed transactions
+  const calculateTotalPaid = () => {
+    return paymentTransactions
+      .filter(t => t.confirmed_by_supplier || t.payment_status === 'confirmed')
+      .reduce((sum, t) => sum + (parseFloat(t.amount_ugx) || 0), 0);
+  };
+
   // Calculate payment percentage
+  const totalPaidAmount = calculateTotalPaid();
   const paymentPercentage = order.total_amount_ugx > 0
-    ? ((order.amount_paid_ugx || 0) / order.total_amount_ugx * 100)
+    ? (totalPaidAmount / order.total_amount_ugx * 100)
     : 0;
 
   // Get status color
@@ -190,7 +198,7 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
             <FiCheck className="text-green-600 text-base" /> Paid
           </div>
           <div className="text-2xl sm:text-xl font-extrabold text-green-700 break-words">
-            {formatUGX(order.amount_paid_ugx || 0)}
+            {formatUGX(totalPaidAmount)}
           </div>
         </div>
 
@@ -200,7 +208,7 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
             <FiAlertCircle className="text-red-600 text-base" /> Balance
           </div>
           <div className="text-2xl sm:text-xl font-extrabold text-red-700 break-words">
-            {formatUGX(order.balance_due_ugx || 0)}
+            {formatUGX(order.total_amount_ugx - totalPaidAmount)}
           </div>
         </div>
       </div>

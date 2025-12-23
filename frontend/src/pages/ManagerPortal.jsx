@@ -8885,8 +8885,8 @@ _Automated Business Report System_`)}`;
         <div className="absolute top-1/2 right-8 text-lg animate-bounce opacity-30">☕</div>
       </div>
 
-      {/* Enhanced Uganda Business Metrics - Mobile Optimized */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+      {/* Enhanced Uganda Business Metrics - Mobile Optimized with Responsive Badges */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-6">
         {[
           { 
             title: 'Today\'s Revenue', 
@@ -8931,7 +8931,7 @@ _Automated Business Report System_`)}`;
         ].map((metric, index) => (
           <div 
             key={index} 
-            className="bg-white rounded-lg md:rounded-xl p-3 md:p-6 shadow-lg hover:shadow-2xl transition-all duration-500 md:transform md:hover:scale-105 border-l-4 border-transparent hover:border-yellow-500 group cursor-pointer relative overflow-hidden"
+            className="bg-white rounded-lg md:rounded-xl p-2.5 sm:p-3 md:p-6 shadow-md sm:shadow-lg hover:shadow-2xl transition-all duration-500 md:transform md:hover:scale-105 border-l-4 border-transparent hover:border-yellow-500 group cursor-pointer relative overflow-hidden"
             onClick={() => {
               toast.success(`Viewing detailed ${metric.title} analytics`);
               setActiveTab('analytics');
@@ -8943,58 +8943,73 @@ _Automated Business Report System_`)}`;
             </div>
             
             <div className="relative z-10">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3 md:mb-4">
-                <div className="flex-1 w-full">
-                  <div className="flex items-center space-x-1 md:space-x-2 mb-1 md:mb-2">
-                    <span className="text-lg md:text-2xl flex-shrink-0">{metric.icon}</span>
-                    <p className="text-gray-600 text-xs md:text-sm font-bold truncate">{metric.title}</p>
-                  </div>
-                  <p className="text-2xl md:text-3xl font-bold text-gray-900 mb-1 group-hover:text-green-600 transition-colors">
-                    {metric.value}
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 md:gap-2 mb-1 md:mb-2 flex-wrap">
-                    <span className="text-green-600 text-xs md:text-sm font-bold flex items-center bg-green-50 px-1 md:px-2 py-1 rounded-full whitespace-nowrap">
-                      <FiTrendingUp className="h-3 w-3 mr-1" />
-                      {metric.change}
-                    </span>
-                    <span className="text-xs text-gray-500 bg-gray-50 px-1 md:px-2 py-1 rounded-full whitespace-nowrap hidden sm:inline-block">
-                      {metric.ugandaInfo}
-                    </span>
-                  </div>
-                  <p className="text-gray-500 text-xs line-clamp-2">{metric.subtitle}</p>
+              <div className="flex flex-col items-start justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3 md:mb-4">
+                {/* Top Row: Icon + Title */}
+                <div className="flex items-center space-x-1.5 sm:space-x-2 w-full">
+                  <span className="text-lg sm:text-xl md:text-2xl flex-shrink-0">{metric.icon}</span>
+                  <p className="text-gray-600 text-xs sm:text-sm font-bold truncate flex-1">{metric.title}</p>
                 </div>
                 
-                <div className="text-center sm:text-right flex-shrink-0">
-                  <div className={`p-2 md:p-4 rounded-lg md:rounded-xl bg-gradient-to-r ${metric.color} shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110`}>
-                    <div className="text-2xl md:text-3xl text-white group-hover:animate-bounce">
-                      {metric.icon}
-                    </div>
-                  </div>
+                {/* Value */}
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors w-full break-words">
+                  {metric.value}
+                </p>
+                
+                {/* Badges Row - Responsive */}
+                <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 md:gap-2 w-full">
+                  {/* Growth Badge */}
+                  <span className="text-green-600 text-xs font-semibold flex items-center bg-green-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap inline-flex">
+                    <FiTrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 flex-shrink-0" />
+                    <span className="text-xs sm:text-xs">{metric.change}</span>
+                  </span>
                   
-                  {/* Mini sparkline - Hidden on mobile */}
-                  <div className="mt-2 flex items-end space-x-0.5 md:space-x-1 justify-center hidden md:flex">
-                    {metric.sparkline.map((value, i) => (
-                      <div
-                        key={i}
-                        className="w-1 bg-gradient-to-t from-gray-300 to-blue-500 rounded-full group-hover:from-yellow-400 group-hover:to-green-500 transition-all duration-300"
-                        style={{ 
-                          height: `${(value / Math.max(...metric.sparkline)) * 20}px`,
-                          animationDelay: `${i * 100}ms`
-                        }}
-                      />
-                    ))}
+                  {/* Uganda Info Badge - Hidden on mobile */}
+                  <span className="text-xs text-gray-500 bg-gray-50 px-1 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap hidden sm:inline-flex">
+                    {metric.ugandaInfo}
+                  </span>
+                </div>
+                
+                {/* Subtitle */}
+                <p className="text-gray-500 text-xs line-clamp-1 sm:line-clamp-2 w-full">{metric.subtitle}</p>
+              </div>
+              
+              {/* Icon Container - Right side on desktop, below on mobile */}
+              <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1.5 sm:pt-2 md:pt-3 border-t border-gray-100">
+                <div className={`p-1.5 sm:p-2 md:p-4 rounded-lg md:rounded-xl bg-gradient-to-r ${metric.color} shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 flex-shrink-0`}>
+                  <div className="text-lg sm:text-xl md:text-3xl text-white group-hover:animate-bounce">
+                    {metric.icon}
                   </div>
+                </div>
+                
+                {/* Mini sparkline - Hidden on small screens */}
+                <div className="flex items-end space-x-0.5 sm:space-x-1 hidden sm:flex flex-1 justify-end h-8">
+                  {metric.sparkline.map((value, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 min-w-1 bg-gradient-to-t from-gray-300 to-blue-500 rounded-full group-hover:from-yellow-400 group-hover:to-green-500 transition-all duration-300"
+                      style={{ 
+                        height: `${(value / Math.max(...metric.sparkline)) * 24}px`,
+                        animationDelay: `${i * 100}ms`
+                      }}
+                    />
+                  ))}
+                </div>
+                
+                {/* Live indicator - Mobile */}
+                <div className="flex items-center space-x-0.5 text-green-600 sm:hidden">
+                  <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-semibold">Live</span>
                 </div>
               </div>
               
-              {/* Uganda-specific indicators */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 md:gap-2 pt-2 md:pt-3 border-t border-gray-100 text-xs">
-                <div className="flex items-center space-x-1 text-gray-500">
-                  <span>Uganda Market</span>
+              {/* Uganda-specific indicators - Bottom line */}
+              <div className="hidden sm:flex items-center justify-between gap-1 md:gap-2 pt-1.5 md:pt-2 text-xs border-t border-gray-100 mt-1.5 md:mt-2">
+                <div className="flex items-center space-x-0.5 text-gray-500">
+                  <span className="text-xs">Uganda Market</span>
                 </div>
-                <div className="flex items-center space-x-1 text-green-600">
-                  <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>Live Data</span>
+                <div className="flex items-center space-x-0.5 text-green-600">
+                  <div className="w-1 h-1 md:w-2 md:h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs md:text-xs">Live Data</span>
                 </div>
               </div>
             </div>

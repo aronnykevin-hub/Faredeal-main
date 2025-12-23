@@ -82,6 +82,13 @@ BEGIN
     updated_at = NOW()
   WHERE id = p_transaction_id;
 
+  -- Update purchase order payment status to paid when supplier confirms
+  UPDATE purchase_orders
+  SET 
+    payment_status = 'paid',
+    updated_at = NOW()
+  WHERE id = v_po_id;
+
   -- Return success response with updated data
   RETURN QUERY
   SELECT 
@@ -99,9 +106,109 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION supplier_confirm_payment(UUID, UUID, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION supplier_confirm_payment(UUID, UUID, TEXT) TO service_role;
 
+-- STEP 5: Create the record_payment_with_tracking RPC function
+DROP FUNCTION IF EXISTS record_payment_with_tracking(NUMERIC, TEXT, UUID, TIMESTAMP WITH TIME ZONE, VARCHAR, VARCHAR);
+
+CREATE OR REPLACE FUNCTION record_payment_with_tracking(
+  p_amount_paid NUMERIC,
+  p_notes TEXT,
+  p_order_id UUID,
+  p_payment_date TIMESTAMP WITH TIME ZONE,
+  p_payment_method VARCHAR,
+  p_payment_reference VARCHAR
+)
+RETURNS TABLE(
+  transaction_id UUID,
+  transaction_number VARCHAR,
+  order_id UUID,
+  payment_status VARCHAR,
+  created_at TIMESTAMP WITH TIME ZONE,
+  message VARCHAR
+) AS $$
+DECLARE
+  v_transaction_id UUID;
+  v_transaction_number VARCHAR;
+  v_order_exists BOOLEAN;
+  v_current_paid NUMERIC;
+  v_order_total NUMERIC;
+BEGIN
+  -- Verify order exists
+  SELECT EXISTS(SELECT 1 FROM purchase_orders WHERE id = p_order_id)
+  INTO v_order_exists;
+  
+  IF NOT v_order_exists THEN
+    RETURN QUERY SELECT 
+      NULL::UUID,
+      NULL::VARCHAR,
+      p_order_id,
+      'error'::VARCHAR,
+      NULL::TIMESTAMP WITH TIME ZONE,
+      'Purchase order not found'::VARCHAR;
+    RETURN;
+  END IF;
+
+  -- Generate a transaction number
+  v_transaction_number := 'TXN-' || to_char(NOW(), 'YYYYMMDD-HH24MISS') || '-' || substr(p_order_id::text, 1, 8);
+
+  -- Create payment transaction record
+  INSERT INTO payment_transactions (
+    purchase_order_id,
+    user_id,
+    amount_ugx,
+    payment_date,
+    payment_method,
+    payment_reference,
+    transaction_number,
+    notes,
+    payment_status,
+    created_at,
+    updated_at
+  )
+  VALUES (
+    p_order_id,
+    auth.uid(),
+    p_amount_paid,
+    COALESCE(p_payment_date, NOW()),
+    p_payment_method,
+    p_payment_reference,
+    v_transaction_number,
+    p_notes,
+    'pending',
+    NOW(),
+    NOW()
+  )
+  RETURNING id
+  INTO v_transaction_id;
+
+  -- Update purchase order with payment info
+  UPDATE purchase_orders
+  SET 
+    last_payment_date = COALESCE(p_payment_date, NOW()),
+    payment_method = p_payment_method,
+    updated_at = NOW()
+  WHERE id = p_order_id;
+
+  -- Return success response
+  RETURN QUERY
+  SELECT 
+    v_transaction_id,
+    v_transaction_number,
+    p_order_id,
+    'pending'::VARCHAR,
+    NOW(),
+    'Payment recorded successfully'::VARCHAR;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION record_payment_with_tracking(NUMERIC, TEXT, UUID, TIMESTAMP WITH TIME ZONE, VARCHAR, VARCHAR) TO authenticated;
+GRANT EXECUTE ON FUNCTION record_payment_with_tracking(NUMERIC, TEXT, UUID, TIMESTAMP WITH TIME ZONE, VARCHAR, VARCHAR) TO service_role;
+
 -- =====================================================================
 -- DEPLOYMENT COMPLETE
 -- =====================================================================
--- All missing columns have been added and the RPC function is ready
+-- All missing columns have been added and RPC functions are ready:
+-- 1. supplier_confirm_payment() - for suppliers to confirm payments
+-- 2. record_payment_with_tracking() - for recording payments with tracking
 -- The payment confirmation feature should now work without errors
 -- =====================================================================
