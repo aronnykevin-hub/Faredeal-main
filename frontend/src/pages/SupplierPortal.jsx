@@ -690,30 +690,31 @@ const SupplierPortal = () => {
         .eq('supplier_id', supplierId)
         .eq('is_active', true);
 
-      // Get payment statistics
-      const { data: invoices } = await supabase
-        .from('supplier_invoices')
-        .select('payment_status, amount_paid_ugx, balance_due_ugx')
+      // Get payment statistics from purchase_orders and payment_transactions
+      const { data: orders } = await supabase
+        .from('purchase_orders')
+        .select('id, payment_status, total_amount')
         .eq('supplier_id', supplierId);
 
-      const paidOrders = invoices?.filter(i => i.payment_status === 'paid').length || 0;
-      const unpaidOrders = invoices?.filter(i => i.payment_status === 'unpaid').length || 0;
-      const partiallyPaidOrders = invoices?.filter(i => i.payment_status === 'partially_paid').length || 0;
-      const totalPaid = invoices?.reduce((sum, i) => sum + (parseFloat(i.amount_paid_ugx) || 0), 0) || 0;
-      const totalOutstanding = invoices?.reduce((sum, i) => sum + (parseFloat(i.balance_due_ugx) || 0), 0) || 0;
-
-      // Get payment method distribution from supplier_payments
+      // Get confirmed payments from payment_transactions
       const { data: payments } = await supabase
-        .from('supplier_payments')
-        .select('payment_method')
-        .eq('supplier_id', supplierId);
+        .from('payment_transactions')
+        .select('amount_ugx, payment_status, confirmed_by_supplier')
+        .in('purchase_order_id', orders?.map(o => o.id) || []);
 
-      const mobileMoneyCount = payments?.filter(p => p.payment_method === 'mobile_money').length || 0;
-      const bankTransferCount = payments?.filter(p => p.payment_method === 'bank_transfer').length || 0;
-      const totalPayments = payments?.length || 1; // Avoid division by zero
-
-      const mobileMoneyPercentage = Math.round((mobileMoneyCount / totalPayments) * 100);
-      const bankTransferPercentage = Math.round((bankTransferCount / totalPayments) * 100);
+      // Calculate payment metrics
+      const paidOrders = orders?.filter(o => o.payment_status === 'paid').length || 0;
+      const unpaidOrders = orders?.filter(o => o.payment_status === 'unpaid').length || 0;
+      const partiallyPaidOrders = orders?.filter(o => o.payment_status === 'partially_paid').length || 0;
+      
+      // Sum confirmed payments
+      const totalPaid = payments
+        ?.filter(p => p.confirmed_by_supplier || p.payment_status === 'confirmed')
+        .reduce((sum, p) => sum + (parseFloat(p.amount_ugx) || 0), 0) || 0;
+      
+      // Calculate outstanding based on orders
+      const totalOrderAmount = orders?.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) || 0;
+      const totalOutstanding = totalOrderAmount - totalPaid;
 
       setPerformanceMetrics({
         totalOrders: totalOrders || 0,
@@ -724,8 +725,8 @@ const SupplierPortal = () => {
         pendingOrders: pendingOrders || 0,
         avgOrderValue: avgOrderValue,
         customerSatisfaction: parseFloat(supplier?.quality_rating) || 0,
-        mobileMoneyTransactions: mobileMoneyPercentage,
-        bankTransferTransactions: bankTransferPercentage,
+        mobileMoneyTransactions: 0,
+        bankTransferTransactions: 0,
         weeklyGrowth: 0,
         monthlyGrowth: 0,
         exportOrders: 0,
