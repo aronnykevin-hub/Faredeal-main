@@ -948,7 +948,7 @@ const CashierPortal = () => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error && error.code === '42P01') {
+      if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
         // Table doesn't exist, use system-generated notifications
         console.log('Notifications table not found, generating system notifications');
         

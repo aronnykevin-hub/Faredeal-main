@@ -305,7 +305,7 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-gray-800">
-                      {formatUGX(transaction.amount_paid)}
+                      {formatUGX(transaction.amount_ugx)}
                     </span>
                     {transaction.confirmed_by_supplier && transaction.confirmation_date && (
                       <span className="text-gray-500 whitespace-nowrap">

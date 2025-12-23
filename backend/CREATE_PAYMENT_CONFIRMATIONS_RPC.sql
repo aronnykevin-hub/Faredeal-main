@@ -36,7 +36,7 @@ BEGIN
   JOIN purchase_orders po ON pt.purchase_order_id = po.id
   LEFT JOIN users u ON po.created_by = u.id
   WHERE po.supplier_id = p_supplier_id 
-    AND pt.payment_status IN ('pending', 'awaiting_confirmation')
+    AND pt.payment_status IN ('pending', 'awaiting_confirmation', 'pending_confirmation')
   ORDER BY pt.payment_date DESC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
