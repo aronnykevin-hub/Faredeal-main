@@ -239,39 +239,30 @@ const CashierPortal = () => {
     };
   }, []);
 
-  // Function to load products from Supabase
+  // Function to load products from Supabase using secure RPC
   const loadProductsFromSupabase = async () => {
     try {
       setProductsLoading(true);
       
-      // Load products with inventory data only
+      // Call secure RPC function that returns only available products
       const { data: productsData, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          inventory (
-            quantity
-          )
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+        .rpc('get_available_products_for_pos');
 
       if (error) throw error;
       
-      // Filter to only show products that are in inventory table
-      const productsWithInventory = (productsData || [])
-        .filter(p => p.inventory && p.inventory.length > 0)
-        .map(p => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
-          selling_price: p.selling_price || p.price || 0,
-          price: p.selling_price || p.price || 0,
-          stock: p.inventory[0]?.quantity || 0,
-          available_stock: p.inventory[0]?.quantity || 0,
-          category: p.category || 'General',
-          categoryName: p.category || 'General'
-        }));
+      // Map RPC response to product format
+      const productsWithInventory = (productsData || []).map(p => ({
+        id: p.product_id,
+        name: p.product_name,
+        sku: p.sku || `SKU-${p.product_id.substring(0, 8)}`,
+        selling_price: parseFloat(p.selling_price) || 0,
+        price: parseFloat(p.selling_price) || 0,
+        stock: p.available_stock || 0,
+        available_stock: p.available_stock || 0,
+        barcode: p.barcode,
+        category: 'General',
+        categoryName: 'General'
+      }));
       
       if (productsWithInventory.length > 0) {
         setProducts(productsWithInventory);
@@ -283,7 +274,7 @@ const CashierPortal = () => {
       }
     } catch (error) {
       console.error('❌ Error loading products:', error);
-      toast.error('Failed to load products from inventory');
+      toast.error('Failed to load products from inventory: ' + error.message);
       setProducts([]);
     } finally {
       setProductsLoading(false);
@@ -918,18 +909,28 @@ const CashierPortal = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if notifications table exists, otherwise create sample notifications
-      const { data: notificationsData, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .or(`user_id.eq.${user.id},user_id.is.null`)
-        .order('created_at', { ascending: false })
-        .limit(10);
+      // Try to load notifications from table, but have fallback if table doesn't exist
+      let notificationsData = [];
+      
+      try {
+        const { data, error } = await supabase
+          .from('notifications')
+          .select('*')
+          .or(`user_id.eq.${user.id},user_id.is.null`)
+          .order('created_at', { ascending: false })
+          .limit(10);
 
-      if (error && error.code === '42P01') {
-        // Table doesn't exist, use system-generated notifications
-        console.log('Notifications table not found, generating system notifications');
-        
+        if (!error) {
+          notificationsData = data || [];
+        }
+      } catch (tableError) {
+        // Table doesn't exist, will use system notifications below
+        console.log('Notifications table not accessible, using system notifications');
+      }
+
+
+      // If no data from table or table doesn't exist, use system-generated notifications
+      if (!notificationsData || notificationsData.length === 0) {
         const systemNotifications = [
           {
             id: 1,
@@ -961,39 +962,21 @@ const CashierPortal = () => {
         return;
       }
 
-      if (error) {
-        console.error('Error loading notifications:', error);
-        return;
-      }
-
-      if (notificationsData && notificationsData.length > 0) {
-        const formatted = notificationsData.map(n => ({
-          id: n.id,
-          title: n.title || 'Notification',
-          message: n.message || '',
-          time: new Date(n.created_at).toLocaleTimeString('en-UG', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          }),
-          read: n.read || false,
-          type: n.type || 'info'
-        }));
-        
-        setNotifications(formatted);
-        console.log('✅ Loaded notifications:', formatted.length);
-      } else {
-        // No notifications found, create welcome message
-        setNotifications([
-          {
-            id: 1,
-            title: 'Welcome!',
-            message: 'You\'re all set up and ready to go',
-            time: new Date().toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-            type: 'info'
-          }
-        ]);
-      }
+      // Format notifications from database
+      const formatted = notificationsData.map(n => ({
+        id: n.id,
+        title: n.title || 'Notification',
+        message: n.message || '',
+        time: new Date(n.created_at).toLocaleTimeString('en-UG', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        read: n.read || false,
+        type: n.type || 'info'
+      }));
+      
+      setNotifications(formatted);
+      console.log('✅ Loaded notifications:', formatted.length);
     } catch (error) {
       console.error('Error loading notifications:', error);
       // Fallback notifications
