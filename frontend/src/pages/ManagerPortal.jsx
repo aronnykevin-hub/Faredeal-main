@@ -3013,11 +3013,7 @@ _Powered by FAREDEAL Business Intelligence_ 🚀`;
           }
           break;
           
-        case 'sms':
-          
-          const smsShareOption = prompt(`🚀 Choose WhatsApp sharing method:\n\n${whatsappOptions.map((option, index) => 
-            `${index + 1}. ${option.icon} ${option.name}\n   ${option.description}`
-          ).join('\n\n')}\n\nEnter 1-4:`);
+        case 'print':
           
           const smsOptionIndex = parseInt(smsShareOption) - 1;
           
@@ -3807,23 +3803,29 @@ _Automated Business Report System_`)}`;
       const startOfLastMonth = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0];
       const endOfLastMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0];
 
-      // Fetch transactions for sales calculation
-      const { data: transactionsToday, error: error1 } = await supabase
-        .from('transactions')
-        .select('amount, customer_id')
-        .gte('created_at', today)
-        .lte('created_at', today + 'T23:59:59');
+      // Fetch transactions for sales calculation (transactions table doesn't exist yet - skip)
+      const transactionsToday = [];
+      const error1 = null;
+      // const { data: transactionsToday, error: error1 } = await supabase
+      //   .from('transactions')
+      //   .select('amount, customer_id')
+      //   .gte('created_at', today)
+      //   .lte('created_at', today + 'T23:59:59');
 
-      const { data: transactionsMonth, error: error2 } = await supabase
-        .from('transactions')
-        .select('amount, customer_id')
-        .gte('created_at', startOfMonth);
+      const transactionsMonth = [];
+      const error2 = null;
+      // const { data: transactionsMonth, error: error2 } = await supabase
+      //   .from('transactions')
+      //   .select('amount, customer_id')
+      //   .gte('created_at', startOfMonth);
 
-      const { data: transactionsLastMonth, error: error3 } = await supabase
-        .from('transactions')
-        .select('amount')
-        .gte('created_at', startOfLastMonth)
-        .lte('created_at', endOfLastMonth);
+      const transactionsLastMonth = [];
+      const error3 = null;
+      // const { data: transactionsLastMonth, error: error3 } = await supabase
+      //   .from('transactions')
+      //   .select('amount')
+      //   .gte('created_at', startOfLastMonth)
+      //   .lte('created_at', endOfLastMonth);
 
       // Fetch top products by sales
       const { data: topProductsData, error: error4 } = await supabase
@@ -4384,19 +4386,21 @@ _Automated Business Report System_`)}`;
   // Load manager profile from Supabase
   const loadManagerProfile = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        console.error('No authenticated user');
+      // Get user ID from localStorage (custom authentication)
+      const storedUser = localStorage.getItem('supermarket_user');
+      if (!storedUser) {
+        console.error('No user found in localStorage');
         return;
       }
+
+      const parsedUser = JSON.parse(storedUser);
+      const userId = parsedUser.id;
 
       // Get manager data from users table
       const { data: managerData, error } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
-        .eq('role', 'manager')
+        .eq('id', userId)
         .single();
 
       if (error) {
@@ -4406,11 +4410,8 @@ _Automated Business Report System_`)}`;
       }
 
       if (managerData) {
-        // Parse metadata if it exists
-        const metadata = managerData.metadata || {};
-        
         // Get profile picture from database first, fallback to localStorage
-        const storageKey = `manager_profile_pic_${user.id}`;
+        const storageKey = `manager_profile_pic_${userId}`;
         const localProfilePic = localStorage.getItem(storageKey);
         const profilePicture = managerData.avatar_url || localProfilePic || null;
         
@@ -4420,14 +4421,14 @@ _Automated Business Report System_`)}`;
           department: managerData.department || 'Operations Management',
           employeeId: managerData.employee_id || 'MGR-001',
           joinDate: new Date(managerData.created_at).toISOString().split('T')[0],
-          avatar: metadata.avatar || '👨‍💼',
+          avatar: '👨‍💼',
           avatar_url: profilePicture,
-          location: metadata.location || 'Kampala, Uganda',
+          location: 'Kampala, Uganda',
           status: 'Online',
-          languages: metadata.languages || ['English', 'Luganda'],
+          languages: ['English', 'Luganda'],
           phoneNumber: managerData.phone || '+256 700 000 000',
-          email: managerData.email || user.email,
-          permissions: metadata.permissions || {
+          email: managerData.email || parsedUser.email || 'manager@faredeal.com',
+          permissions: {
             analytics: true,
             teamManagement: true,
             inventory: true,
@@ -4464,25 +4465,29 @@ _Automated Business Report System_`)}`;
         return;
       }
 
-      // Prepare update data
+      // Get user ID from localStorage
+      const storedUser = localStorage.getItem('supermarket_user');
+      const userSession = storedUser ? JSON.parse(storedUser) : null;
+      const userId = userSession?.id;
+
+      if (!userId) {
+        toast.error('User session not found. Please log in again.');
+        return;
+      }
+
+      // Prepare update data (only update columns that exist in users table)
       const updateData = {
         full_name: editedProfile.name || managerProfile.name,
         phone: editedProfile.phoneNumber || managerProfile.phoneNumber,
         department: editedProfile.department || managerProfile.department,
-        metadata: {
-          avatar: editedProfile.avatar || managerProfile.avatar,
-          location: editedProfile.location || managerProfile.location,
-          languages: editedProfile.languages || managerProfile.languages,
-          permissions: editedProfile.permissions || managerProfile.permissions
-        },
         updated_at: new Date().toISOString()
       };
 
-      // Update in Supabase
+      // Update in Supabase using the correct user ID
       const { error } = await supabase
         .from('users')
         .update(updateData)
-        .eq('auth_id', user.id)
+        .eq('id', userId)
         .eq('role', 'manager');
 
       if (error) {
@@ -4491,16 +4496,12 @@ _Automated Business Report System_`)}`;
         return;
       }
 
-      // Update local state
+      // Update local state with the updated data
       setManagerProfile(prev => ({
         ...prev,
         name: updateData.full_name,
         phoneNumber: updateData.phone,
-        department: updateData.department,
-        avatar: updateData.metadata.avatar,
-        location: updateData.metadata.location,
-        languages: updateData.metadata.languages,
-        permissions: updateData.metadata.permissions
+        department: updateData.department
       }));
 
       setIsEditingProfile(false);
@@ -4589,8 +4590,7 @@ _Automated Business Report System_`)}`;
               avatar_url: base64String,
               updated_at: new Date().toISOString()
             })
-            .eq('auth_id', user.id)
-            .eq('role', 'manager');
+            .eq('id', userId);
 
           if (error) {
             console.error('Error saving to database:', error);
@@ -4730,36 +4730,45 @@ _Automated Business Report System_`)}`;
   // Load Purchase Order Statistics from Supabase
   const loadPurchaseOrderStats = async () => {
     try {
-      // Get active orders (not completed, delivered, or cancelled)
-      const { count: activeCount, error: activeError } = await supabase
+      // Get all orders and filter in JavaScript to avoid enum issues
+      const { data: allOrders, error: ordersError } = await supabase
         .from('purchase_orders')
-        .select('*', { count: 'exact', head: true })
-        .not('status', 'in', '(completed,delivered,cancelled)');
+        .select('status, payment_status, balance_due_ugx');
 
-      // Get orders with payment issues (unpaid or partially_paid)
-      const { count: paymentCount, error: paymentError } = await supabase
-        .from('purchase_orders')
-        .select('*', { count: 'exact', head: true })
-        .in('payment_status', ['unpaid', 'partially_paid'])
-        .gt('balance_due_ugx', 0);
-
-      // Get total orders
-      const { count: totalCount, error: totalError } = await supabase
-        .from('purchase_orders')
-        .select('*', { count: 'exact', head: true });
-
-      if (!activeError && !paymentError && !totalError) {
+      if (ordersError) {
+        console.warn('Error loading purchase orders:', ordersError);
+        // Set defaults if query fails
         setPurchaseOrderStats({
-          activeOrders: activeCount || 0,
-          paymentIssues: paymentCount || 0,
-          totalOrders: totalCount || 0
+          activeOrders: 0,
+          paymentIssues: 0,
+          totalOrders: 0
         });
-        console.log('✅ Loaded purchase order stats from Supabase', {
-          activeOrders: activeCount,
-          paymentIssues: paymentCount,
-          totalOrders: totalCount
-        });
+        return;
       }
+
+      // Filter active orders (not completed, delivered, or cancelled)
+      const activeCount = allOrders?.filter(o => 
+        !['completed', 'delivered', 'cancelled'].includes(o.status)
+      ).length || 0;
+
+      // Filter orders with payment issues
+      const paymentCount = allOrders?.filter(o =>
+        ['unpaid', 'partially_paid'].includes(o.payment_status) && 
+        (parseFloat(o.balance_due_ugx) || 0) > 0
+      ).length || 0;
+
+      const totalCount = allOrders?.length || 0;
+
+      setPurchaseOrderStats({
+        activeOrders: activeCount || 0,
+        paymentIssues: paymentCount || 0,
+        totalOrders: totalCount || 0
+      });
+      console.log('✅ Loaded purchase order stats from Supabase', {
+        activeOrders: activeCount,
+        paymentIssues: paymentCount,
+        totalOrders: totalCount
+      });
     } catch (error) {
       console.error('Error loading purchase order stats:', error);
     }
@@ -6730,8 +6739,7 @@ _Automated Business Report System_`)}`;
             const { error } = await window.supabase
               .from('users')
               .update({ avatar_url: base64String })
-              .eq('auth_id', user.id)
-              .eq('role', 'manager');
+              .eq('id', userId);
             
             if (error) {
               console.error('Error uploading avatar:', error);
@@ -6745,8 +6753,7 @@ _Automated Business Report System_`)}`;
             const { data: updatedData, error: fetchError } = await window.supabase
               .from('users')
               .select('avatar_url')
-              .eq('auth_id', user.id)
-              .eq('role', 'manager')
+              .eq('id', userId)
               .single();
             
             if (fetchError) {

@@ -97,30 +97,11 @@ const ManagerAuth = () => {
         setCurrentUser(user);
         
         // Check if user exists in database
-        // Try with assigned_admin_id first, fall back without it if column doesn't exist
         let { data: userData, error: fetchError } = await supabase
           .from('users')
-          .select('id, auth_id, email, full_name, role, is_active, phone, department, assigned_admin_id')
+          .select('id, auth_id, email, full_name, role, is_active, phone, department')
           .eq('auth_id', user.id)
           .single();
-
-        // If error is "column does not exist", try without assigned_admin_id
-        if (fetchError?.code === '42703') {
-          console.warn('⚠️ assigned_admin_id column not found, querying without it...');
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('users')
-            .select('id, auth_id, email, full_name, role, is_active, phone, department')
-            .eq('auth_id', user.id)
-            .single();
-          
-          if (fallbackData) {
-            userData = { ...fallbackData, assigned_admin_id: null };
-            fetchError = null;
-            console.log('✅ User data retrieved without assigned_admin_id:', userData);
-          } else {
-            fetchError = fallbackError;
-          }
-        }
 
         console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
 
@@ -137,7 +118,7 @@ const ManagerAuth = () => {
           // Try again
           const { data: retryData, error: retryError } = await supabase
             .from('users')
-            .select('id, auth_id, email, full_name, role, is_active, phone, department, assigned_admin_id')
+            .select('id, auth_id, email, full_name, role, is_active, phone, department')
             .eq('auth_id', user.id)
             .single();
           
@@ -155,8 +136,7 @@ const ManagerAuth = () => {
               role: 'customer',
               is_active: false,
               phone: null,
-              department: null,
-              assigned_admin_id: null
+              department: null
             };
             console.log('⚠️ Using fallback user object - record will be created on profile submission');
             notificationService.show('Welcome! Please complete your manager profile.', 'info', 4000);
@@ -166,11 +146,9 @@ const ManagerAuth = () => {
           throw fetchError;
         }
         
-        // Check admin assignment
-        if (userData?.assigned_admin_id) {
-          console.log('✅ Admin assigned:', userData.assigned_admin_id);
-        } else if (userData && !userData.is_active) {
-          console.warn('⚠️ No admin assigned yet - will be assigned on approval');
+        // Check if account is approved
+        if (userData && !userData.is_active) {
+          console.warn('⚠️ Account pending approval from administrator');
         }
 
 
@@ -271,11 +249,20 @@ const ManagerAuth = () => {
     try {
       console.log('📝 Submitting manager profile via RPC function...');
       
+      // Get user ID from localStorage (from login_user RPC)
+      const storedUser = localStorage.getItem('supermarket_user');
+      const userData = storedUser ? JSON.parse(storedUser) : null;
+      const userId = userData?.id;
+      
+      if (!userId) {
+        throw new Error('User session not found. Please log in again.');
+      }
+      
       // Use RPC function to update profile and verify admin assignment
       const { data: rpcResult, error: rpcError } = await supabase.rpc(
         'update_manager_profile_on_submission',
         {
-          p_auth_id: currentUser.id,
+          p_auth_id: userId,
           p_full_name: formData.fullName,
           p_phone: formData.phone,
           p_department: formData.department
@@ -407,52 +394,42 @@ const ManagerAuth = () => {
     setLoading(true);
 
     try {
-      // Get user by username
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', formData.username)
-        .maybeSingle();
+      // Use custom RPC login function that validates username/password
+      const { data: loginResult, error: loginError } = await supabase
+        .rpc('login_user', {
+          p_username: formData.username,
+          p_password: formData.password
+        });
 
-      if (userError) {
-        console.error('Database error:', userError);
+      if (loginError) {
+        console.error('Login RPC error:', loginError);
         throw new Error('Invalid username or password');
       }
 
-      if (!userData) {
-        throw new Error('Invalid username or password');
-      }
-
-      if (userData.role !== 'manager') {
-        throw new Error('This portal is for managers only');
-      }
-
-      if (!userData.is_active) {
-        notificationService.show(
-          '⏳ Your account is pending admin approval. You will be notified once approved.',
-          'warning'
-        );
+      if (!loginResult?.success) {
+        // Check if pending approval
+        if (loginResult?.pending_approval) {
+          notificationService.show(
+            '⏳ Your account is pending admin approval. You will be notified once approved.',
+            'warning'
+          );
+        } else {
+          throw new Error(loginResult?.error || 'Invalid username or password');
+        }
         return;
       }
 
-      // Authenticate (Supabase uses internal email, hidden from user)
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: userData.email,
-        password: formData.password
-      });
-
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error('Invalid username or password');
+      // Verify role is manager
+      if (loginResult.role !== 'manager') {
+        throw new Error('This portal is for managers only');
       }
 
       // Store manager data
       localStorage.setItem('supermarket_user', JSON.stringify({
-        id: userData.id,
-        name: userData.full_name,
+        id: loginResult.user_id,
+        name: loginResult.full_name,
         role: 'manager',
-        username: userData.username,
-        department: userData.department,
+        username: loginResult.username,
         timestamp: Date.now()
       }));
 

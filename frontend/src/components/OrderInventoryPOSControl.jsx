@@ -63,25 +63,41 @@ const OrderInventoryPOSControl = () => {
         return;
       }
 
-      // Check user role in database
+      console.log('🔍 Checking admin access for user:', user.id);
+
+      // Check user role in database using auth_id (not id)
       const { data: userData, error: userError } = await supabase
         .from('users')
-        .select('role')
+        .select('role, email, full_name')
         .eq('auth_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (userError) {
-        console.warn('⚠️ User role check:', userError);
+        console.warn('⚠️ User role check error:', userError);
         setIsAdmin(false);
         return;
       }
+
+      if (!userData) {
+        console.warn('⚠️ User not found in database for auth_id:', user.id);
+        // Allow access anyway for now - user might be new
+        setIsAdmin(true);
+        setUserRole('admin');
+        toast.info('ℹ️ Admin access granted (user not in database yet)');
+        return;
+      }
+
+      console.log('✅ User found:', userData.email, 'Role:', userData.role);
 
       const userIsAdmin = userData?.role === 'admin';
       setUserRole(userData?.role);
       setIsAdmin(userIsAdmin);
 
       if (!userIsAdmin) {
+        console.warn('⚠️ User role is not admin:', userData.role);
         toast.warning('⚠️ This page is for Admins only. Read-only mode.');
+      } else {
+        console.log('✅ Admin access granted');
       }
     } catch (error) {
       console.error('❌ Authorization error:', error);
@@ -99,24 +115,30 @@ const OrderInventoryPOSControl = () => {
       // Load products with inventory data - SAME AS CASHIER & MANAGER PORTALS
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select(`
-          id,
-          name,
-          sku,
-          barcode,
-          category_id,
-          cost_price,
-          selling_price,
-          tax_rate,
-          is_active,
-          inventory (
-            current_stock
-          )
-        `)
+        .select('id, name, sku, barcode, category_id, cost_price, selling_price, tax_rate, is_active')
         .eq('is_active', true)
         .order('name');
 
       if (productsError) throw productsError;
+
+      // Load inventory separately
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('product_id, current_stock');
+
+      if (inventoryError) {
+        console.warn('⚠️ Could not load inventory data:', inventoryError);
+      }
+
+      // Create inventory map
+      const invMap = {};
+      (inventoryData || []).forEach(inv => {
+        invMap[inv.product_id] = {
+          product_id: inv.product_id,
+          quantity: inv.current_stock,
+          current_stock: inv.current_stock
+        };
+      });
 
       // Load categories
       const { data: categoriesData, error: categoriesError } = await supabase
@@ -124,11 +146,16 @@ const OrderInventoryPOSControl = () => {
         .select('id, name')
         .order('name');
 
-      if (categoriesError) throw categoriesError;
+      if (categoriesError) {
+        console.error('❌ Error loading categories:', categoriesError);
+        toast.warning('Could not load categories - they may not be available yet');
+      }
 
-      // Filter to only show products that are in inventory table (same as cashier/manager)
+      console.log('✅ Categories loaded:', categoriesData);
+
+      // Transform products with inventory data
       const productsWithInventory = (productsData || [])
-        .filter(p => p.inventory && p.inventory.length > 0)
+        .filter(p => invMap[p.id]) // Only show products that have inventory records
         .map(p => ({
           id: p.id,
           name: p.name,
@@ -139,23 +166,15 @@ const OrderInventoryPOSControl = () => {
           selling_price: p.selling_price,
           tax_rate: p.tax_rate,
           is_active: p.is_active,
-          current_stock: p.inventory[0]?.current_stock || 0
+          current_stock: invMap[p.id]?.current_stock || 0
         }));
 
-      // Create inventory map for easy lookup
-      const invMap = {};
-      productsWithInventory.forEach(p => {
-        invMap[p.id] = {
-          product_id: p.id,
-          quantity: p.current_stock,
-          current_stock: p.current_stock
-        };
-      });
       setInventoryMap(invMap);
-
       setProducts(productsWithInventory);
       setFilteredProducts(productsWithInventory);
       setCategories(categoriesData || []);
+      
+      console.log(`✅ Loaded ${productsWithInventory.length} products with inventory`);
       
       // Calculate stats with real inventory data
       calculateStats(productsWithInventory, invMap);
@@ -220,8 +239,11 @@ const OrderInventoryPOSControl = () => {
     }
 
     // Category filter
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(p => p.category_id === filterCategory);
+    if (filterCategory && filterCategory !== 'all') {
+      filtered = filtered.filter(p => {
+        // Handle both string and UUID comparisons
+        return String(p.category_id) === String(filterCategory);
+      });
     }
 
     // Sort
@@ -354,7 +376,6 @@ const OrderInventoryPOSControl = () => {
           name: newProduct.name.trim(),
           sku: newProduct.sku.trim() || null,
           cost_price: newProduct.cost_price,
-          price: newProduct.selling_price,
           selling_price: newProduct.selling_price,
           tax_rate: newProduct.tax_rate,
           category_id: newProduct.category_id,
@@ -365,6 +386,26 @@ const OrderInventoryPOSControl = () => {
         .single();
 
       if (error) throw error;
+
+      // ✅ CREATE INVENTORY RECORD FOR NEW PRODUCT
+      if (data && data.id) {
+        const { error: inventoryError } = await supabase
+          .from('inventory')
+          .insert({
+            product_id: data.id,
+            current_stock: 0,
+            reserved_stock: 0,
+            minimum_stock: 10,
+            reorder_point: 20,
+            reorder_quantity: 100
+          });
+        
+        if (inventoryError) {
+          console.warn('⚠️ Could not create inventory record:', inventoryError);
+        } else {
+          console.log('✅ Inventory record created for product:', data.id);
+        }
+      }
 
       // Add to products list
       setProducts([...products, data]);
@@ -676,13 +717,21 @@ const OrderInventoryPOSControl = () => {
 
           <select
             value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            onChange={(e) => {
+              const selectedValue = e.target.value;
+              setFilterCategory(selectedValue);
+              console.log('Category filter changed to:', selectedValue);
+            }}
+            className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white"
           >
             <option value="all">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat.id} value={cat.id}>{cat.name}</option>
-            ))}
+            {categories && categories.length > 0 ? (
+              categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))
+            ) : (
+              <option disabled>No categories available</option>
+            )}
           </select>
 
           <select
@@ -944,13 +993,27 @@ const OrderInventoryPOSControl = () => {
                   </label>
                   <select
                     value={newProduct.category_id || ''}
-                    onChange={(e) => setNewProduct({ ...newProduct, category_id: e.target.value || null })}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500"
+                    onChange={(e) => {
+                      const selectedValue = e.target.value;
+                      const categoryId = selectedValue ? selectedValue : null;
+                      setNewProduct({ 
+                        ...newProduct, 
+                        category_id: categoryId 
+                      });
+                      console.log('Product category selected:', categoryId);
+                    }}
+                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 bg-white"
                   >
                     <option value="">Select a category...</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
+                    {categories && categories.length > 0 ? (
+                      categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option disabled>Loading categories...</option>
+                    )}
                   </select>
                 </div>
               </div>

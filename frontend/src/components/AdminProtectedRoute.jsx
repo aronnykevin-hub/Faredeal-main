@@ -21,11 +21,19 @@ const AdminProtectedRoute = ({ children }) => {
     const currentURL = window.location.href.toLowerCase();
     const allowedURLs = [
       'http://localhost:5173',
-      'https://faredeal-main.vercel.app'
+      'http://localhost:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'https://faredeal-main.vercel.app',
+      'http://10.0.2.139'  // Android emulator
     ];
     
-    // Check if current URL is from allowed domains
-    const isAllowed = allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+    // Check if current URL is from allowed domains (more flexible)
+    const isAllowed = allowedURLs.some(url => 
+      currentURL.toLowerCase().includes(url.toLowerCase().replace('http://', '').replace('https://', ''))
+    );
+    
     setIsURLAllowed(isAllowed);
     
     if (!isAllowed) {

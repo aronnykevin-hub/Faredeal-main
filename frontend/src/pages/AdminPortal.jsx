@@ -101,11 +101,63 @@ const AdminPortal = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
 
+  // Authorization state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // User Management Filters
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterVerification, setFilterVerification] = useState('all'); // 'all', 'verified', 'unverified'
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Check admin access on component mount
+  useEffect(() => {
+    checkAdminAccess();
+  }, []);
+
+  const checkAdminAccess = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        setIsAdmin(false);
+        setAuthLoading(false);
+        return;
+      }
+
+      try {
+        const { data: userData, error } = await supabase
+          .from('users')
+          .select('role')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+
+        if (error) {
+          console.warn('⚠️ Error fetching user role:', error);
+          // Don't block on error - let the component load
+          setAuthLoading(false);
+          return;
+        }
+
+        const userIsAdmin = userData?.role === 'admin';
+        setIsAdmin(userIsAdmin);
+        
+        if (!userIsAdmin) {
+          console.warn('⚠️ Non-admin user attempting to access AdminPortal:', userData?.role);
+        }
+      } catch (queryError) {
+        console.warn('⚠️ Failed to query user role, allowing access:', queryError);
+        // Don't block on query errors
+        setAuthLoading(false);
+      }
+    } catch (error) {
+      console.error('❌ Error checking admin access:', error);
+      setIsAdmin(false);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
 
   // Load pending users for approval
   const loadPendingUsers = useCallback(async () => {
@@ -116,8 +168,7 @@ const AdminPortal = () => {
       
       // Try using RPC function first (works with frontend, bypasses RLS)
       try {
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_pending_users');
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_pending_users');
         
         if (!rpcError && rpcData) {
           console.log(`✅ Loaded ${rpcData.length} pending users via RPC:`, rpcData);
@@ -133,7 +184,7 @@ const AdminPortal = () => {
         
         console.log('⚠️ RPC function returned error or no data, trying direct query', rpcError);
       } catch (rpcErr) {
-        console.log('❌ RPC function not available:', rpcErr);
+        console.log('❌ RPC function not available:', rpcErr.message);
       }
       
       // Fallback: Direct query (will work if RLS is disabled or policies allow)
@@ -189,8 +240,7 @@ const AdminPortal = () => {
       
       // Try using RPC helper function that bypasses RLS
       try {
-        const { data: rpcData, error: rpcError } = await supabase
-          .rpc('get_all_users_admin');
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
         
         if (!rpcError && rpcData) {
           // Transform to include verification status - approved = verified
@@ -208,7 +258,7 @@ const AdminPortal = () => {
         
         console.log('RPC function returned error or no data, trying direct query');
       } catch (rpcErr) {
-        console.warn('RPC function not available:', rpcErr);
+        console.warn('RPC function not available:', rpcErr.message);
       }
       
       // Fallback: Direct query (will work if RLS is disabled or policies allow)
@@ -426,6 +476,7 @@ const AdminPortal = () => {
 
   // Load users when accessing user management or approvals
   useEffect(() => {
+    // Only load when explicitly changing to these sections
     if (activeSection === 'users') {
       if (viewMode === 'pending') {
         loadPendingUsers();
@@ -435,14 +486,27 @@ const AdminPortal = () => {
     } else if (activeSection === 'approvals') {
       loadPendingUsers();
     } else if (activeSection === 'orders') {
-      loadOrderStats();
-      loadDetailedOrders();
+      // Load orders data
+      const loadOrders = async () => {
+        try {
+          await Promise.all([
+            loadOrderStats(),
+            loadDetailedOrders()
+          ]).catch(err => {
+            console.warn('⚠️ Orders loading encountered an error, showing empty state:', err.message);
+          });
+        } catch (error) {
+          console.warn('Error loading orders:', error.message);
+        }
+      };
       
-      // Auto-refresh orders every 5 seconds
+      loadOrders();
+      
+      // Auto-refresh orders every 5 seconds only if orders section is still active
       const refreshInterval = setInterval(() => {
+        if (document.hidden) return; // Don't refresh if tab is not visible
         console.log('🔄 Auto-refreshing order stats...');
-        loadOrderStats();
-        loadDetailedOrders();
+        loadOrders();
       }, 5000);
       
       return () => clearInterval(refreshInterval);
@@ -6479,6 +6543,37 @@ const AdminPortal = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Authorization Check */}
+      {authLoading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Verifying access...</p>
+          </div>
+        </div>
+      ) : !isAdmin ? (
+        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
+          <div className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border-2 border-red-300">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🚫</div>
+              <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
+              <p className="text-gray-700 mb-6">
+                This portal is for administrators only. Your account does not have the required permissions.
+              </p>
+              <p className="text-sm text-gray-600 mb-6">
+                If you believe this is an error, please contact your administrator.
+              </p>
+              <button
+                onClick={() => window.location.href = '/'}
+                className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300"
+              >
+                Return to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
       <NotificationCenter />
       <style dangerouslySetInnerHTML={{
         __html: `
@@ -6944,7 +7039,7 @@ const AdminPortal = () => {
       <UserDetailsModal />
       
       {/* CSS Animations for Data Dashboard */}
-      <style jsx>{`
+      <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -6991,6 +7086,8 @@ const AdminPortal = () => {
           background-size: 20px 20px;
         }
       `}</style>
+        </>
+      )}
     </div>
   );
 };

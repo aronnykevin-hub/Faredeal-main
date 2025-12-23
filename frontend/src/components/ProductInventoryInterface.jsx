@@ -26,7 +26,7 @@ const ProductInventoryInterface = () => {
     try {
       setLoading(true);
       
-      // First, try to fetch products without the inventory join
+      // Fetch products
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
@@ -40,27 +40,45 @@ const ProductInventoryInterface = () => {
 
       console.log('Raw products from Supabase:', productsData);
 
-      // Transform data to match component format
-      const transformedProducts = (productsData || []).map(p => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku,
-        price: parseFloat(p.selling_price || p.price || 0),
-        stock: p.quantity || p.stock || 0,
-        minStock: p.low_stock_threshold || p.minimum_stock || p.min_stock || 10,
-        maxStock: p.maximum_stock || p.max_stock || 100,
-        status: calculateStatus(
-          p.quantity || p.stock || 0,
-          p.low_stock_threshold || p.minimum_stock || p.min_stock || 10
-        ),
-        location: p.location || 'Not assigned',
-        supplier: p.supplier_name || p.supplier || 'No supplier',
-        productId: p.id,
-        inventoryId: p.inventory_id || p.id
-      }));
+      // Fetch inventory data separately
+      const { data: inventoryData, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('product_id, current_stock, minimum_stock, reorder_point');
 
+      if (inventoryError) {
+        console.warn('⚠️ Could not load inventory data:', inventoryError);
+      }
+
+      // Create inventory map
+      const inventoryMap = {};
+      (inventoryData || []).forEach(inv => {
+        inventoryMap[inv.product_id] = inv;
+      });
+
+      // Transform data to match component format
+      const transformedProducts = (productsData || []).map(p => {
+        const inv = inventoryMap[p.id] || {}; // Get inventory for this product
+        return {
+          id: p.id,
+          name: p.name,
+          sku: p.sku,
+          price: parseFloat(p.selling_price || p.price || 0),
+          stock: inv.current_stock || 0,
+          minStock: inv.minimum_stock || p.low_stock_threshold || 10,
+          maxStock: p.maximum_stock || p.max_stock || 100,
+          status: calculateStatus(
+            inv.current_stock || 0,
+            inv.minimum_stock || p.low_stock_threshold || 10
+          ),
+          location: p.location || 'Not assigned',
+          supplier: p.supplier_name || p.supplier || 'No supplier',
+          productId: p.id,
+          inventoryId: p.inventory_id || p.id
+        };
+      });
+
+      console.log(`✅ Loaded ${transformedProducts.length} products with inventory data`);
       setProducts(transformedProducts);
-      console.log(`✅ Loaded ${transformedProducts.length} products from Supabase`);
       
     } catch (error) {
       console.error('Error in loadProducts:', error);

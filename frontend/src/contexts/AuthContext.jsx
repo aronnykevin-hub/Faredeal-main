@@ -13,10 +13,18 @@ export const AuthProvider = ({ children }) => {
     // Check for existing user session on mount
     const checkUser = async () => {
       try {
-        const currentUser = await mockService.getCurrentUser();
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth check timeout')), 3000)
+        );
+        
+        const currentUser = await Promise.race([
+          mockService.getCurrentUser(),
+          timeoutPromise
+        ]);
         setUser(currentUser);
       } catch (error) {
-        console.log('No active session');
+        console.log('No active session:', error?.message || error);
       } finally {
         setLoading(false);
       }

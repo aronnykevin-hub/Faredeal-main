@@ -32,7 +32,7 @@ class AdminService {
       const { data: userData, error: userError } = await this.supabase
         .from('users')
         .select('id, email, role, status, first_name, last_name')
-        .eq('id', user.id)
+        .eq('auth_id', user.id)
         .single();
 
       if (userError || !userData) {

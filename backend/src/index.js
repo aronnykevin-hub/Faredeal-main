@@ -179,6 +179,43 @@ app.get('/api/auth/profile', async (req, res) => {
 });
 
 // =============================================================================
+// EMAIL ROUTES
+// =============================================================================
+
+/**
+ * Send Admin Signup Email
+ * POST /api/email/send-signup
+ */
+app.post('/api/email/send-signup', async (req, res) => {
+  try {
+    const { email, fullName } = req.body;
+
+    if (!email || !fullName) {
+      return res.status(400).json({
+        error: 'Email and full name are required'
+      });
+    }
+
+    // Import email service
+    const { sendAdminSignupEmail } = await import('./services/emailNotifications.js');
+    
+    await sendAdminSignupEmail(email, fullName);
+    
+    res.json({
+      success: true,
+      message: 'Welcome email sent successfully'
+    });
+
+  } catch (error) {
+    console.error('Email send error:', error);
+    res.status(500).json({
+      error: 'Failed to send email',
+      message: error.message
+    });
+  }
+});
+
+// =============================================================================
 // INVENTORY MANAGEMENT ROUTES
 // =============================================================================
 

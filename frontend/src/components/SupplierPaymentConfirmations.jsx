@@ -82,15 +82,33 @@ const SupplierPaymentConfirmations = () => {
 
       console.log('🔍 Fetching pending payments for supplier ID:', supplierId);
 
-      // Call the RPC function to get pending confirmations
-      const { data, error: rpcError } = await supabase.rpc(
+      // Create timeout promise (5 seconds)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Payment loading timeout')), 5000)
+      );
+
+      // Try to call the RPC function
+      const rpcPromise = supabase.rpc(
         'get_pending_payment_confirmations',
         { p_supplier_id: supplierId }
       );
 
+      let data, rpcError;
+      try {
+        const result = await Promise.race([rpcPromise, timeoutPromise]);
+        data = result.data;
+        rpcError = result.error;
+      } catch (timeoutErr) {
+        console.warn('⚠️ RPC timeout or function does not exist:', timeoutErr.message);
+        // RPC function doesn't exist - just use empty array
+        data = [];
+        rpcError = null;
+      }
+
       if (rpcError) {
-        console.error('❌ Error fetching pending payments:', rpcError);
-        setError(rpcError.message);
+        console.warn('⚠️ Error fetching pending payments (will show empty list):', rpcError);
+        // Don't block - just show empty list
+        setPendingPayments([]);
       } else {
         console.log('✅ Loaded', data?.length || 0, 'pending payments');
         setPendingPayments(data || []);
@@ -98,6 +116,7 @@ const SupplierPaymentConfirmations = () => {
     } catch (err) {
       console.error('❌ Error loading pending payments:', err);
       setError(err.message);
+      setPendingPayments([]); // Show empty list instead of error
     } finally {
       setLoading(false);
     }

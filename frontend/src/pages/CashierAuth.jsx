@@ -97,8 +97,13 @@ const CashierAuth = () => {
           .from('users')
           .select('*')
           .eq('auth_id', user.id)
-          .eq('role', 'cashier')
-          .single();
+          .maybeSingle();
+
+        // Check if user is a cashier (filter in JS to avoid enum issues)
+        if (userData && userData.role !== 'cashier') {
+          console.warn('⚠️ User exists but is not a cashier, role:', userData.role);
+          userData = null;
+        }
 
         console.log('👤 User data from database:', userData);
 
@@ -331,9 +336,15 @@ const CashierAuth = () => {
         return;
       }
 
-      // Authenticate (Supabase uses internal email, hidden from user)
+      // Authenticate using email (fallback to username if email not set)
+      const loginEmail = userData.email || userData.username;
+      
+      if (!loginEmail) {
+        throw new Error('User email/username not found');
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: userData.email,
+        email: loginEmail,
         password: formData.password
       });
 

@@ -23,17 +23,21 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
 
   // Fetch payment transactions for this order
   useEffect(() => {
-    if (order?.id) {
-      fetchPaymentTransactions();
+    // Use orderId (UUID) if available, otherwise try order_uuid, otherwise use id
+    const orderId = order?.orderId || order?.order_uuid || order?.id;
+    
+    // Only fetch if we have a valid UUID (36 characters)
+    if (orderId && typeof orderId === 'string' && orderId.length === 36) {
+      fetchPaymentTransactions(orderId);
     }
-  }, [order?.id]);
+  }, [order?.orderId, order?.order_uuid, order?.id]);
 
-  const fetchPaymentTransactions = async () => {
+  const fetchPaymentTransactions = async (orderId) => {
     try {
       const { data, error } = await supabase
         .from('payment_transactions')
         .select('*')
-        .eq('purchase_order_id', order.id)
+        .eq('purchase_order_id', orderId)
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
@@ -106,8 +110,9 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
       }
       
       // Call the record_payment_with_tracking function
+      const orderId = order?.orderId || order?.order_uuid || order?.id;
       const { data, error } = await supabase.rpc('record_payment_with_tracking', {
-        p_order_id: order.id,
+        p_order_id: orderId,
         p_amount_paid: amount,
         p_payment_method: paymentData.method,
         p_payment_reference: paymentData.reference || null,

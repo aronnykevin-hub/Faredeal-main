@@ -27,20 +27,22 @@ const SupplierOrderManagement = () => {
   const [products, setProducts] = useState([]); // Products in POS inventory
 
   /**
-   * Get current manager ID from localStorage or Supabase auth
+   * Get current manager ID from localStorage (custom authentication)
    */
-  const getManagerId = async () => {
-    let managerId = localStorage.getItem('userId');
-    
-    if (!managerId) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        managerId = user.id;
-        localStorage.setItem('userId', user.id);
-      }
+  const getManagerId = () => {
+    const storedUser = localStorage.getItem('supermarket_user');
+    if (!storedUser) {
+      console.warn('⚠️ No user session in localStorage');
+      return null;
     }
     
-    return managerId;
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      return parsedUser.id;
+    } catch (e) {
+      console.error('Error parsing stored user:', e);
+      return null;
+    }
   };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -684,13 +686,13 @@ const SupplierOrderManagement = () => {
    * Handle mark order as completed
    */
   const handleMarkAsCompleted = async (orderId) => {
-    if (!confirm('Mark this order as COMPLETED?')) return;
+    if (!confirm('Mark this order as RECEIVED?')) return;
 
     try {
       const { error } = await supabase
         .from('purchase_orders')
         .update({ 
-          status: 'completed',
+          status: 'received',
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
@@ -701,7 +703,7 @@ const SupplierOrderManagement = () => {
         return;
       }
 
-      alert('✅ Order marked as completed!');
+      alert('✅ Order marked as received!');
       loadAllData();
     } catch (err) {
       console.error('Error completing order:', err);
@@ -727,13 +729,11 @@ const SupplierOrderManagement = () => {
   const getStatusColor = (status) => {
     const colors = {
       'draft': 'bg-gray-100 text-gray-800 border-gray-300',
-      'pending_approval': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-300',
       'approved': 'bg-green-100 text-green-800 border-green-300',
-      'sent_to_supplier': 'bg-blue-100 text-blue-800 border-blue-300',
-      'confirmed': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+      'ordered': 'bg-blue-100 text-blue-800 border-blue-300',
       'partially_received': 'bg-purple-100 text-purple-800 border-purple-300',
       'received': 'bg-teal-100 text-teal-800 border-teal-300',
-      'completed': 'bg-green-100 text-green-800 border-green-300',
       'cancelled': 'bg-red-100 text-red-800 border-red-300'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
@@ -1022,7 +1022,7 @@ const SupplierOrderManagement = () => {
                 <option value="sent_to_supplier">Sent to Supplier</option>
                 <option value="confirmed">Confirmed</option>
                 <option value="received">Received</option>
-                <option value="completed">Completed</option>
+                <option value="received">Received</option>
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>
@@ -1208,7 +1208,7 @@ const SupplierOrderManagement = () => {
                     order.status === 'sent_to_supplier' || 
                     order.status === 'confirmed' || 
                     order.status === 'received' || 
-                    order.status === 'completed') && (
+                    order.status === 'received') && (
                     <div className="mb-4">
                       <OrderPaymentTracker
                         order={order}
@@ -1325,7 +1325,7 @@ const SupplierOrderManagement = () => {
                       order.status === 'sent_to_supplier' || 
                       order.status === 'confirmed' || 
                       order.status === 'received' || 
-                      order.status === 'completed') && 
+                      order.status === 'received') && 
                       order.payment_status !== 'paid' && (
                       <button
                         onClick={(e) => {
@@ -1723,29 +1723,16 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
     setSubmitting(true);
 
     try {
-      // Get authenticated user
-      const { data: { user } } = await supabase.auth.getUser();
+      // Get manager ID from localStorage (custom authentication)
+      const storedUser = localStorage.getItem('supermarket_user');
       
-      if (!user) {
-        alert('❌ Error: User not authenticated. Please log in again.');
+      if (!storedUser) {
+        alert('❌ Error: No user session found. Please log in again.');
         return;
       }
 
-      // Get internal user ID from users table (NOT auth_id)
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', user.id)
-        .eq('role', 'manager')
-        .single();
-
-      if (userError || !userData?.id) {
-        console.error('❌ Error fetching manager user ID:', userError);
-        alert('❌ Error: Manager profile not found. Please contact admin.');
-        return;
-      }
-
-      const managerId = userData.id;
+      const parsedUser = JSON.parse(storedUser);
+      const managerId = parsedUser.id;
       console.log('👤 Manager ID for order:', managerId);
       
       const orderData = {
@@ -2104,15 +2091,13 @@ const PaymentModal = ({ order, onClose, onSuccess }) => {
     setSubmitting(true);
 
     try {
-      // Get manager ID
-      let managerId = localStorage.getItem('userId');
-      if (!managerId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          managerId = user.id;
-          localStorage.setItem('userId', user.id);
-        }
+      // Get manager ID from localStorage
+      const storedUser = localStorage.getItem('supermarket_user');
+      if (!storedUser) {
+        throw new Error('No user session found');
       }
+      const parsedUser = JSON.parse(storedUser);
+      const managerId = parsedUser.id;
       
       // Record payment with tracking
       const { data, error } = await supabase.rpc('record_payment_with_tracking', {

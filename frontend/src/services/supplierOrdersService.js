@@ -261,7 +261,7 @@ export const getAllPurchaseOrders = async (filters = {}) => {
     if (supplierIds.length > 0) {
       const { data: suppliersData, error: supplierError } = await supabase
         .from('users')
-        .select('id, company_name, full_name, username, email, phone, avatar_url, category')
+        .select('id, company_name, full_name, username, email, phone, category')
         .eq('role', 'supplier')
         .in('id', supplierIds);
       
@@ -281,27 +281,27 @@ export const getAllPurchaseOrders = async (filters = {}) => {
       }
     }
 
-    // Fetch payment metrics for each order
+    // Fetch payment metrics for each order (table doesn't exist yet - skip)
     const orderIds = orders.map(o => o.id);
     let metrics = [];
-    if (orderIds.length > 0) {
-      const { data: metricsData } = await supabase
-        .from('payment_metrics')
-        .select('*')
-        .in('purchase_order_id', orderIds);
-      metrics = metricsData || [];
-    }
+    // if (orderIds.length > 0) {
+    //   const { data: metricsData } = await supabase
+    //     .from('payment_metrics')
+    //     .select('*')
+    //     .in('purchase_order_id', orderIds);
+    //   metrics = metricsData || [];
+    // }
 
-    // Fetch payment installments
+    // Fetch payment installments (table doesn't exist yet - skip)
     let installments = [];
-    if (orderIds.length > 0) {
-      const { data: installmentsData } = await supabase
-        .from('payment_installments')
-        .select('*')
-        .in('purchase_order_id', orderIds)
-        .order('installment_number');
-      installments = installmentsData || [];
-    }
+    // if (orderIds.length > 0) {
+    //   const { data: installmentsData } = await supabase
+    //     .from('payment_installments')
+    //     .select('*')
+    //     .in('purchase_order_id', orderIds)
+    //     .order('installment_number');
+    //   installments = installmentsData || [];
+    // }
 
     // Create lookups
     const supplierMap = {};
@@ -313,7 +313,7 @@ export const getAllPurchaseOrders = async (filters = {}) => {
         full_name: s.full_name,
         email: s.email,
         phone: s.phone,
-        avatar_url: s.avatar_url,
+        // avatar_url: s.avatar_url, // Column doesn't exist in users table
         category: s.category
       };
     });
@@ -349,9 +349,7 @@ export const getAllPurchaseOrders = async (filters = {}) => {
         supplierCompany: supplier?.company_name,
         supplierEmail: supplier?.email,
         supplierPhone: supplier?.phone,
-        supplierAvatar: supplier?.avatar_url,
-        supplierCategory: supplier?.category,
-        supplierAvatar: supplier?.avatar_url,
+        // supplierAvatar: supplier?.avatar_url, // Column doesn't exist
         supplierCategory: supplier?.category,
         
         // Payment metrics
@@ -976,12 +974,16 @@ export const getSupplierOrderStats = async () => {
 
     if (orderError) throw orderError;
 
-    // Get supplier counts
+    // Get supplier counts (removed status field - column doesn't exist)
     const { data: supplierData, error: supplierError } = await supabase
       .from('supplier_profiles')
-      .select('status');
+      .select('id');
 
-    if (supplierError) throw supplierError;
+    if (supplierError) {
+      console.error('⚠️ Error fetching supplier stats (table may not exist):', supplierError);
+      // Continue with empty supplier data - don't redeclare
+      // supplierData is already declared from const above
+    }
 
     // Get delivery stats
     const { data: deliveryData, error: deliveryError } = await supabase
@@ -1009,8 +1011,8 @@ export const getSupplierOrderStats = async () => {
       totalValue: orderStats?.reduce((sum, o) => sum + parseFloat(o.total_amount_ugx || 0), 0) || 0,
       
       totalSuppliers: supplierData?.length || 0,
-      activeSuppliers: supplierData?.filter(s => s.status === 'active').length || 0,
-      pendingSuppliers: supplierData?.filter(s => s.status === 'pending_approval').length || 0,
+      // activeSuppliers: supplierData?.filter(s => s.status === 'active').length || 0, // status column doesn't exist
+      // pendingSuppliers: supplierData?.filter(s => s.status === 'pending_approval').length || 0, // status column doesn't exist
       
       totalDeliveries: deliveryData?.length || 0,
       pendingDeliveries: deliveryData?.filter(d => d.delivery_status === 'pending').length || 0,

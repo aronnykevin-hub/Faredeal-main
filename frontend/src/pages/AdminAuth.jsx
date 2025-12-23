@@ -49,10 +49,19 @@ const AdminAuth = () => {
     const currentURL = window.location.href.toLowerCase();
     const allowedURLs = [
       'http://localhost:5173',
-      'https://faredeal-main.vercel.app'
+      'http://localhost:3000',
+      'http://localhost:5000',
+      'http://127.0.0.1:5173',
+      'http://127.0.0.1:3000',
+      'https://faredeal-main.vercel.app',
+      'http://10.0.2.139'  // Android emulator
     ];
     
-    const isAllowed = allowedURLs.some(url => currentURL.startsWith(url.toLowerCase()));
+    // Check if current URL matches allowed domains (more flexible)
+    const isAllowed = allowedURLs.some(url => 
+      currentURL.toLowerCase().includes(url.toLowerCase().replace('http://', '').replace('https://', ''))
+    );
+    
     setUrlAllowed(isAllowed);
     
     if (!isAllowed) {
@@ -84,52 +93,52 @@ const AdminAuth = () => {
           
           // Get user data from providers
           const { email, user_metadata } = user;
+          const fullName = user_metadata?.full_name || user_metadata?.name || 'Admin User';
           
-          // Create user record in public.users if not exists (for Google OAuth)
-          const { data: existingUser, error: checkError } = await supabase
+          // Try to insert user record (will fail if exists - that's ok)
+          const { error: insertError } = await supabase
             .from('users')
-            .select('id')
-            .eq('id', user.id)
-            .single();
+            .insert([{
+              id: user.id,
+              email: email,
+              full_name: fullName,
+              phone: user_metadata?.phone || null,
+              role: 'admin',
+              is_active: true,
+              email_verified: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }]);
           
-          if (checkError && checkError.code === 'PGRST116') {
-            // User doesn't exist, create it with admin role
-            const { error: createError } = await supabase
-              .from('users')
-              .insert([{
-                id: user.id,
-                auth_id: user.id,
-                email: email,
-                full_name: user_metadata?.full_name || user_metadata?.name || 'Admin User',
-                phone: user_metadata?.phone,
-                role: 'admin',
-                is_active: true,
-                status: 'active',
-                created_at: new Date().toISOString()
-              }]);
-            
-            if (createError) {
-              console.log('User record may have been created by trigger:', createError.message);
-            } else {
-              console.log('✅ Admin user record created for Google OAuth:', email);
-            }
-          } else if (!checkError) {
-            // User exists, ensure role is admin
+          if (insertError && insertError.code !== '23505') {
+            // If error is not "unique violation", try update
+            console.log('Insert failed, updating user record...');
             const { error: updateError } = await supabase
               .from('users')
-              .update({ role: 'admin', is_active: true })
-              .eq('id', user.id);
+              .update({ 
+                full_name: fullName,
+                phone: user_metadata?.phone || null,
+                role: 'admin', 
+                is_active: true,
+                email_verified: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('auth_id', user.id);
             
-            if (!updateError) {
-              console.log('✅ Admin user record verified for Google OAuth:', email);
+            if (updateError) {
+              console.warn('⚠️ Could not sync user to database:', updateError.message);
             }
+          } else if (!insertError) {
+            console.log('✅ Admin user record created for Google OAuth:', email);
+          } else {
+            console.log('✅ Admin user record already exists:', email);
           }
           
           // ✅ Set admin access and redirect to admin portal
           localStorage.setItem('adminKey', 'true');
           localStorage.setItem('supermarket_user', JSON.stringify({
             id: user.id,
-            name: user_metadata?.full_name || user_metadata?.name || 'Admin',
+            name: fullName,
             role: 'admin',
             email: email,
             accessLevel: 'system',
@@ -315,14 +324,25 @@ const AdminAuth = () => {
     }
 
     setLoading(true);
+    console.log('🔐 [LOGIN] Starting login process...');
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      console.log('🔐 [LOGIN] Calling signInWithPassword...');
+      
+      // Add timeout to prevent hanging
+      const signInPromise = supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password
       });
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Login timeout - Supabase not responding')), 15000)
+      );
+      
+      const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
 
       if (error) {
+        console.error('🔐 [LOGIN] Auth error:', error.message);
         // Check if it's an email confirmation error
         if (error.message.toLowerCase().includes('email') && 
             error.message.toLowerCase().includes('confirm')) {
@@ -336,47 +356,62 @@ const AdminAuth = () => {
         throw error;
       }
 
+      console.log('🔐 [LOGIN] Auth successful for:', data.user.email);
+
       // ✅ ENSURE USER HAS ADMIN ROLE IN DATABASE
       if (data.user) {
         try {
+          console.log('🔐 [LOGIN] Checking user record...');
           // Check if user exists in users table
           const { data: existingUser, error: checkError } = await supabase
             .from('users')
             .select('id, role')
             .eq('id', data.user.id)
-            .single();
+            .maybeSingle();
 
-          if (checkError || !existingUser) {
+          console.log('🔐 [LOGIN] User check result:', { existingUser, checkError });
+
+          if (!existingUser) {
             // User doesn't exist, create them with admin role
-            console.log('📝 Creating user record with admin role...');
-            await supabase
+            console.log('🔐 [LOGIN] Creating user record with admin role...');
+            const { error: insertError } = await supabase
               .from('users')
               .insert({
                 id: data.user.id,
                 email: data.user.email,
                 full_name: data.user.user_metadata?.full_name || 'Admin',
                 phone: data.user.user_metadata?.phone || null,
-                role: 'admin', // ✅ Set role to admin
-                status: 'active',
-                is_active: true,
-                created_at: new Date().toISOString(),
-                auth_id: data.user.id
+                role: 'admin',
+                is_active: true
               });
-            console.log('✅ User record created with role=admin');
+            
+            if (insertError) {
+              console.warn('🔐 [LOGIN] Insert error:', insertError.message);
+            } else {
+              console.log('🔐 [LOGIN] User record created');
+            }
           } else if (existingUser.role !== 'admin') {
             // User exists but role is not admin - update it
-            console.log('🔄 Updating user role to admin...');
-            await supabase
+            console.log('🔐 [LOGIN] Updating user role to admin...');
+            const { error: updateError } = await supabase
               .from('users')
               .update({ role: 'admin' })
               .eq('id', data.user.id);
-            console.log('✅ User role updated to admin');
+            
+            if (updateError) {
+              console.warn('🔐 [LOGIN] Update error:', updateError.message);
+            } else {
+              console.log('🔐 [LOGIN] User role updated');
+            }
+          } else {
+            console.log('🔐 [LOGIN] User already has admin role');
           }
         } catch (userError) {
-          console.log('Note: Could not ensure admin role:', userError.message);
+          console.log('🔐 [LOGIN] User record error:', userError.message);
         }
       }
 
+      console.log('🔐 [LOGIN] Setting localStorage...');
       // Set admin access flag
       localStorage.setItem('adminKey', 'true');
       localStorage.setItem('supermarket_user', JSON.stringify({
@@ -388,21 +423,22 @@ const AdminAuth = () => {
         timestamp: Date.now()
       }));
 
+      console.log('🔐 [LOGIN] Showing success message...');
       notificationService.show('✅ Welcome back, Admin!', 'success');
       
-      // Redirect to admin portal
+      console.log('🔐 [LOGIN] Redirecting to /admin-portal...');
+      // Redirect to admin portal after a short delay
       setTimeout(() => {
         navigate('/admin-portal');
-      }, 500);
+      }, 800);
 
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('🔐 [LOGIN] Login error:', error);
+      setLoading(false);
       notificationService.show(
         error.message || 'Invalid email or password',
         'error'
       );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -439,38 +475,46 @@ const AdminAuth = () => {
         try {
           console.log('📝 Creating user record with admin role...', data.user.id);
           
-          // Try to insert user record with admin role
+          // Insert user record with admin role
           const { data: userRecord, error: userError } = await supabase
             .from('users')
-            .insert([{
+            .insert({
               id: data.user.id,
               email: formData.email,
               full_name: formData.fullName,
               phone: formData.phone || null,
-              role: 'admin', // ✅ Set role to admin
-              status: 'active',
+              role: 'admin',
               is_active: true,
-              auth_id: data.user.id,
-              created_at: new Date().toISOString()
-            }])
+              email_verified: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
             .select();
 
           if (userError) {
-            // Check if it's a duplicate error (already exists)
-            if (userError.code === '23505' || userError.message?.includes('duplicate')) {
-              console.log('ℹ️ User record already exists, updating role to admin...');
-              // Update existing record to ensure role is admin
-              const { error: updateError } = await supabase
+            // If insert fails (user exists), try update instead
+            if (userError.code === '23505') { // Unique violation
+              console.log('User already exists, updating...');
+              const { data: updateData, error: updateError } = await supabase
                 .from('users')
-                .update({ role: 'admin', is_active: true, status: 'active' })
-                .eq('id', data.user.id);
+                .update({
+                  full_name: formData.fullName,
+                  phone: formData.phone || null,
+                  role: 'admin',
+                  is_active: true,
+                  email_verified: true,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', data.user.id)
+                .select();
               
-              if (!updateError) {
-                console.log('✅ User role updated to admin');
+              if (updateError) {
+                console.warn('⚠️ Could not update user record:', updateError.message);
+              } else {
+                console.log('✅ User record updated with role=admin');
               }
             } else {
-              console.warn('⚠️ Could not create user record:', userError.message);
-              // Don't fail signup if user record creation fails - auth user is created
+              console.warn('⚠️ Could not insert user record:', userError.message);
             }
           } else {
             console.log('✅ User record created with role=admin');
@@ -481,79 +525,48 @@ const AdminAuth = () => {
         }
       }
 
-      // Log the signup activity
-      if (data.user) {
-        try {
-          await supabase.from('admin_activity_log').insert({
-            admin_id: data.user.id,
-            activity_type: 'signup',
-            activity_description: `Admin account created: ${formData.fullName}`,
-            ip_address: 'localhost',
-            user_agent: navigator.userAgent
-          });
-        } catch (logError) {
-          console.log('Note: Could not log activity', logError.message);
+      // 📧 Send welcome email (non-blocking)
+      try {
+        const emailResponse = await fetch('http://localhost:3001/api/email/send-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            fullName: formData.fullName
+          })
+        });
+        
+        if (emailResponse.ok) {
+          console.log('✅ Welcome email sent successfully');
+        } else {
+          console.warn('⚠️ Email endpoint response:', emailResponse.status);
         }
+      } catch (emailError) {
+        // Non-blocking: log but don't fail signup
+        console.log('📧 Note: Could not send welcome email:', emailError.message);
       }
 
-      // Check if user is auto-confirmed or needs email verification
-      const isAutoConfirmed = data.user?.email_confirmed_at || data.user?.confirmed_at;
+      // Auto-confirm and redirect to dashboard
+      notificationService.show(
+        '🎉 Admin account created! Welcome to FAREDEAL!',
+        'success'
+      );
       
-      if (isAutoConfirmed) {
-        // Admin is auto-confirmed - provide instant access
-        notificationService.show(
-          '🎉 Admin account created! Logging you in...',
-          'success'
-        );
-        
-        // Auto-login the newly created admin
-        setTimeout(async () => {
-          try {
-            const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-              email: formData.email,
-              password: formData.password
-            });
-
-            if (!loginError && loginData.user) {
-              localStorage.setItem('adminKey', 'true');
-              localStorage.setItem('supermarket_user', JSON.stringify({
-                id: loginData.user.id,
-                name: formData.fullName,
-                role: 'admin',
-                email: formData.email,
-                accessLevel: 'system',
-                timestamp: Date.now()
-              }));
-
-              notificationService.show('✅ Welcome to FAREDEAL Admin Portal!', 'success');
-              navigate('/admin-portal');
-            }
-          } catch (error) {
-            console.error('Auto-login error:', error);
-          }
-        }, 1000);
-      } else {
-        // Email confirmation required
-        notificationService.show(
-          '📧 Please check your email to verify your account! Click the confirmation link to activate your admin access.',
-          'success',
-          8000
-        );
-        
-        // Switch to login form
-        setTimeout(() => {
-          setIsLogin(true);
-          setFormData(prev => ({
-            email: prev.email,
-            password: '',
-            confirmPassword: '',
-            fullName: '',
-            phone: '',
-            department: 'Administration',
-            role: 'Admin'
-          }));
-        }, 3000);
-      }
+      // Store admin session immediately
+      localStorage.setItem('adminKey', 'true');
+      localStorage.setItem('supermarket_user', JSON.stringify({
+        id: data.user.id,
+        name: formData.fullName,
+        role: 'admin',
+        email: formData.email,
+        accessLevel: 'system',
+        timestamp: Date.now()
+      }));
+      
+      // Redirect to dashboard immediately
+      setTimeout(() => {
+        navigate('/admin-portal');
+      }, 500);
 
     } catch (error) {
       console.error('Signup error:', error);

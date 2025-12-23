@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || process.env.REACT_APP_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || process.env.REACT_APP_ANON_KEY
 
+console.log('🔧 [SUPABASE] Loading config...');
+console.log('🔧 [SUPABASE] URL:', supabaseUrl ? supabaseUrl.substring(0, 30) + '...' : '❌ MISSING');
+console.log('🔧 [SUPABASE] Key:', supabaseAnonKey ? supabaseAnonKey.substring(0, 20) + '...' : '❌ MISSING');
+
 if (!supabaseUrl) {
   console.error('⚠️ Missing Supabase URL. Please check your environment variables.')
 }
@@ -22,7 +26,7 @@ function initSupabase() {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        flowType: 'pkce'
+        flowType: 'implicit'  // Changed from 'pkce' to 'implicit' for debugging
       },
       realtime: {
         params: {

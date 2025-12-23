@@ -650,29 +650,31 @@ const SupplierPortal = () => {
         .select('*', { count: 'exact', head: true })
         .eq('supplier_id', supplierId);
 
-      // Get pending orders
-      const { count: pendingOrders } = await supabase
+      // Get pending orders (filter status in JavaScript instead of enum)
+      const { data: allOrders } = await supabase
         .from('purchase_orders')
-        .select('*', { count: 'exact', head: true })
-        .eq('supplier_id', supplierId)
-        .in('status', ['pending_approval', 'approved', 'sent_to_supplier', 'confirmed']);
-
-      // Get all orders for calculations
-      const { data: orders } = await supabase
-        .from('purchase_orders')
-        .select('total_amount_ugx, status, order_date, expected_delivery_date, actual_delivery_date')
+        .select('*', { count: 'exact', head: false })
         .eq('supplier_id', supplierId);
+
+      const pendingOrders = allOrders?.filter(o => 
+        ['pending_approval', 'approved', 'sent_to_supplier', 'confirmed'].includes(o.status)
+      ).length || 0;
+
+      // Calculate metrics from all orders
+      const { data: orders } = { data: allOrders };
 
       // Calculate total revenue (received and completed orders)
       const totalRevenue = orders
-        ?.filter(o => o.status === 'received' || o.status === 'completed')
+        ?.filter(o => ['received', 'completed'].includes(o.status))
         .reduce((sum, o) => sum + (parseFloat(o.total_amount_ugx) || 0), 0) || 0;
 
       // Calculate average order value
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
       // Calculate on-time delivery
-      const deliveredOrders = orders?.filter(o => o.status === 'received' || o.status === 'completed') || [];
+      const deliveredOrders = orders?.filter(o => 
+        ['received', 'completed'].includes(o.status)
+      ) || [];
       const onTimeOrders = deliveredOrders.filter(o => {
         if (!o.expected_delivery_date || !o.actual_delivery_date) return false;
         return new Date(o.actual_delivery_date) <= new Date(o.expected_delivery_date);
@@ -767,7 +769,6 @@ const SupplierPortal = () => {
         .from('purchase_orders')
         .select('*')
         .eq('supplier_id', supplier.id)
-        .in('status', ['received', 'completed', 'cancelled'])
         .order('order_date', { ascending: false })
         .limit(20);
 
@@ -776,17 +777,22 @@ const SupplierPortal = () => {
         return;
       }
 
-      if (!orders || orders.length === 0) {
+      // Filter for completed/received/cancelled orders in JavaScript
+      const filteredOrders = orders?.filter(o => 
+        ['received', 'completed', 'cancelled'].includes(o.status)
+      ) || [];
+
+      if (!filteredOrders || filteredOrders.length === 0) {
         console.log('No order history found in database');
         setOrderHistory([]);
         return;
       }
 
-      console.log(`Found ${orders.length} orders in history`);
+      console.log(`Found ${filteredOrders.length} orders in history`);
 
       // Format orders with payment data from purchase_orders table
       // (payment data is now tracked directly in purchase_orders)
-      const formatted = orders.map(order => {
+      const formatted = filteredOrders.map(order => {
         return {
           id: order.po_number || order.id,
           orderId: order.id,
@@ -892,20 +898,24 @@ const SupplierPortal = () => {
 
       const { data: orders } = await supabase
         .from('purchase_orders')
-        .select('total_amount, status, order_date')
+        .select('total_amount_ugx, status, order_date')
         .eq('supplier_id', supplier.id)
-        .eq('status', 'received')
         .gte('order_date', sixMonthsAgo.toISOString().split('T')[0])
         .order('order_date');
 
+      // Filter for completed/received orders in JavaScript
+      const completedOrders = orders?.filter(o => 
+        ['received', 'completed'].includes(o.status)
+      ) || [];
+
       // Group by month
       const revenueByMonth = {};
-      orders?.forEach(order => {
+      completedOrders.forEach(order => {
         const month = new Date(order.order_date).toLocaleDateString('en-US', { month: 'short' });
         if (!revenueByMonth[month]) {
           revenueByMonth[month] = { name: month, revenue: 0, orders: 0, products: 0 };
         }
-        revenueByMonth[month].revenue += parseFloat(order.total_amount) || 0;
+        revenueByMonth[month].revenue += parseFloat(order.total_amount_ugx) || 0;
         revenueByMonth[month].orders += 1;
       });
 
@@ -966,7 +976,6 @@ const SupplierPortal = () => {
         .from('purchase_orders')
         .select('*')
         .eq('supplier_id', supplierId)
-        .in('status', ['sent_to_supplier', 'confirmed', 'approved', 'pending_approval', 'received', 'completed'])
         .order('order_date', { ascending: false });
 
       if (error) {
@@ -974,7 +983,11 @@ const SupplierPortal = () => {
         return;
       }
 
-      const formatted = orders?.map(order => {
+      // Filter statuses in JavaScript instead of relying on enum
+      const validStatuses = ['sent_to_supplier', 'confirmed', 'approved', 'pending_approval', 'received', 'completed'];
+      const filteredOrders = orders?.filter(o => validStatuses.includes(o.status)) || [];
+
+      const formatted = filteredOrders.map(order => {
         return {
           id: order.po_number || order.id,
           orderId: order.id,
@@ -1018,22 +1031,65 @@ const SupplierPortal = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.error('No user logged in');
+        setLoading(false);
         return;
       }
 
       console.log('Loading supplier data for user:', user.id);
       
-      // Load all data
-      await Promise.all([
-        loadSupplierProfile(user.id),
-        loadPerformanceMetrics(user.id),
-        loadOrderHistory(user.id),
-        loadPendingOrders(user.id),
-        loadProductCatalog(user.id),
-        loadRevenueData(user.id)
-      ]);
-      
-      console.log('Supplier data loaded successfully');
+      // Create timeout promise that rejects after 15 seconds
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Data loading timeout')), 15000)
+      );
+
+      // Load all data with timeout
+      const loadPromise = (async () => {
+        try {
+          await loadSupplierProfile(user.id);
+        } catch (e) {
+          console.error('Error in loadSupplierProfile:', e);
+        }
+        
+        try {
+          await loadPerformanceMetrics(user.id);
+        } catch (e) {
+          console.error('Error in loadPerformanceMetrics:', e);
+        }
+        
+        try {
+          await loadOrderHistory(user.id);
+        } catch (e) {
+          console.error('Error in loadOrderHistory:', e);
+        }
+        
+        try {
+          await loadPendingOrders(user.id);
+        } catch (e) {
+          console.error('Error in loadPendingOrders:', e);
+        }
+        
+        try {
+          await loadProductCatalog(user.id);
+        } catch (e) {
+          console.error('Error in loadProductCatalog:', e);
+        }
+        
+        try {
+          await loadRevenueData(user.id);
+        } catch (e) {
+          console.error('Error in loadRevenueData:', e);
+        }
+        
+        console.log('Supplier data loaded successfully');
+      })();
+
+      // Race between load and timeout
+      try {
+        await Promise.race([loadPromise, timeoutPromise]);
+      } catch (e) {
+        console.error('Loading timeout or error:', e.message);
+        // Continue anyway - some data may have loaded
+      }
     } catch (error) {
       console.error('Error loading supplier data:', error);
     } finally {
