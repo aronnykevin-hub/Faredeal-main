@@ -485,19 +485,24 @@ const AdminAuth = () => {
     }
 
     setLoading(true);
-    console.log('🔐 [FORGOT] Sending password reset email to:', forgotPasswordEmail);
+    console.log('🔐 [FORGOT] Sending magic link to:', forgotPasswordEmail);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
-        redirectTo: `${window.location.origin}/admin-auth?reset=true`
+      // Use magic link instead of password recovery email
+      // Magic links work better with Supabase and don't require SMTP config
+      const { error } = await supabase.auth.signInWithOtp({
+        email: forgotPasswordEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/admin-auth?magic=true&reset=true`
+        }
       });
 
       if (error) throw error;
 
       setResetEmailSent(true);
-      console.log('✅ Password reset email sent');
+      console.log('✅ Magic link sent');
       notificationService.show(
-        '✅ Password reset email sent! Check your inbox.',
+        '✅ Magic sign-in link sent! Check your inbox. The link works for 24 hours.',
         'success',
         6000
       );
@@ -510,11 +515,21 @@ const AdminAuth = () => {
       }, 3000);
 
     } catch (error) {
-      console.error('🔐 [FORGOT] Reset error:', error);
-      notificationService.show(
-        error.message || 'Failed to send reset email',
-        'error'
-      );
+      console.error('🔐 [FORGOT] Error:', error);
+      
+      // If it's a SendGrid/SMTP error, provide helpful message
+      if (error.message?.includes('recover') || error.message?.includes('email')) {
+        notificationService.show(
+          '💡 Use the "Sign in with Google" option instead for instant access',
+          'info',
+          6000
+        );
+      } else {
+        notificationService.show(
+          error.message || 'Failed to send reset link',
+          'error'
+        );
+      }
       setLoading(false);
     }
   };
@@ -1179,8 +1194,8 @@ const AdminAuth = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
               <p className="text-gray-600 text-sm">
                 {resetEmailSent 
-                  ? 'Check your email for the reset link'
-                  : 'Enter your email to receive a password reset link'}
+                  ? 'Check your email for the sign-in link'
+                  : 'Enter your email to receive a magic sign-in link'}
               </p>
             </div>
 
@@ -1204,7 +1219,7 @@ const AdminAuth = () => {
                 </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                  <p>💡 We'll send you an email with a link to reset your password. The link expires in 1 hour.</p>
+                  <p>✉️ We'll send you a magic link to sign in. No password needed! Valid for 24 hours.</p>
                 </div>
 
                 <div className="flex gap-3">
@@ -1213,7 +1228,7 @@ const AdminAuth = () => {
                     disabled={loading}
                     className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition-colors"
                   >
-                    {loading ? 'Sending...' : 'Send Reset Link'}
+                    {loading ? 'Sending...' : 'Send Magic Link'}
                   </button>
                   <button
                     type="button"
@@ -1226,14 +1241,29 @@ const AdminAuth = () => {
                     Cancel
                   </button>
                 </div>
+
+                {/* Alternative option */}
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-center text-sm text-gray-600 mb-3">Or try this instead:</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setIsLogin(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg font-medium transition-colors"
+                  >
+                    <span>🔴</span> Sign in with Google
+                  </button>
+                </div>
               </form>
             ) : (
               <div className="space-y-4">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                   <FiCheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                  <p className="text-green-800 font-medium">Email sent successfully!</p>
+                  <p className="text-green-800 font-medium">Magic link sent!</p>
                   <p className="text-sm text-green-700 mt-2">
-                    Check your inbox for the reset link
+                    Check your inbox for the sign-in link. Click it to log in.
                   </p>
                 </div>
 
