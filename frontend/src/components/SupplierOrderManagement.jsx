@@ -558,11 +558,11 @@ const SupplierOrderManagement = () => {
               newStock = quantity;
               const { error: invError } = await supabase
                 .from('inventory')
-                .insert({
+                .upsert({
                   product_id: existingProduct.id,
                   current_stock: quantity,
                   minimum_stock: 10
-                });
+                }, { onConflict: 'product_id' });
               if (invError) throw invError;
             } else {
               newStock = (inventoryRecord.current_stock || 0) + quantity;
@@ -609,11 +609,11 @@ const SupplierOrderManagement = () => {
             if (newProduct && newProduct.length > 0) {
               const { error: invError } = await supabase
                 .from('inventory')
-                .insert({
+                .upsert({
                   product_id: newProduct[0].id,
                   current_stock: quantity,
                   minimum_stock: 10
-                });
+                }, { onConflict: 'product_id' });
 
               if (invError) throw invError;
             }
