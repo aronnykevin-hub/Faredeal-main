@@ -535,50 +535,50 @@ const AdminProfile = () => {
   };
 
   const renderOverview = () => (
-    <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-3 md:space-y-6">
+      {/* Stats Grid - Mobile Optimized */}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
         {stats.map((stat, index) => (
-          <div key={index} className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                <stat.icon className="h-6 w-6 text-white" />
+          <div key={index} className="bg-white rounded-lg md:rounded-xl p-3 md:p-6 shadow-md hover:shadow-lg transition-all duration-300">
+            <div className="flex items-center justify-between mb-2 md:mb-4">
+              <div className={`w-9 md:w-12 h-9 md:h-12 rounded-lg bg-gradient-to-br ${stat.color} flex items-center justify-center flex-shrink-0`}>
+                <stat.icon className="h-5 md:h-6 w-5 md:w-6 text-white" />
               </div>
-              <span className="text-sm font-semibold text-green-600">{stat.change}</span>
+              <span className="text-xs md:text-sm font-semibold text-green-600">{stat.change}</span>
             </div>
             <div>
-              <p className="text-gray-600 text-sm mb-1">{stat.label}</p>
-              <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+              <p className="text-gray-600 text-xs md:text-sm mb-0.5 md:mb-1 truncate">{stat.label}</p>
+              <p className="text-2xl md:text-3xl font-bold text-gray-900">{stat.value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Profile Info */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Profile Information</h3>
+      {/* Profile Info - Mobile Optimized */}
+      <div className="bg-white rounded-lg md:rounded-xl shadow-lg p-4 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 mb-4 md:mb-6">
+          <h3 className="text-lg md:text-2xl font-bold text-gray-900">Profile Information</h3>
           {!editing ? (
             <button
               onClick={() => setEditing(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base w-full md:w-auto"
             >
               <FiEdit2 className="h-4 w-4" />
-              <span>Edit Profile</span>
+              <span>Edit</span>
             </button>
           ) : (
-            <div className="flex space-x-2">
+            <div className="flex gap-1.5 md:gap-2 w-full md:w-auto">
               <button
                 onClick={handleSaveProfile}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm md:text-base"
               >
                 <FiSave className="h-4 w-4" />
                 <span>{loading ? 'Saving...' : 'Save'}</span>
               </button>
               <button
                 onClick={() => setEditing(false)}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm md:text-base"
               >
                 <FiX className="h-4 w-4" />
                 <span>Cancel</span>
@@ -587,7 +587,7 @@ const AdminProfile = () => {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
           {[
             { label: 'Full Name', value: adminData.full_name, field: 'full_name', icon: FiUser },
             { label: 'Email', value: adminData.email, field: 'email', icon: FiMail, disabled: true },
@@ -598,9 +598,9 @@ const AdminProfile = () => {
             { label: 'Join Date', value: new Date(adminData.joinDate).toLocaleDateString(), field: 'joinDate', icon: FiCalendar, disabled: true },
             { label: 'Last Login', value: new Date(adminData.lastLogin).toLocaleString(), field: 'lastLogin', icon: FiClock, disabled: true }
           ].map((item, index) => (
-            <div key={index} className="space-y-2">
-              <label className="flex items-center space-x-2 text-sm font-medium text-gray-700">
-                <item.icon className="h-4 w-4 text-gray-400" />
+            <div key={index} className="space-y-1.5 md:space-y-2">
+              <label className="flex items-center gap-1.5 text-xs md:text-sm font-medium text-gray-700">
+                <item.icon className="h-4 w-4 text-gray-400 flex-shrink-0" />
                 <span>{item.label}</span>
               </label>
               {editing && !item.disabled ? (
@@ -608,33 +608,33 @@ const AdminProfile = () => {
                   type="text"
                   value={adminData[item.field]}
                   onChange={(e) => setAdminData({ ...adminData, [item.field]: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 md:px-4 py-2 md:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm md:text-base"
                 />
               ) : (
-                <p className="px-4 py-3 bg-gray-50 rounded-lg text-gray-900">{item.value}</p>
+                <p className="px-3 md:px-4 py-2 md:py-3 bg-gray-50 rounded-lg text-gray-900 text-xs md:text-sm truncate">{item.value}</p>
               )}
             </div>
           ))}
         </div>
       </div>
 
-      {/* Recent Activity */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-2xl font-bold text-gray-900">Recent Activity</h3>
-          <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            View All
+      {/* Recent Activity - Mobile Optimized */}
+      <div className="bg-white rounded-lg md:rounded-xl shadow-lg p-4 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 mb-4 md:mb-6">
+          <h3 className="text-lg md:text-2xl font-bold text-gray-900">Recent Activity</h3>
+          <button className="text-xs md:text-sm text-blue-600 hover:text-blue-700 font-medium text-left md:text-right">
+            View All →
           </button>
         </div>
-        <div className="space-y-4">
+        <div className="space-y-2 md:space-y-4">
           {activities.map((activity, index) => (
-            <div key={index} className="flex items-start space-x-4 p-4 rounded-lg hover:bg-gray-50 transition-colors">
-              <div className={`p-3 rounded-lg ${activity.bg}`}>
-                <activity.icon className={`h-5 w-5 ${activity.color}`} />
+            <div key={index} className="flex items-start gap-3 md:gap-4 p-2 md:p-4 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className={`p-2 md:p-3 rounded-lg flex-shrink-0 ${activity.bg}`}>
+                <activity.icon className={`h-4 md:h-5 w-4 md:w-5 ${activity.color}`} />
               </div>
-              <div className="flex-1">
-                <p className="text-gray-900 font-medium">{activity.description}</p>
-                <p className="text-sm text-gray-500">{activity.time}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-900 font-medium text-xs md:text-sm line-clamp-2">{activity.description}</p>
+                <p className="text-xs md:text-sm text-gray-500 mt-0.5">{activity.time}</p>
               </div>
             </div>
           ))}
@@ -644,18 +644,18 @@ const AdminProfile = () => {
   );
 
   const renderSecurity = () => (
-    <div className="space-y-6">
-      {/* Password Change */}
-      <div className="bg-white rounded-xl shadow-lg p-8">
-        <div className="flex items-center justify-between mb-6">
+    <div className="space-y-3 md:space-y-6">
+      {/* Password Change - Mobile Optimized */}
+      <div className="bg-white rounded-lg md:rounded-xl shadow-lg p-4 md:p-8">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 md:gap-4 mb-4 md:mb-6">
           <div>
-            <h3 className="text-2xl font-bold text-gray-900">Change Password</h3>
-            <p className="text-gray-600 mt-1">Keep your account secure by regularly updating your password</p>
+            <h3 className="text-lg md:text-2xl font-bold text-gray-900">Change Password</h3>
+            <p className="text-xs md:text-base text-gray-600 mt-1">Keep your account secure by regularly updating your password</p>
           </div>
           {!showPasswordChange && (
             <button
               onClick={() => setShowPasswordChange(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base w-full md:w-auto flex-shrink-0"
             >
               <FiLock className="h-4 w-4" />
               <span>Change Password</span>
@@ -664,20 +664,20 @@ const AdminProfile = () => {
         </div>
 
         {showPasswordChange && (
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {[
               { label: 'Current Password', field: 'currentPassword', show: 'showCurrent' },
               { label: 'New Password', field: 'newPassword', show: 'showNew' },
               { label: 'Confirm Password', field: 'confirmPassword', show: 'showConfirm' }
             ].map((item, index) => (
-              <div key={index} className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">{item.label}</label>
+              <div key={index} className="space-y-1.5 md:space-y-2">
+                <label className="block text-xs md:text-sm font-medium text-gray-700">{item.label}</label>
                 <div className="relative">
                   <input
                     type={passwordData[item.show] ? 'text' : 'password'}
                     value={passwordData[item.field]}
                     onChange={(e) => setPasswordData({ ...passwordData, [item.field]: e.target.value })}
-                    className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 md:px-4 py-2 md:py-3 pr-10 md:pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm md:text-base"
                     placeholder="••••••••"
                   />
                   <button
@@ -685,19 +685,19 @@ const AdminProfile = () => {
                     onClick={() => setPasswordData({ ...passwordData, [item.show]: !passwordData[item.show] })}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   >
-                    {passwordData[item.show] ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
+                    {passwordData[item.show] ? <FiEyeOff className="h-4 md:h-5 w-4 md:w-5" /> : <FiEye className="h-4 md:h-5 w-4 md:w-5" />}
                   </button>
                 </div>
               </div>
             ))}
             
-            <div className="flex space-x-3 pt-4">
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3 pt-2 md:pt-4">
               <button
                 onClick={handlePasswordChange}
                 disabled={loading}
-                className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 px-4 md:px-6 py-2 md:py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm md:text-base"
               >
-                <FiSave className="h-5 w-5" />
+                <FiSave className="h-4 md:h-5 w-4 md:w-5" />
                 <span>{loading ? 'Updating...' : 'Update Password'}</span>
               </button>
               <button
@@ -712,7 +712,7 @@ const AdminProfile = () => {
                     showConfirm: false
                   });
                 }}
-                className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                className="flex-1 px-4 md:px-6 py-2 md:py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm md:text-base"
               >
                 Cancel
               </button>
@@ -783,13 +783,13 @@ const AdminProfile = () => {
   );
 
   const renderPermissions = () => (
-    <div className="bg-white rounded-xl shadow-lg p-8">
-      <h3 className="text-2xl font-bold text-gray-900 mb-6">Access Permissions</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="bg-white rounded-lg md:rounded-xl shadow-lg p-4 md:p-8">
+      <h3 className="text-lg md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">Access Permissions</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
         {adminData.permissions.map((permission, index) => (
-          <div key={index} className="flex items-center space-x-3 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
+          <div key={index} className="flex items-center gap-2 md:gap-3 p-2 md:p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border border-green-200">
             <FiCheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-            <span className="text-gray-900 font-medium capitalize">
+            <span className="text-gray-900 font-medium text-xs md:text-sm capitalize">
               {permission.replace(/_/g, ' ')}
             </span>
           </div>
@@ -895,17 +895,17 @@ const AdminProfile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
-      {/* Header */}
+      {/* Header - Mobile Optimized */}
       <div className="bg-white shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 md:px-6 lg:px-8 py-3 md:py-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Profile</h1>
-              <p className="text-gray-600 mt-1">Manage your account settings and preferences</p>
+              <h1 className="text-xl md:text-3xl font-bold text-gray-900">Admin Profile</h1>
+              <p className="text-xs md:text-base text-gray-600 mt-0.5 md:mt-1">Manage your account settings and preferences</p>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center justify-center gap-1.5 px-3 md:px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm md:text-base w-full md:w-auto"
             >
               <FiLogOut className="h-4 w-4" />
               <span>Logout</span>
@@ -914,22 +914,22 @@ const AdminProfile = () => {
         </div>
       </div>
 
-      {/* Profile Header Card */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden mb-8">
+      {/* Profile Header Card - Mobile Optimized */}
+      <div className="max-w-7xl mx-auto px-3 md:px-6 lg:px-8 py-4 md:py-8">
+        <div className="bg-white rounded-lg md:rounded-2xl shadow-xl overflow-hidden mb-4 md:mb-8">
           {/* Cover Image */}
-          <div className="h-48 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative">
+          <div className="h-32 md:h-48 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 relative">
             <div className="absolute inset-0 bg-black opacity-20"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-6">
-              <div className="flex items-end space-x-6">
+            <div className="absolute bottom-0 left-0 right-0 p-3 md:p-6">
+              <div className="flex items-end gap-3 md:gap-6">
                 {/* Avatar */}
                 <div className="relative group">
-                  <div className="w-32 h-32 rounded-full border-4 border-white bg-white shadow-xl overflow-hidden">
+                  <div className="w-20 md:w-32 h-20 md:h-32 rounded-full border-3 md:border-4 border-white bg-white shadow-lg overflow-hidden flex-shrink-0">
                     {adminData.avatar ? (
                       <img src={adminData.avatar} alt={adminData.full_name} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <span className="text-white text-4xl font-bold">
+                        <span className="text-white text-2xl md:text-4xl font-bold">
                           {adminData.full_name?.charAt(0) || 'A'}
                         </span>
                       </div>
@@ -939,10 +939,10 @@ const AdminProfile = () => {
                   {/* Upload Button */}
                   <label 
                     htmlFor="avatar-upload"
-                    className="absolute bottom-0 right-0 w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-700"
+                    className="absolute bottom-0 right-0 w-7 md:w-10 h-7 md:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-blue-700"
                     title="Change profile photo"
                   >
-                    <FiCamera className="h-5 w-5" />
+                    <FiCamera className="h-4 md:h-5 w-4 md:w-5" />
                     <input
                       id="avatar-upload"
                       type="file"
@@ -956,31 +956,31 @@ const AdminProfile = () => {
                   {adminData.avatar && (
                     <button
                       onClick={handleRemoveAvatar}
-                      className="absolute top-0 right-0 w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
+                      className="absolute top-0 right-0 w-6 md:w-8 h-6 md:h-8 bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700"
                       title="Remove photo"
                     >
-                      <FiX className="h-4 w-4" />
+                      <FiX className="h-3 md:h-4 w-3 md:w-4" />
                     </button>
                   )}
                 </div>
                 
                 {/* Info */}
-                <div className="flex-1 pb-2">
-                  <h2 className="text-2xl font-bold text-white">{adminData.full_name}</h2>
-                  <div className="flex items-center space-x-4 mt-2">
-                    <span className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-medium">
+                <div className="flex-1 pb-0 md:pb-2 min-w-0">
+                  <h2 className="text-base md:text-2xl font-bold text-white truncate">{adminData.full_name}</h2>
+                  <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 mt-1 md:mt-2">
+                    <span className="px-2 md:px-3 py-0.5 md:py-1 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs md:text-sm font-medium w-fit">
                       {adminData.role}
                     </span>
-                    <span className="text-white/90 text-sm">{adminData.email}</span>
+                    <span className="text-white/90 text-xs md:text-sm truncate">{adminData.email}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-200">
-            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+          {/* Tabs - Mobile Optimized */}
+          <div className="border-b border-gray-200 overflow-x-auto">
+            <nav className="flex gap-1 md:gap-8 px-3 md:px-6 min-w-max md:min-w-full" aria-label="Tabs">
               {[
                 { id: 'overview', label: 'Overview', icon: FiUser },
                 { id: 'security', label: 'Security', icon: FiShield },
@@ -990,13 +990,13 @@ const AdminProfile = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  className={`flex items-center gap-1 md:gap-2 py-3 md:py-4 px-1 md:px-1 border-b-2 font-medium text-xs md:text-sm transition-colors whitespace-nowrap ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <tab.icon className="h-5 w-5" />
+                  <tab.icon className="h-4 w-4" />
                   <span>{tab.label}</span>
                 </button>
               ))}
@@ -1005,10 +1005,12 @@ const AdminProfile = () => {
         </div>
 
         {/* Content */}
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'security' && renderSecurity()}
-        {activeTab === 'permissions' && renderPermissions()}
-        {activeTab === 'settings' && renderSettings()}
+        <div className="px-3 md:px-0">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'security' && renderSecurity()}
+          {activeTab === 'permissions' && renderPermissions()}
+          {activeTab === 'settings' && renderSettings()}
+        </div>
       </div>
     </div>
   );

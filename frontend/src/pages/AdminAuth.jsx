@@ -362,17 +362,43 @@ const AdminAuth = () => {
     try {
       console.log('🔐 [LOGIN] Calling signInWithPassword...');
       
-      // Add timeout to prevent hanging
-      const signInPromise = supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
-      });
+      // Add retry logic with extended timeout for mobile networks
+      let data, error;
+      let retries = 0;
+      const maxRetries = 2;
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Login timeout - Supabase not responding')), 15000)
-      );
-      
-      const { data, error } = await Promise.race([signInPromise, timeoutPromise]);
+      while (retries <= maxRetries) {
+        try {
+          // Create a timeout promise that rejects after 45 seconds (mobile-friendly)
+          const signInPromise = supabase.auth.signInWithPassword({
+            email: formData.email,
+            password: formData.password
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout - Retrying...')), 45000)
+          );
+          
+          const result = await Promise.race([signInPromise, timeoutPromise]);
+          data = result.data;
+          error = result.error;
+          break; // Success, exit retry loop
+        } catch (err) {
+          retries++;
+          if (retries <= maxRetries) {
+            console.log(`🔄 Login attempt ${retries} failed, retrying...`);
+            notificationService.show(
+              `🔄 Connection slow, attempt ${retries}/${maxRetries}...`,
+              'info',
+              3000
+            );
+            // Wait 2 seconds before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            throw err;
+          }
+        }
+      }
 
       if (error) {
         console.error('🔐 [LOGIN] Auth error:', error.message);

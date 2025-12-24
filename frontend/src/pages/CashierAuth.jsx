@@ -343,10 +343,43 @@ const CashierAuth = () => {
         throw new Error('User email/username not found');
       }
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: formData.password
-      });
+      // Add retry logic with extended timeout for mobile networks
+      let authData, authError;
+      let retries = 0;
+      const maxRetries = 2;
+      
+      while (retries <= maxRetries) {
+        try {
+          // Create a timeout promise that rejects after 45 seconds (mobile-friendly)
+          const signInPromise = supabase.auth.signInWithPassword({
+            email: loginEmail,
+            password: formData.password
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Connection timeout - Retrying...')), 45000)
+          );
+          
+          const result = await Promise.race([signInPromise, timeoutPromise]);
+          authData = result.data;
+          authError = result.error;
+          break; // Success, exit retry loop
+        } catch (error) {
+          retries++;
+          if (retries <= maxRetries) {
+            console.log(`🔄 Login attempt ${retries} failed, retrying...`);
+            notificationService.show(
+              `🔄 Connection slow, attempt ${retries}/${maxRetries}...`,
+              'info',
+              3000
+            );
+            // Wait 2 seconds before retry
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            throw error;
+          }
+        }
+      }
 
       if (authError) {
         console.error('Auth error:', authError);
@@ -366,10 +399,17 @@ const CashierAuth = () => {
 
     } catch (error) {
       console.error('Login error:', error);
-      notificationService.show(
-        error.message || 'Invalid username or password',
-        'error'
-      );
+      
+      // Provide helpful error messages based on error type
+      let errorMessage = error.message || 'Invalid username or password';
+      
+      if (error.message.includes('timeout') || error.message.includes('Supabase')) {
+        errorMessage = '⚠️ Connection issue. Please check your internet and try again.';
+      } else if (error.message.includes('pending admin')) {
+        errorMessage = '⏳ Your account is pending admin approval.';
+      }
+      
+      notificationService.show(errorMessage, 'error');
     } finally {
       setLoading(false);
     }

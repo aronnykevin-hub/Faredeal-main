@@ -26,15 +26,35 @@ function initSupabase() {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-        flowType: 'implicit'  // Changed from 'pkce' to 'implicit' for debugging
+        flowType: 'implicit',  // Changed from 'pkce' to 'implicit' for debugging
+        persistSessionTimeout: 30000  // 30 second timeout for session persistence
       },
       realtime: {
         params: {
           eventsPerSecond: 10,
         },
       },
+      global: {
+        headers: {
+          'Connection': 'keep-alive'
+        },
+        fetch: function(url, init) {
+          // Add 45 second timeout for API calls (increased for mobile networks)
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            controller.abort();
+          }, 45000);
+
+          return fetch(url, {
+            ...init,
+            signal: controller.signal
+          }).finally(() => {
+            clearTimeout(timeoutId);
+          });
+        }
+      }
     })
-    console.log('✅ Supabase client initialized')
+    console.log('✅ Supabase client initialized with mobile-optimized settings')
   }
   return supabaseInstance
 }
