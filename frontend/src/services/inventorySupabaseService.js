@@ -51,16 +51,14 @@ class InventorySupabaseService {
           supplier:suppliers(id, company_name, contact_person),
           inventory(
             id,
+            product_id,
             current_stock,
             reserved_stock,
-            available_stock,
             minimum_stock,
-            maximum_stock,
             reorder_point,
-            status,
-            location,
-            warehouse,
-            last_restocked_at
+            reorder_quantity,
+            last_stocktake_date,
+            last_restock_date
           )
         `);
 
@@ -92,23 +90,40 @@ class InventorySupabaseService {
 
       if (error) throw error;
 
+      console.log('🔍 Raw data from Supabase:', data);
+      console.log('📦 First product raw data:', data?.[0]);
+      
+      // Check inventory data
+      if (data?.[0]) {
+        console.log('📦 First product inventory array:', data[0].inventory);
+        console.log('📦 Books inventory details:', {
+          name: data[0].name,
+          hasInventory: !!data[0].inventory,
+          inventoryLength: data[0].inventory?.length || 0,
+          inventoryData: data[0].inventory
+        });
+      }
+
       // Transform data to match expected format
-      const products = data.map(product => ({
-        ...product,
-        stock: product.inventory?.[0]?.current_stock || 0,
-        available_stock: product.inventory?.[0]?.available_stock || 0,
-        reserved_stock: product.inventory?.[0]?.reserved_stock || 0,
-        minStock: product.inventory?.[0]?.minimum_stock || 0,
-        maxStock: product.inventory?.[0]?.maximum_stock || 0,
-        reorderPoint: product.inventory?.[0]?.reorder_point || 0,
-        stockStatus: product.inventory?.[0]?.status || 'unknown',
-        location: product.inventory?.[0]?.location || 'Not Set',
-        warehouse: product.inventory?.[0]?.warehouse || 'Main Warehouse',
-        categoryName: product.category?.name || 'Uncategorized',
-        supplierName: product.supplier?.company_name || 'No Supplier'
-      }));
+      const products = data.map(product => {
+        const stock = product.inventory?.[0]?.current_stock || 0;
+        return {
+          ...product,
+          stock: stock,
+          available_stock: stock - (product.inventory?.[0]?.reserved_stock || 0),
+          reserved_stock: product.inventory?.[0]?.reserved_stock || 0,
+          minStock: product.inventory?.[0]?.minimum_stock || 0,
+          reorderPoint: product.inventory?.[0]?.reorder_point || 0,
+          reorderQuantity: product.inventory?.[0]?.reorder_quantity || 100,
+          lastStocktakeDate: product.inventory?.[0]?.last_stocktake_date,
+          lastRestockDate: product.inventory?.[0]?.last_restock_date,
+          categoryName: product.category?.name || 'Uncategorized',
+          supplierName: product.supplier?.company_name || 'No Supplier'
+        };
+      });
 
       console.log(`✅ Loaded ${products.length} products from Supabase`);
+      console.log('📊 Processed products:', products.map(p => ({ name: p.name, sku: p.sku, stock: p.stock })));
       return products;
 
     } catch (error) {

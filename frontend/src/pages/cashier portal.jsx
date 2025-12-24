@@ -267,50 +267,66 @@ const CashierPortal = () => {
   // Function to load products from Supabase
   const loadProductsFromSupabase = async () => {
     try {
+      setProductsLoading(true);
       setRefreshingProducts(true);
       
-      // Load products with inventory data only
-      const { data: productsData, error } = await supabase
+      // Load products and inventory separately (like Admin does)
+      const { data: productsData } = await supabase
         .from('products')
-        .select(`
-          *,
-          inventory (
-            current_stock
-          )
-        `)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+        .select('id, name, price, selling_price, cost_price, category, barcode, sku, is_active')
+        .eq('is_active', true);
 
-      if (error) throw error;
+      const { data: inventoryData } = await supabase
+        .from('inventory')
+        .select('product_id, current_stock, reserved_stock, minimum_stock, reorder_point');
+
+      // Create inventory lookup map
+      const inventoryMap = {};
+      inventoryData?.forEach(inv => {
+        inventoryMap[inv.product_id] = inv;
+      });
+
+      // Combine products with inventory
+      const allProducts = (productsData || []).map(product => {
+        const inv = inventoryMap[product.id];
+        return {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          price: product.price || 0,
+          selling_price: product.selling_price || 0,
+          cost_price: product.cost_price || 0,
+          category: product.category || 'General',
+          categoryName: product.category || 'General',
+          is_active: product.is_active,
+          // Inventory data
+          stock: inv?.current_stock || 0,
+          current_stock: inv?.current_stock || 0,
+          available_stock: (inv?.current_stock || 0) - (inv?.reserved_stock || 0),
+          reserved_stock: inv?.reserved_stock || 0,
+          minimum_stock: inv?.minimum_stock || 10,
+          reorder_point: inv?.reorder_point || 20
+        };
+      });
+
+      console.log('📊 Loaded products and inventory:', allProducts.length);
+      console.log('📦 Books product:', allProducts.find(p => p.name === 'Books'));
       
-      // Filter to only show products that are in inventory table
-      const productsWithInventory = (productsData || [])
-        .filter(p => p.inventory && p.inventory.length > 0)
-        .map(p => ({
-          id: p.id,
-          name: p.name,
-          sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
-          selling_price: p.selling_price || p.price || 0,
-          price: p.selling_price || p.price || 0,
-          stock: p.inventory[0]?.current_stock || 0,
-          available_stock: p.inventory[0]?.current_stock || 0,
-          category: p.category || 'General',
-          categoryName: p.category || 'General'
-        }));
-      
-      if (productsWithInventory.length > 0) {
-        setProducts(productsWithInventory);
-        toast.success(`✅ Loaded ${productsWithInventory.length} products from inventory`);
-        console.log(`🎯 Loaded ${productsWithInventory.length} products with inventory`);
+      if (allProducts.length > 0) {
+        setProducts(allProducts);
+        const inStock = allProducts.filter(p => p.stock > 0).length;
+        toast.success(`✅ Loaded ${allProducts.length} products (${inStock} in stock)`);
       } else {
         setProducts([]);
-        toast.info('No products in inventory. Please add products.');
+        toast.info('No products found. Admin needs to create products.');
       }
     } catch (error) {
       console.error('❌ Error loading products:', error);
-      toast.error('Failed to load products from inventory');
+      toast.error('Failed to load products: ' + error.message);
       setProducts([]);
     } finally {
+      setProductsLoading(false);
       setRefreshingProducts(false);
     }
   };
@@ -632,7 +648,7 @@ const CashierPortal = () => {
 
       // Load today's transactions for this cashier
       const { data: transactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .eq('cashier_id', user.id)
         .gte('created_at', today.toISOString())
@@ -691,7 +707,7 @@ const CashierPortal = () => {
 
       // Get last 5 transactions
       const { data: transactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(5);
@@ -738,7 +754,7 @@ const CashierPortal = () => {
 
       // Get today's transactions
       const { data: transactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString());
@@ -805,7 +821,7 @@ const CashierPortal = () => {
         nextDay.setDate(nextDay.getDate() + 1);
 
         const { data: dayTransactions, error } = await supabase
-          .from('sales_transactions')
+          .from('transactions')
           .select('*')
           .gte('created_at', date.toISOString())
           .lt('created_at', nextDay.toISOString());
@@ -852,7 +868,7 @@ const CashierPortal = () => {
 
       // Get today's transactions with items
       const { data: transactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .gte('created_at', today.toISOString())
         .lt('created_at', tomorrow.toISOString());
@@ -1629,53 +1645,53 @@ const CashierPortal = () => {
 
   const renderPOS = () => (
     <div className="space-y-6 animate-fadeInUp container-glass shadow-xl rounded-2xl p-8 border border-yellow-200">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Product Selection */}
-        <div className="lg:col-span-2 bg-white rounded-xl p-6 shadow-lg">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
+        <div className="lg:col-span-2 bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6 gap-3">
+            <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center">
               🛒 Product Selection
             </h3>
-            <div className="flex items-center space-x-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={loadProductsFromSupabase}
                 disabled={refreshingProducts}
-                className={`px-3 py-2 ${refreshingProducts ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700'} text-white rounded-lg font-bold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg`}
+                className={`px-3 py-2 md:px-4 ${refreshingProducts ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700'} text-white rounded-lg font-bold transition-all duration-300 transform hover:scale-105 flex items-center justify-center md:justify-start space-x-2 shadow-lg text-sm md:text-base`}
                 title="Refresh products from Manager Portal"
               >
-                <FiRefreshCw className={`h-5 w-5 ${refreshingProducts ? 'animate-spin' : ''}`} />
+                <FiRefreshCw className={`h-4 w-4 md:h-5 md:w-5 ${refreshingProducts ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{refreshingProducts ? 'Loading...' : 'Load POS'}</span>
               </button>
               <button
                 onClick={() => setShowAddProductModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
+                className="px-3 py-2 md:px-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg text-sm md:text-base"
               >
-                <FiPlus className="h-5 w-5" />
-                <span>Add Product</span>
+                <FiPlus className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden xs:inline">Add Product</span>
               </button>
               <button
                 onClick={() => setShowBarcodeScanner(true)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-green-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
+                className="px-3 py-2 md:px-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-green-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg text-sm md:text-base"
               >
-                <FiCamera className="h-5 w-5" />
-                <span>📱 Scan Barcode</span>
+                <FiCamera className="h-4 w-4 md:h-5 md:w-5" />
+                <span className="hidden xs:inline">Scan</span>
               </button>
             </div>
           </div>
           
           {/* 🔥 SUPABASE PRODUCTS GRID - Real-time inventory */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 max-h-72 md:max-h-96 overflow-y-auto">
             {productsLoading ? (
-              <div className="col-span-3 text-center py-8">
+              <div className="col-span-2 md:col-span-3 text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-gray-500 mt-2">Loading products from database...</p>
+                <p className="text-gray-500 mt-2 text-sm">Loading products from database...</p>
               </div>
             ) : products.length === 0 ? (
-              <div className="col-span-3 text-center py-8">
-                <p className="text-gray-500">No products available</p>
+              <div className="col-span-2 md:col-span-3 text-center py-8">
+                <p className="text-gray-500 text-sm">No products available</p>
                 <button 
                   onClick={loadProductsFromSupabase}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                 >
                   <FiRefreshCw className="inline mr-2" />
                   Reload Products
@@ -1693,33 +1709,33 @@ const CashierPortal = () => {
                   <div
                     key={product.id}
                     onClick={() => !isOutOfStock && addItemToTransaction(product)}
-                    className={`border rounded-lg p-4 hover:shadow-md transition-all duration-300 ${
+                    className={`border rounded-lg p-3 md:p-4 hover:shadow-md transition-all duration-300 ${
                       isOutOfStock 
                         ? 'cursor-not-allowed opacity-50 bg-gray-100 border-gray-300' 
                         : 'cursor-pointer hover:bg-yellow-50 border-gray-200 hover:border-yellow-300'
                     }`}
                   >
                     <div className="text-center">
-                      <div className="text-2xl mb-2">
+                      <div className="text-xl md:text-2xl mb-1 md:mb-2">
                         {categoryName.toLowerCase().includes('produce') ? '🥬' :
                          categoryName.toLowerCase().includes('dairy') ? '🥛' :
                          categoryName.toLowerCase().includes('bakery') ? '🍞' :
                          categoryName.toLowerCase().includes('personal') ? '🧼' :
                          categoryName.toLowerCase().includes('electronics') ? '📱' : '🌾'}
                       </div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-1">{product.name}</h4>
-                      <p className="text-green-600 font-bold">{formatUGX(productPrice)}</p>
+                      <h4 className="font-semibold text-xs md:text-sm text-gray-900 mb-1 line-clamp-2">{product.name}</h4>
+                      <p className="text-green-600 font-bold text-sm md:text-base">{formatUGX(productPrice)}</p>
                       <div className="flex items-center justify-center space-x-1 text-xs mt-1">
                         {isOutOfStock ? (
-                          <span className="text-red-600 font-semibold">❌ Out of Stock</span>
+                          <span className="text-red-600 font-semibold text-xs">❌ Out</span>
                         ) : isLowStock ? (
-                          <span className="text-orange-600 font-semibold">⚠️ Low: {productStock}</span>
+                          <span className="text-orange-600 font-semibold text-xs">⚠️ {productStock}</span>
                         ) : (
-                          <span className="text-gray-500">✓ Stock: {productStock}</span>
+                          <span className="text-gray-500 text-xs">✓ {productStock}</span>
                         )}
                       </div>
                       {product.sku && (
-                        <p className="text-xs text-gray-400 mt-1">SKU: {product.sku}</p>
+                        <p className="text-xs text-gray-400 mt-1 line-clamp-1">SKU: {product.sku}</p>
                       )}
                     </div>
                   </div>
@@ -1730,7 +1746,7 @@ const CashierPortal = () => {
         </div>
 
         {/* Transaction Summary */}
-        <div className="bg-white rounded-xl p-6 shadow-lg">
+        <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
           <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
             🧾 Current Transaction
           </h3>
@@ -1918,24 +1934,24 @@ const CashierPortal = () => {
 
   const renderDashboard = () => (
     <div className="space-y-6 animate-slideInLeft container-3d bg-white rounded-2xl p-8 shadow-2xl">
-      {/* Ugandan-themed Welcome Section */}
+      {/* Ugandan-themed Welcome Section - Real Data */}
       <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold mb-2">
-              {getGreeting()}, {cashierProfile.name}! 🇺🇬
+              {getGreeting()}, {cashierProfile?.name || 'Cashier'}! 🇺🇬
             </h1>
             <p className="text-yellow-100 text-lg">
               Welcome to your cashier portal - Ready to serve customers!
             </p>
-            <div className="flex items-center mt-4 space-x-6">
+            <div className="flex items-center mt-4 space-x-6 flex-wrap gap-3">
               <div className="flex items-center space-x-2">
                 <FiClock className="h-5 w-5" />
                 <span>{currentTime.toLocaleTimeString('en-UG')}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <FiMapPin className="h-5 w-5" />
-                <span>{cashierProfile.location}</span>
+                <span>{cashierProfile?.location || 'Kampala Branch'}</span>
               </div>
               <div className="flex items-center space-x-2">
                 <span className={`font-semibold ${getShiftStatus().color}`}>
@@ -1944,14 +1960,15 @@ const CashierPortal = () => {
               </div>
               <div className="flex items-center space-x-2">
                 <FiShoppingCart className="h-5 w-5" />
-                <span>{cashierProfile.register}</span>
+                <span>Till #{cashierProfile?.register || '1'}</span>
               </div>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-6xl mb-2">🏪</div>
-            <p className="text-yellow-100 font-semibold">FAREDEAL Uganda</p>
-            <p className="text-yellow-200 text-sm">Supermarket</p>
+            <div className="text-5xl md:text-6xl mb-2">🏪</div>
+            <p className="text-yellow-100 font-semibold">FAREDEAL</p>
+            <p className="text-yellow-200 text-sm">Uganda</p>
+            <p className="text-yellow-100 text-xs mt-1">Supermarket</p>
             
             {/* Quick Scanner Access */}
             <button
@@ -2012,16 +2029,16 @@ const CashierPortal = () => {
         </div>
       </div>
 
-      {/* Ugandan Performance Metrics */}
+      {/* Real Performance Metrics from Database */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { title: 'Today\'s Sales', value: formatUGX(performanceMetrics.todaySales), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '+15.2%', desc: 'vs yesterday' },
-          { title: 'Customers Served', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '+12.3%', desc: 'customers' },
-          { title: 'Avg Basket Size', value: formatUGX(performanceMetrics.averageBasketSize), icon: FiShoppingBag, color: 'from-purple-500 to-purple-600', change: '+8.2%', desc: 'per customer' },
-          { title: 'Mobile Money', value: `${performanceMetrics.mobileMoneyTransactions}`, icon: FiPhone, color: 'from-orange-500 to-orange-600', change: '+18.7%', desc: 'transactions' },
-          { title: 'Efficiency Score', value: `${performanceMetrics.efficiency}%`, icon: FiTarget, color: 'from-indigo-500 to-indigo-600', change: '+2.1%', desc: 'accuracy' },
-          { title: 'Loyalty Signups', value: performanceMetrics.loyaltySignups, icon: FiAward, color: 'from-pink-500 to-pink-600', change: '+6', desc: 'new members' },
-          { title: 'Return Rate', value: `${performanceMetrics.returnRate}%`, icon: FiRefreshCw, color: 'from-red-500 to-red-600', change: '-0.5%', desc: 'returns' },
+          { title: 'Today\'s Sales', value: formatUGX(performanceMetrics.todaySales), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '📊 Revenue', desc: 'Today' },
+          { title: 'Customers Served', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '👥 Active', desc: 'Today' },
+          { title: 'Avg Basket Size', value: formatUGX(performanceMetrics.averageBasketSize), icon: FiShoppingBag, color: 'from-purple-500 to-purple-600', change: '🛒 Avg', desc: 'per customer' },
+          { title: 'Mobile Money', value: `${performanceMetrics.mobileMoneyTransactions}`, icon: FiPhone, color: 'from-orange-500 to-orange-600', change: '📱 Mobile', desc: 'payments' },
+          { title: 'Efficiency Score', value: `${performanceMetrics.efficiency}%`, icon: FiTarget, color: 'from-indigo-500 to-indigo-600', change: '⚡ Speed', desc: 'rating' },
+          { title: 'Total Transactions', value: performanceMetrics.todayTransactions, icon: FiAward, color: 'from-pink-500 to-pink-600', change: '💼 Count', desc: 'today' },
+          { title: 'Items Sold', value: performanceMetrics.totalItems || 0, icon: FiRefreshCw, color: 'from-red-500 to-red-600', change: '📦 Items', desc: 'today' },
           { 
             title: 'Quick Scanner', 
             value: '📱', 

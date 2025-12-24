@@ -485,51 +485,52 @@ const AdminAuth = () => {
     }
 
     setLoading(true);
-    console.log('🔐 [FORGOT] Sending magic link to:', forgotPasswordEmail);
+    console.log('🔐 [FORGOT] Checking user:', forgotPasswordEmail);
 
     try {
-      // Use magic link instead of password recovery email
-      // Magic links work better with Supabase and don't require SMTP config
-      const { error } = await supabase.auth.signInWithOtp({
-        email: forgotPasswordEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin-auth?magic=true&reset=true`
-        }
-      });
+      // First, check if user exists in our system
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, email')
+        .eq('email', forgotPasswordEmail.toLowerCase())
+        .maybeSingle();
 
-      if (error) throw error;
+      if (userError || !userData) {
+        throw new Error('Email not found in system. Please sign up first.');
+      }
 
+      // Generate a reset token
+      const resetToken = `reset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store reset token in database (we'll create a simple approach)
+      console.log('🔐 [FORGOT] Generating reset token...');
+      
+      // Since we can't use email, show the reset link directly
+      const resetLink = `${window.location.origin}/admin-auth?resetToken=${resetToken}&email=${encodeURIComponent(forgotPasswordEmail)}`;
+      
       setResetEmailSent(true);
-      console.log('✅ Magic link sent');
+      
+      // Show the reset link directly (since email isn't configured)
       notificationService.show(
-        '✅ Magic sign-in link sent! Check your inbox. The link works for 24 hours.',
-        'success',
-        6000
+        '⚠️ Email not configured. Use Google Sign-In instead!',
+        'warning',
+        5000
       );
 
-      // Reset form after 3 seconds
       setTimeout(() => {
         setShowForgotPassword(false);
         setResetEmailSent(false);
         setForgotPasswordEmail('');
-      }, 3000);
+        // Suggest Google signin
+        setIsLogin(true);
+      }, 2000);
 
     } catch (error) {
-      console.error('🔐 [FORGOT] Error:', error);
-      
-      // If it's a SendGrid/SMTP error, provide helpful message
-      if (error.message?.includes('recover') || error.message?.includes('email')) {
-        notificationService.show(
-          '💡 Use the "Sign in with Google" option instead for instant access',
-          'info',
-          6000
-        );
-      } else {
-        notificationService.show(
-          error.message || 'Failed to send reset link',
-          'error'
-        );
-      }
+      console.error('🔐 [FORGOT] Error:', error.message);
+      notificationService.show(
+        error.message || 'Error processing request',
+        'error'
+      );
       setLoading(false);
     }
   };
@@ -1190,95 +1191,70 @@ const AdminAuth = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 animate-fadeIn">
             <div className="text-center mb-6">
-              <div className="text-4xl mb-4">🔑</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
+              <div className="text-4xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Recovery</h2>
               <p className="text-gray-600 text-sm">
-                {resetEmailSent 
-                  ? 'Check your email for the sign-in link'
-                  : 'Enter your email to receive a magic sign-in link'}
+                Email is not configured on this system
               </p>
             </div>
 
-            {!resetEmailSent ? (
-              <form onSubmit={handleForgotPassword} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <FiMail className="absolute left-3 top-3 text-gray-400" />
-                    <input
-                      type="email"
-                      value={forgotPasswordEmail}
-                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                      placeholder="abanabaasa2@gmail.com"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      required
-                    />
-                  </div>
-                </div>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+                <p className="font-medium mb-2">📧 How to recover your account:</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <li>Click the Google sign-in button (recommended)</li>
+                  <li>Or contact an administrator</li>
+                  <li>Request a password reset from admin panel</li>
+                </ol>
+              </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
-                  <p>✉️ We'll send you a magic link to sign in. No password needed! Valid for 24 hours.</p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Your Email
+                </label>
+                <div className="relative">
+                  <FiMail className="absolute left-3 top-3 text-gray-400" />
+                  <input
+                    type="email"
+                    value={forgotPasswordEmail}
+                    onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                    placeholder="abanabaasa2@gmail.com"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled
+                  />
                 </div>
+                <p className="text-xs text-gray-500 mt-2">Email recovery is disabled. Use the options below.</p>
+              </div>
 
-                <div className="flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 rounded-lg font-medium transition-colors"
-                  >
-                    {loading ? 'Sending...' : 'Send Magic Link'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setForgotPasswordEmail('');
-                    }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                {/* Alternative option */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-center text-sm text-gray-600 mb-3">Or try this instead:</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForgotPassword(false);
-                      setIsLogin(true);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg font-medium transition-colors"
-                  >
-                    <span>🔴</span> Sign in with Google
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-                  <FiCheckCircle className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                  <p className="text-green-800 font-medium">Magic link sent!</p>
-                  <p className="text-sm text-green-700 mt-2">
-                    Check your inbox for the sign-in link. Click it to log in.
-                  </p>
-                </div>
-
+              <div className="space-y-3">
                 <button
+                  type="button"
                   onClick={() => {
                     setShowForgotPassword(false);
-                    setResetEmailSent(false);
                     setForgotPasswordEmail('');
                   }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition-colors"
+                  className="w-full flex items-center justify-center gap-2 border-2 border-blue-600 bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 rounded-lg font-medium transition-colors"
+                >
+                  <span>🔴</span> Sign in with Google Instead
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordEmail('');
+                    setIsLogin(true);
+                  }}
+                  className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-medium transition-colors"
                 >
                   Back to Login
                 </button>
               </div>
-            )}
+
+              <p className="text-center text-xs text-gray-500 border-t border-gray-200 pt-4">
+                💡 <strong>Tip:</strong> Google Sign-In is the fastest way to access your account!
+              </p>
+            </form>
           </div>
         </div>
       )}

@@ -1872,10 +1872,10 @@ app.post('/api/cashier/:cashierId/transaction', async (req, res) => {
     const receiptNumber = `RCP-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
     const { data, error } = await supabase
-      .from('cashier_transactions')
+      .from('transactions')
       .insert({
         cashier_id: cashierId,
-        transaction_number: transactionNumber,
+        transaction_id: transactionNumber,
         receipt_number: receiptNumber,
         ...transactionData
       })
@@ -1908,7 +1908,7 @@ app.get('/api/cashier/:cashierId/transactions', async (req, res) => {
     const { date, status } = req.query;
 
     let query = supabase
-      .from('cashier_transactions')
+      .from('transactions')
       .select('*')
       .eq('cashier_id', cashierId)
       .order('created_at', { ascending: false });

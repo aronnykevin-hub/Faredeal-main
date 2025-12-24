@@ -26,6 +26,7 @@ import TransactionHistory from '../components/TransactionHistory';
 import Receipt from '../components/Receipt';
 import TillSuppliesOrderManagement from '../components/TillSuppliesOrderManagement';
 import SupplierOrderManagement from '../components/SupplierOrderManagement';
+import OrderInventoryPOSControl from '../components/OrderInventoryPOSControl';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabase';
 
@@ -3575,7 +3576,7 @@ _Automated Business Report System_`)}`;
     
     // Fetch all transactions
     const { data: allTransactions } = await supabase
-      .from('sales_transactions')
+      .from('transactions')
       .select('*')
       .order('created_at', { ascending: false });
 
@@ -4656,7 +4657,7 @@ _Automated Business Report System_`)}`;
 
       // Get all transactions
       const { data: allTransactions, error: transError } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*');
 
       if (transError) {
@@ -4802,7 +4803,7 @@ _Automated Business Report System_`)}`;
         nextDay.setDate(nextDay.getDate() + 1);
 
         const { data: dayTransactions, error } = await supabase
-          .from('sales_transactions')
+          .from('transactions')
           .select('*')
           .gte('created_at', date.toISOString())
           .lt('created_at', nextDay.toISOString());
@@ -4842,7 +4843,7 @@ _Automated Business Report System_`)}`;
     try {
       // Get recent transactions
       const { data: recentTransactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(8);
@@ -4888,7 +4889,7 @@ _Automated Business Report System_`)}`;
 
       // Get transactions from last 30 days
       const { data: transactions, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('items')
         .gte('created_at', thirtyDaysAgo.toISOString());
 
@@ -5025,7 +5026,7 @@ _Automated Business Report System_`)}`;
     try {
       // Get current metrics
       const { data: transactions } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('total_amount, created_at');
 
       const totalRevenue = transactions?.reduce((sum, t) => sum + (t.total_amount || 0), 0) || 0;
@@ -5035,7 +5036,7 @@ _Automated Business Report System_`)}`;
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
       
       const { data: monthlyTransactions } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('total_amount')
         .gte('created_at', startOfMonth.toISOString());
 
@@ -5054,7 +5055,7 @@ _Automated Business Report System_`)}`;
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       const { data: recentTransactions } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('items')
         .gte('created_at', thirtyDaysAgo.toISOString());
 
@@ -5936,6 +5937,14 @@ _Automated Business Report System_`)}`;
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showMobileDropdown]);
 
+  // Load POS items when tab is active
+  useEffect(() => {
+    if (activeTab === 'pos') {
+      console.log('📦 POS tab activated, loading items...');
+      loadPosItems();
+    }
+  }, [activeTab]);
+
   // Handle ESC key to close dropdowns
   useEffect(() => {
     const handleEscapeKey = (event) => {
@@ -6082,7 +6091,7 @@ _Automated Business Report System_`)}`;
             .from('products')
             .select('id, name, sku, selling_price, price, cost_price, category, is_active')
             .eq('is_active', true)
-            .limit(50),
+            .limit(100),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), 2000)
           )
@@ -6092,41 +6101,57 @@ _Automated Business Report System_`)}`;
         Promise.race([
           supabase
             .from('inventory')
-            .select('product_id, current_stock'),
+            .select('product_id, current_stock, reserved_stock, minimum_stock, reorder_point'),
           new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), 2000)
           )
         ]).catch(err => ({ data: [], error: err }))
       ]);
 
+      console.log('📦 Products loaded:', productsResult.data?.length || 0);
+      console.log('📊 Inventory records loaded:', inventoryResult.data?.length || 0);
+      console.log('🔍 Sample inventory data:', inventoryResult.data?.slice(0, 3));
+      console.log('🔍 Sample product data:', productsResult.data?.slice(0, 3));
+
       // Create stock map
       const stockMap = {};
       if (inventoryResult.data) {
         (inventoryResult.data || []).forEach(inv => {
-          stockMap[inv.product_id] = inv.current_stock;
+          console.log(`📌 Mapping inventory for product ${inv.product_id}: stock=${inv.current_stock}`);
+          stockMap[inv.product_id] = inv;
         });
       }
 
+      console.log('🗺️ Stock map:', stockMap);
+
       // Transform products with stock data
-      const posItems = ((productsResult.data || []).map(p => ({
-        id: p.id,
-        product_name: p.name,
-        name: p.name,
-        barcode: p.sku || `SKU-${p.id.substring(0, 8)}`,
-        sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
-        selling_price: p.selling_price || p.price || 0,
-        price: p.selling_price || p.price || 0,
-        cost_price: p.cost_price || 0,
-        quantity: stockMap[p.id] || 0, // Get from stock map
-        available_stock: stockMap[p.id] || 0,
-        category: p.category || 'General',
-        categoryName: p.category || 'General',
-        status: 'available',
-        is_active: p.is_active,
-        source: 'admin'
-      }))).sort((a, b) => a.name.localeCompare(b.name));
+      const posItems = ((productsResult.data || []).map(p => {
+        const inv = stockMap[p.id];
+        const stock = inv?.current_stock || 0;
+        console.log(`📦 Product: ${p.name} (${p.id}) -> Stock: ${stock} (found: ${!!inv})`);
+        return {
+          id: p.id,
+          product_name: p.name,
+          name: p.name,
+          barcode: p.sku || `SKU-${p.id.substring(0, 8)}`,
+          sku: p.sku || `SKU-${p.id.substring(0, 8)}`,
+          selling_price: p.selling_price || p.price || 0,
+          price: p.selling_price || p.price || 0,
+          cost_price: p.cost_price || 0,
+          quantity: stock,
+          current_stock: stock,
+          available_stock: stock,
+          reserved_stock: inv?.reserved_stock || 0,
+          category: p.category || 'General',
+          categoryName: p.category || 'General',
+          status: 'available',
+          is_active: p.is_active,
+          source: 'admin'
+        };
+      })).sort((a, b) => a.name.localeCompare(b.name));
 
       console.log(`✅ Loaded ${posItems.length} products for POS with stock data`);
+      console.log('📦 Sample POS items:', posItems.slice(0, 3));
       setPosItems(posItems.length > 0 ? posItems : []);
       
     } catch (error) {
@@ -11991,6 +12016,7 @@ FAREDEAL Uganda Management Team
                 // { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Partner verification', gradient: 'from-orange-500 to-orange-600' }, // DISABLED - Supplier verification moved to Order Management
                 { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', gradient: 'from-cyan-500 to-cyan-600' },
                 { id: 'pos', icon: '🛒', label: 'POS Items', desc: 'Products for sale', gradient: 'from-emerald-500 to-emerald-600' },
+                { id: 'pos-control', icon: '⚙️', label: 'POS Pricing', desc: 'Manage pricing & stock', gradient: 'from-orange-500 to-orange-600' },
                 // { id: 'tillsupplies', icon: '🏪', label: 'Till Supplies', desc: 'Cashier requests', gradient: 'from-teal-500 to-teal-600' }, // DISABLED - Cashier supply ordering removed
                 // { id: 'inventory', icon: '📋', label: 'Inventory', desc: 'Stock control', gradient: 'from-indigo-500 to-indigo-600' }, // DISABLED - Inventory management removed
                 { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', gradient: 'from-pink-500 to-pink-600' },

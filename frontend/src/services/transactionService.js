@@ -32,12 +32,17 @@ class TransactionService {
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substring(7).toUpperCase()}`;
       const receiptNumber = await this.generateReceiptNumber();
 
+      // Get current user ID (cashier)
+      const { data: { user } } = await supabase.auth.getUser();
+      const cashierId = user?.id || cashier?.id || null;
+
       // Prepare transaction record
       const transactionRecord = {
         transaction_id: transactionId,
         receipt_number: receiptNumber,
         
         // Cashier info
+        cashier_id: cashierId,
         cashier_name: cashier?.name || 'Cashier',
         register_number: register || 'POS-001',
         store_location: location || 'Kampala Main Branch',
@@ -52,7 +57,6 @@ class TransactionService {
         payment_method: paymentMethod?.id || 'cash',
         payment_provider: paymentMethod?.name || 'Cash',
         payment_reference: paymentReference || transactionId,
-        amount_paid: parseFloat(amountPaid || total),
         change_given: parseFloat(changeGiven || 0),
         payment_fee: parseFloat(paymentFee || 0),
         
@@ -62,16 +66,16 @@ class TransactionService {
         
         // Items
         items_count: items.length,
+        items: items, // Store items as JSON for reference
         
         // Status
         status: 'completed',
-        transaction_date: new Date().toISOString(),
-        transaction_time: new Date().toLocaleTimeString('en-UG'),
+        created_at: new Date().toISOString(),
       };
 
       // Insert transaction
       const { data: transaction, error: transactionError } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .insert(transactionRecord)
         .select()
         .single();
@@ -84,7 +88,7 @@ class TransactionService {
           transactionRecord.receipt_number = `RCP-${Date.now()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
           
           const { data: retryTransaction, error: retryError } = await supabase
-            .from('sales_transactions')
+            .from('transactions')
             .insert(transactionRecord)
             .select()
             .single();
@@ -161,10 +165,10 @@ class TransactionService {
       
       // Get today's transaction count using proper ISO format
       const { count, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*', { count: 'exact', head: true })
-        .gte('transaction_date', startOfDay.toISOString())
-        .lt('transaction_date', endOfDay.toISOString());
+        .gte('created_at', startOfDay.toISOString())
+        .lt('created_at', endOfDay.toISOString());
 
       if (error) {
         console.warn('⚠️ Error counting transactions, using timestamp fallback:', error);
@@ -192,7 +196,7 @@ class TransactionService {
   async getTransaction(transactionId) {
     try {
       const { data: transaction, error: transactionError } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .eq('id', transactionId)
         .single();
@@ -228,7 +232,7 @@ class TransactionService {
   async getTransactionByReceipt(receiptNumber) {
     try {
       const { data: transaction, error: transactionError } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .eq('receipt_number', receiptNumber)
         .single();
@@ -271,34 +275,47 @@ class TransactionService {
       endOfDay.setHours(23, 59, 59, 999);
 
       let query = supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
-        .gte('transaction_date', startOfDay.toISOString())
-        .lte('transaction_date', endOfDay.toISOString())
-        .order('transaction_date', { ascending: false });
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
+        .order('created_at', { ascending: false });
 
+      // Only filter by cashier if specifically provided
       if (cashierId) {
         query = query.eq('cashier_id', cashierId);
       }
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching today\'s transactions:', error);
+        return {
+          success: false,
+          transactions: [],
+          count: 0,
+          totalSales: 0,
+          error: error.message
+        };
+      }
+
+      const transactions = data || [];
+      const totalSales = transactions.reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0);
 
       return {
         success: true,
-        transactions: data || [],
-        count: data?.length || 0,
-        totalSales: (data || []).reduce((sum, t) => sum + parseFloat(t.total_amount || 0), 0)
+        transactions: transactions,
+        count: transactions.length,
+        totalSales: totalSales
       };
     } catch (error) {
       console.error('Error fetching today\'s transactions:', error);
       return {
         success: false,
-        error: error.message,
         transactions: [],
         count: 0,
-        totalSales: 0
+        totalSales: 0,
+        error: error.message
       };
     }
   }
@@ -309,11 +326,11 @@ class TransactionService {
   async getTransactionsByDateRange(startDate, endDate, cashierId = null) {
     try {
       let query = supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
-        .gte('transaction_date', startDate)
-        .lte('transaction_date', endDate)
-        .order('transaction_date', { ascending: false });
+        .gte('created_at', startDate)
+        .lte('created_at', endDate)
+        .order('created_at', { ascending: false });
 
       if (cashierId) {
         query = query.eq('cashier_id', cashierId);
@@ -390,10 +407,10 @@ class TransactionService {
 
       // Get all transactions for the day
       const { data: transactions, error: transError } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
-        .gte('transaction_date', startOfDay.toISOString())
-        .lte('transaction_date', endOfDay.toISOString())
+        .gte('created_at', startOfDay.toISOString())
+        .lte('created_at', endOfDay.toISOString())
         .eq('status', 'completed');
 
       if (transError) throw transError;
@@ -454,7 +471,7 @@ class TransactionService {
 
       // Update transaction
       await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .update({ receipt_printed: true })
         .eq('id', transactionId);
 
@@ -471,10 +488,10 @@ class TransactionService {
   async searchTransactions(searchTerm) {
     try {
       const { data, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .select('*')
         .or(`receipt_number.ilike.%${searchTerm}%,transaction_id.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,customer_phone.ilike.%${searchTerm}%`)
-        .order('transaction_date', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
@@ -501,7 +518,7 @@ class TransactionService {
   async voidTransaction(transactionId, reason, voidedBy) {
     try {
       const { data, error } = await supabase
-        .from('sales_transactions')
+        .from('transactions')
         .update({
           status: 'voided',
           voided_at: new Date().toISOString(),
