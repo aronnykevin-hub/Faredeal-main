@@ -4424,24 +4424,44 @@ _Automated Business Report System_`)}`;
         return;
       }
 
+      // Try to load profile data from manager_profiles table
+      let profileData = null;
+      const { data: managerProfileData } = await supabase
+        .from('manager_profiles')
+        .select('*')
+        .eq('manager_id', userId)
+        .maybeSingle();
+
+      if (managerProfileData) {
+        profileData = managerProfileData;
+      }
+
       if (managerData) {
         // Get profile picture from database first, fallback to localStorage
         const storageKey = `manager_profile_pic_${userId}`;
         const localProfilePic = localStorage.getItem(storageKey);
-        const profilePicture = managerData.avatar_url || localProfilePic || null;
+        const profilePicture = managerData.avatar_url || profileData?.avatar_url || localProfilePic || null;
+        
+        // Parse languages if stored as string
+        let languages = ['English'];
+        if (profileData?.languages) {
+          languages = typeof profileData.languages === 'string' 
+            ? profileData.languages.split(',').map(l => l.trim())
+            : profileData.languages;
+        }
         
         setManagerProfile({
-          name: managerData.full_name || 'Manager',
+          name: profileData?.full_name || managerData.full_name || 'Manager',
           role: 'Store Manager',
-          department: managerData.department || 'Operations Management',
-          employeeId: managerData.employee_id || 'MGR-001',
+          department: profileData?.department || managerData.department || 'Operations Management',
+          employeeId: profileData?.employee_id || managerData.employee_id || 'MGR-001',
           joinDate: new Date(managerData.created_at).toISOString().split('T')[0],
-          avatar: '👨‍💼',
+          avatar: profileData?.avatar || '👨‍💼',
           avatar_url: profilePicture,
-          location: 'Kampala, Uganda',
-          status: 'Online',
-          languages: ['English', 'Luganda'],
-          phoneNumber: managerData.phone || '+256 700 000 000',
+          location: profileData?.location || 'Kampala, Uganda',
+          status: profileData?.status || 'Online',
+          languages: languages,
+          phoneNumber: profileData?.phone || managerData.phone || '+256 700 000 000',
           email: managerData.email || parsedUser.email || 'manager@faredeal.com',
           permissions: {
             analytics: true,
@@ -4490,33 +4510,77 @@ _Automated Business Report System_`)}`;
         return;
       }
 
-      // Prepare update data (only update columns that exist in users table)
-      const updateData = {
+      // Prepare update data for users table
+      const usersUpdateData = {
         full_name: editedProfile.name || managerProfile.name,
         phone: editedProfile.phoneNumber || managerProfile.phoneNumber,
         department: editedProfile.department || managerProfile.department,
         updated_at: new Date().toISOString()
       };
 
-      // Update in Supabase using the correct user ID
-      const { error } = await supabase
+      // Update users table
+      const { error: usersError } = await supabase
         .from('users')
-        .update(updateData)
+        .update(usersUpdateData)
         .eq('id', userId)
         .eq('role', 'manager');
 
-      if (error) {
-        console.error('Error saving profile:', error);
+      if (usersError) {
+        console.error('Error updating users table:', usersError);
         toast.error('Failed to save profile changes');
         return;
+      }
+
+      // Prepare data for manager_profiles table
+      const profileData = {
+        manager_id: userId,
+        full_name: editedProfile.name || managerProfile.name,
+        phone: editedProfile.phoneNumber || managerProfile.phoneNumber,
+        department: editedProfile.department || managerProfile.department,
+        location: editedProfile.location || managerProfile.location,
+        languages: (editedProfile.languages || managerProfile.languages || ['English']).join(','),
+        avatar: editedProfile.avatar || managerProfile.avatar,
+        employee_id: managerProfile.employeeId,
+        updated_at: new Date().toISOString()
+      };
+
+      // Check if profile record exists
+      const { data: existingProfile } = await supabase
+        .from('manager_profiles')
+        .select('id')
+        .eq('manager_id', userId)
+        .maybeSingle();
+
+      let profileError;
+      if (existingProfile) {
+        // Update existing profile
+        const { error } = await supabase
+          .from('manager_profiles')
+          .update(profileData)
+          .eq('manager_id', userId);
+        profileError = error;
+      } else {
+        // Insert new profile
+        const { error } = await supabase
+          .from('manager_profiles')
+          .insert([profileData]);
+        profileError = error;
+      }
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.error('Error saving to manager_profiles table:', profileError);
+        toast.warning('⚠️ Profile partially saved - database table error');
       }
 
       // Update local state with the updated data
       setManagerProfile(prev => ({
         ...prev,
-        name: updateData.full_name,
-        phoneNumber: updateData.phone,
-        department: updateData.department
+        name: usersUpdateData.full_name,
+        phoneNumber: usersUpdateData.phone,
+        department: usersUpdateData.department,
+        location: editedProfile.location || prev.location,
+        languages: editedProfile.languages || prev.languages,
+        avatar: editedProfile.avatar || prev.avatar
       }));
 
       setIsEditingProfile(false);
