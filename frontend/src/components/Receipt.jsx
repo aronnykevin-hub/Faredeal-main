@@ -263,24 +263,24 @@ www.faredeal.ug
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 md:p-4">
+      <div className="bg-white rounded-lg md:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] md:max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-6 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center">
-              🧾 Transaction Receipt
+        <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-3 md:p-6 flex items-center justify-between">
+          <div className="flex-1">
+            <h2 className="text-lg md:text-2xl font-bold flex items-center">
+              🧾 Receipt
             </h2>
-            <p className="text-green-100 mt-1">
-              Receipt #{receiptData.receiptNumber}
+            <p className="text-green-100 mt-1 text-xs md:text-sm">
+              #{receiptData.receiptNumber}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
+            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors flex-shrink-0"
           >
-            <FiX className="h-6 w-6" />
+            <FiX className="h-5 w-5 md:h-6 md:w-6" />
           </button>
         </div>
 
@@ -336,13 +336,13 @@ www.faredeal.ug
         </div>
 
         {/* Receipt Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div ref={receiptRef} className="max-w-md mx-auto bg-white">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6">
+          <div ref={receiptRef} className="max-w-md mx-auto bg-white text-xs md:text-sm">
             {/* Receipt Header */}
-            <div className="receipt-header text-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
-              <div className="text-3xl font-bold mb-2">🏪 FAREDEAL</div>
-              <div className="text-xl font-semibold text-gray-700">Uganda Supermarket 🇺🇬</div>
-              <div className="text-sm text-gray-600 mt-2">
+            <div className="receipt-header text-center border-b-2 border-dashed border-gray-300 pb-3 md:pb-4 mb-3 md:mb-4">
+              <div className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">🏪 FAREDEAL</div>
+              <div className="text-base md:text-xl font-semibold text-gray-700">Uganda Supermarket 🇺🇬</div>
+              <div className="text-xs md:text-sm text-gray-600 mt-2 space-y-1">
                 <p>Kampala Main Branch</p>
                 <p>Plot 123, Kampala Road</p>
                 <p>Tel: +256-700-123456</p>
@@ -351,39 +351,39 @@ www.faredeal.ug
             </div>
 
             {/* Transaction Details */}
-            <div className="mb-4 text-sm space-y-1">
+            <div className="mb-3 md:mb-4 text-xs md:text-sm space-y-1">
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Receipt No:</span>
-                <span>{receiptData.receiptNumber}</span>
+                <span className="text-right">{receiptData.receiptNumber}</span>
               </div>
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Date:</span>
-                <span>{new Date(receiptData.timestamp).toLocaleDateString('en-UG')}</span>
+                <span className="text-right">{new Date(receiptData.timestamp).toLocaleDateString('en-UG')}</span>
               </div>
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Time:</span>
-                <span>{new Date(receiptData.timestamp).toLocaleTimeString('en-UG')}</span>
+                <span className="text-right">{new Date(receiptData.timestamp).toLocaleTimeString('en-UG')}</span>
               </div>
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Cashier:</span>
-                <span>{receiptData.receipt.cashier}</span>
+                <span className="text-right">{receiptData.receipt.cashier}</span>
               </div>
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Register:</span>
-                <span>{receiptData.receipt.register}</span>
+                <span className="text-right">{receiptData.receipt.register}</span>
               </div>
             </div>
 
             {/* Items */}
-            <div className="border-t-2 border-dashed border-gray-300 pt-4 mb-4">
-              <div className="font-bold mb-2 text-center">ITEMS PURCHASED</div>
+            <div className="border-t-2 border-dashed border-gray-300 pt-3 md:pt-4 mb-3 md:mb-4">
+              <div className="font-bold mb-2 text-center text-xs md:text-sm">ITEMS PURCHASED</div>
               {receiptData.receipt.items.map((item, index) => {
                 const itemPrice = item.selling_price || item.price;
                 const lineTotal = item.quantity * itemPrice;
                 return (
-                  <div key={index} className="receipt-item mb-3 pb-2 border-b border-dashed border-gray-200">
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="receipt-row flex justify-between text-sm text-gray-600">
+                  <div key={index} className="receipt-item mb-2 md:mb-3 pb-2 border-b border-dashed border-gray-200">
+                    <div className="font-semibold text-xs md:text-sm line-clamp-2">{item.name}</div>
+                    <div className="receipt-row flex justify-between text-xs md:text-sm text-gray-600">
                       <span>{item.quantity} x {formatCurrency(itemPrice)}</span>
                       <span className="font-semibold text-gray-900">{formatCurrency(lineTotal)}</span>
                     </div>
@@ -393,63 +393,63 @@ www.faredeal.ug
             </div>
 
             {/* Totals */}
-            <div className="border-t-2 border-gray-300 pt-4 space-y-2">
-              <div className="receipt-row flex justify-between text-sm">
+            <div className="border-t-2 border-gray-300 pt-3 md:pt-4 space-y-1 md:space-y-2">
+              <div className="receipt-row flex justify-between text-xs md:text-sm">
                 <span>Subtotal:</span>
                 <span>{formatCurrency(receiptData.receipt.subtotal)}</span>
               </div>
-              <div className="receipt-row flex justify-between text-sm">
+              <div className="receipt-row flex justify-between text-xs md:text-sm">
                 <span>VAT (18%):</span>
                 <span>{formatCurrency(receiptData.receipt.tax)}</span>
               </div>
-              <div className="receipt-total flex justify-between text-lg font-bold border-t-2 border-gray-800 pt-2">
+              <div className="receipt-total flex justify-between text-base md:text-lg font-bold border-t-2 border-gray-800 pt-2">
                 <span>TOTAL:</span>
                 <span>{formatCurrency(receiptData.receipt.total)}</span>
               </div>
             </div>
 
             {/* Payment Info */}
-            <div className="mt-4 border-t border-dashed border-gray-300 pt-3 space-y-1 text-sm">
+            <div className="mt-3 md:mt-4 border-t border-dashed border-gray-300 pt-2 md:pt-3 space-y-1 text-xs md:text-sm">
               <div className="receipt-row flex justify-between">
                 <span className="font-semibold">Payment Method:</span>
-                <span>{receiptData.paymentMethod}</span>
+                <span className="text-right">{receiptData.paymentMethod}</span>
               </div>
               {receiptData.amountPaid && (
                 <>
                   <div className="receipt-row flex justify-between">
                     <span>Amount Paid:</span>
-                    <span>{formatCurrency(receiptData.amount)}</span>
+                    <span className="text-right">{formatCurrency(receiptData.amount)}</span>
                   </div>
                   {receiptData.changeGiven > 0 && (
                     <div className="receipt-row flex justify-between font-semibold">
                       <span>Change:</span>
-                      <span>{formatCurrency(receiptData.changeGiven)}</span>
+                      <span className="text-right">{formatCurrency(receiptData.changeGiven)}</span>
                     </div>
                   )}
                 </>
               )}
               <div className="receipt-row flex justify-between text-xs text-gray-500">
                 <span>Transaction ID:</span>
-                <span>{receiptData.transactionId}</span>
+                <span className="text-right text-xs truncate">{receiptData.transactionId}</span>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="receipt-footer text-center border-t-2 border-dashed border-gray-300 pt-4 mt-6 text-sm">
-              <p className="font-bold text-lg mb-2">Webale nyo! 🙏</p>
-              <p className="text-gray-600">Thank you for shopping with us!</p>
-              <p className="text-gray-600 mt-2">Visit us again at FAREDEAL Uganda</p>
-              <p className="text-xs text-gray-500 mt-3">
+            <div className="receipt-footer text-center border-t-2 border-dashed border-gray-300 pt-3 md:pt-4 mt-4 md:mt-6 text-xs md:text-sm">
+              <p className="font-bold text-base md:text-lg mb-1 md:mb-2">Webale nyo! 🙏</p>
+              <p className="text-gray-600 text-xs md:text-sm">Thank you for shopping with us!</p>
+              <p className="text-gray-600 text-xs md:text-sm mt-2">Visit us again at FAREDEAL Uganda</p>
+              <p className="text-xs text-gray-500 mt-2 md:mt-3">
                 VAT Inclusive • All prices in UGX
               </p>
               <p className="text-xs text-gray-500">
                 Exchange & Return within 7 days with receipt
               </p>
-              <div className="mt-4 text-xs text-gray-400">
+              <div className="mt-3 md:mt-4 text-xs text-gray-400 space-y-1">
                 <p>www.faredeal.ug</p>
                 <p>support@faredeal.ug</p>
               </div>
-              <div className="mt-4 text-2xl">
+              <div className="mt-3 md:mt-4 text-xl md:text-2xl">
                 🇺🇬
               </div>
             </div>

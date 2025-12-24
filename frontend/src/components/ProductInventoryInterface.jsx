@@ -16,6 +16,8 @@ const ProductInventoryInterface = () => {
   const [adjustmentAmount, setAdjustmentAmount] = useState(0);
   const [adjustmentReason, setAdjustmentReason] = useState('');
   const [reorderQuantity, setReorderQuantity] = useState(0);
+  const [expandedProductId, setExpandedProductId] = useState(null); // Track which product is expanded
+  const [showProductList, setShowProductList] = useState(false); // Track if product list is shown
 
   // Load products from Supabase on mount
   useEffect(() => {
@@ -461,72 +463,132 @@ const ProductInventoryInterface = () => {
         </div>
       )}
 
-      {/* Products Grid - Mobile Optimized */}
+      {/* Products Grid - Mobile Optimized with Accordion */}
       {!loading && products.length > 0 && (
         <div className="p-4 md:p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 max-w-7xl mx-auto">
-            {products.map((product) => (
-            <div key={product.id} className="bg-white border border-gray-200 rounded-lg md:rounded-xl p-4 md:p-6 hover:shadow-lg transition-shadow">
-              {/* Product Header */}
-              <div className="flex items-start justify-between mb-3 md:mb-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-900 text-sm md:text-lg line-clamp-2">{product.name}</h3>
-                  <p className="text-xs md:text-sm text-gray-600">SKU: {product.sku}</p>
-                </div>
-                <span className={`ml-2 px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs md:text-sm font-medium border whitespace-nowrap ${getStatusColor(product.status)}`}>
-                  {product.status}
-                </span>
+          {/* Show/Hide Products Button - Compact */}
+          <div className="max-w-7xl mx-auto mb-4">
+            <button
+              onClick={() => setShowProductList(!showProductList)}
+              className="w-full flex items-center justify-between px-4 md:px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg md:rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all font-bold text-sm md:text-base shadow-lg"
+            >
+              <div className="flex items-center gap-2 md:gap-3">
+                <FiPackage className="h-5 w-5 md:h-6 md:w-6" />
+                <span>🔍 Product Management</span>
               </div>
-
-              {/* Price */}
-              <div className="mb-3 md:mb-4">
-                <div className="text-xl md:text-2xl font-bold text-gray-900">{formatCurrency(product.price)}</div>
-              </div>
-
-              {/* Stock Info - Compact */}
-              <div className="space-y-2 md:space-y-3 mb-4 md:mb-6">
-                <div className="flex justify-between text-xs md:text-sm">
-                  <span className="text-gray-600">Stock: <strong>{product.stock}</strong></span>
-                  <span className="text-gray-600">Min: {product.minStock}</span>
-                </div>
-                
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all ${
-                      product.stock === 0 ? 'bg-red-500' :
-                      product.stock <= product.minStock ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    }`}
-                    style={{ width: `${Math.min((product.stock / product.maxStock) * 100, 100)}%` }}
-                  ></div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-500 gap-2">
-                  <span className="truncate">📍 {product.location}</span>
-                  <span className="truncate">🏢 {product.supplier}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons - Full Width on Mobile */}
-              <div className="flex flex-col md:flex-row gap-2 md:space-x-3">
-                <button
-                  onClick={() => handleReorder(product)}
-                  className="flex-1 bg-blue-600 text-white py-2 md:py-2.5 px-3 md:px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center space-x-1.5"
-                >
-                  <FiShoppingCart className="h-4 w-4" />
-                  <span>Reorder</span>
-                </button>
-                <button
-                  onClick={() => handleAdjust(product)}
-                  className="flex-1 bg-green-600 text-white py-2 md:py-2.5 px-3 md:px-4 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center space-x-1.5"
-                >
-                  <FiSettings className="h-4 w-4" />
-                  <span>Adjust</span>
-                </button>
-              </div>
-            </div>
-            ))}
+              <span className="text-lg md:text-xl">
+                {showProductList ? '▼' : '▶'}
+              </span>
+            </button>
           </div>
+
+          {/* Products List - Collapsible */}
+          {showProductList && (
+            <div className="max-w-7xl mx-auto space-y-2 md:space-y-3 animate-fadeIn">
+              {products.map((product) => (
+                <div key={product.id} className="bg-white border-2 border-gray-200 rounded-lg md:rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all">
+                  {/* Product Summary Row - Clickable */}
+                  <button
+                    onClick={() => setExpandedProductId(expandedProductId === product.id ? null : product.id)}
+                    className="w-full flex items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 transition-colors text-left"
+                  >
+                    {/* Expand Icon */}
+                    <span className="text-lg md:text-xl flex-shrink-0 min-w-[24px] text-center">
+                      {expandedProductId === product.id ? '▼' : '▶'}
+                    </span>
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-gray-900 text-sm md:text-base">{product.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-gray-600">SKU: {product.sku}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(product.status)}`}>
+                          {product.status}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Stock & Price - Compact */}
+                    <div className="text-right flex-shrink-0">
+                      <div className="font-bold text-sm md:text-base text-gray-900">{product.stock}</div>
+                      <div className="text-xs text-gray-600">
+                        {formatCurrency(product.price)}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Expanded Details */}
+                  {expandedProductId === product.id && (
+                    <div className="border-t border-gray-200 p-3 md:p-4 bg-gradient-to-b from-gray-50 to-white space-y-3 md:space-y-4 animate-slideDown">
+                      {/* Stock Progress */}
+                      <div>
+                        <div className="flex justify-between items-center text-xs md:text-sm mb-2">
+                          <span className="text-gray-600">Stock Level</span>
+                          <span className="font-semibold text-gray-900">
+                            {product.stock} / {product.maxStock} units
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              product.stock === 0 ? 'bg-red-500' :
+                              product.stock <= product.minStock ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min((product.stock / product.maxStock) * 100, 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-2 gap-2 md:gap-3 text-xs md:text-sm">
+                        <div className="bg-white p-2 md:p-3 rounded-lg border border-gray-100">
+                          <div className="text-gray-600">Price</div>
+                          <div className="font-bold text-gray-900">{formatCurrency(product.price)}</div>
+                        </div>
+                        <div className="bg-white p-2 md:p-3 rounded-lg border border-gray-100">
+                          <div className="text-gray-600">Min Stock</div>
+                          <div className="font-bold text-gray-900">{product.minStock}</div>
+                        </div>
+                        <div className="bg-white p-2 md:p-3 rounded-lg border border-gray-100 col-span-2">
+                          <div className="text-gray-600 mb-1">📍 Location</div>
+                          <div className="font-bold text-gray-900 text-xs md:text-sm truncate">{product.location}</div>
+                        </div>
+                        <div className="bg-white p-2 md:p-3 rounded-lg border border-gray-100 col-span-2">
+                          <div className="text-gray-600 mb-1">🏢 Supplier</div>
+                          <div className="font-bold text-gray-900 text-xs md:text-sm truncate">{product.supplier}</div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons - Full Width Stack */}
+                      <div className="flex flex-col gap-2 pt-2 md:pt-3 border-t border-gray-200">
+                        <button
+                          onClick={() => {
+                            handleReorder(product);
+                            setExpandedProductId(null);
+                          }}
+                          className="w-full bg-blue-600 text-white py-2.5 md:py-3 px-3 md:px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center gap-2"
+                        >
+                          <FiShoppingCart className="h-4 w-4" />
+                          <span>Reorder</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleAdjust(product);
+                            setExpandedProductId(null);
+                          }}
+                          className="w-full bg-green-600 text-white py-2.5 md:py-3 px-3 md:px-4 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm md:text-base flex items-center justify-center gap-2"
+                        >
+                          <FiSettings className="h-4 w-4" />
+                          <span>Adjust Stock</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -719,5 +781,40 @@ const ProductInventoryInterface = () => {
     </div>
   );
 };
+
+// Add CSS for animations
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+      overflow: hidden;
+    }
+    to {
+      opacity: 1;
+      max-height: 1000px;
+      overflow: visible;
+    }
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slideDown {
+    animation: slideDown 0.3s ease-in-out;
+  }
+`;
+document.head.appendChild(style);
 
 export default ProductInventoryInterface;

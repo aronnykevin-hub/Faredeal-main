@@ -1796,25 +1796,25 @@ const CashierPortal = () => {
             <div className="border-t pt-4 space-y-3">
               {/* Subtotal and Tax */}
               <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs md:text-sm">
                   <span className="text-gray-600">Subtotal:</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs md:text-sm">
                   <span className="text-gray-600">VAT (18%):</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.tax)}</span>
                 </div>
               </div>
               
               {/* Total Amount Due */}
-              <div className="flex justify-between text-2xl font-bold border-t-2 border-b-2 border-gray-300 py-3 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex justify-between text-lg md:text-2xl font-bold border-t-2 border-b-2 border-gray-300 py-3 bg-gradient-to-r from-green-50 to-emerald-50">
                 <span className="text-gray-900">TOTAL:</span>
                 <span className="text-green-600">{formatUGX(currentTransaction.total)}</span>
               </div>
               
               {/* Cash Received Input */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 space-y-3">
-                <label className="block text-sm font-semibold text-blue-900 mb-2">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg md:rounded-xl p-3 md:p-4 space-y-3">
+                <label className="block text-xs md:text-sm font-semibold text-blue-900 mb-2">
                   💵 Cash Received (UGX)
                 </label>
                 <input
@@ -1826,7 +1826,7 @@ const CashierPortal = () => {
                   }}
                   onFocus={(e) => e.target.select()}
                   placeholder="Enter amount..."
-                  className="w-full px-4 py-3 text-2xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  className="w-full px-3 md:px-4 py-2 md:py-3 text-xl md:text-2xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 />
                 
                 {/* Quick Cash Buttons */}
@@ -1841,7 +1841,7 @@ const CashierPortal = () => {
                     <button
                       key={amount}
                       onClick={() => setCashReceived(amount.toString())}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-semibold transform hover:scale-105"
+                      className="px-2 md:px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs md:text-sm font-semibold transform hover:scale-105"
                     >
                       {formatUGX(amount)}
                     </button>
@@ -1851,7 +1851,7 @@ const CashierPortal = () => {
                 {/* Exact Amount Button */}
                 <button
                   onClick={() => setCashReceived(currentTransaction.total.toString())}
-                  className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-sm font-semibold"
+                  className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-xs md:text-sm font-semibold"
                 >
                   ✓ Exact Amount
                 </button>
@@ -1859,10 +1859,10 @@ const CashierPortal = () => {
               
               {/* Change Calculator */}
               {cashReceived && parseFloat(cashReceived) >= currentTransaction.total && (
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-4 animate-pulse">
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg md:rounded-xl p-3 md:p-4 animate-pulse">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg font-bold text-yellow-900">💰 CHANGE TO GIVE:</span>
-                    <span className="text-3xl font-bold text-orange-600">
+                    <span className="text-sm md:text-lg font-bold text-yellow-900">💰 CHANGE:</span>
+                    <span className="text-2xl md:text-3xl font-bold text-orange-600">
                       {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}
                     </span>
                   </div>
@@ -1884,12 +1884,12 @@ const CashierPortal = () => {
                     
                     return breakdown.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-yellow-300">
-                        <p className="text-xs font-semibold text-yellow-900 mb-2">💵 Change Breakdown:</p>
+                        <p className="text-xs font-semibold text-yellow-900 mb-2">💵 Breakdown:</p>
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           {breakdown.map(({ denom, count }) => (
                             <div key={denom} className="flex justify-between bg-white/50 rounded px-2 py-1">
                               <span className="font-semibold">{formatUGX(denom)}:</span>
-                              <span className="text-yellow-900">{count} note{count > 1 ? 's' : ''}</span>
+                              <span className="text-yellow-900">{count}x</span>
                             </div>
                           ))}
                         </div>
@@ -1901,10 +1901,10 @@ const CashierPortal = () => {
               
               {/* Warning if insufficient cash */}
               {cashReceived && parseFloat(cashReceived) < currentTransaction.total && (
-                <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 flex items-center space-x-2">
-                  <FiAlertTriangle className="h-5 w-5 text-red-600" />
-                  <span className="text-sm font-semibold text-red-900">
-                    Insufficient! Need {formatUGX(currentTransaction.total - parseFloat(cashReceived))} more
+                <div className="bg-red-50 border-2 border-red-300 rounded-lg md:rounded-xl p-3 flex items-center space-x-2">
+                  <FiAlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                  <span className="text-xs md:text-sm font-semibold text-red-900">
+                    Need {formatUGX(currentTransaction.total - parseFloat(cashReceived))} more
                   </span>
                 </div>
               )}
@@ -1913,14 +1913,14 @@ const CashierPortal = () => {
               <button
                 onClick={() => setPaymentModal(true)}
                 disabled={cashReceived && parseFloat(cashReceived) < currentTransaction.total}
-                className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 mt-4 transform hover:scale-105 shadow-lg ${
+                className={`w-full py-3 md:py-4 rounded-lg md:rounded-xl font-bold text-sm md:text-lg transition-all duration-300 mt-4 transform hover:scale-105 shadow-lg ${
                   cashReceived && parseFloat(cashReceived) >= currentTransaction.total
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
                     : 'bg-gradient-to-r from-yellow-500 to-red-600 text-white hover:from-yellow-600 hover:to-red-700'
                 }`}
               >
                 {cashReceived && parseFloat(cashReceived) >= currentTransaction.total ? (
-                  <>✅ Complete Sale - Change: {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}</>
+                  <>✅ Complete Sale</>
                 ) : (
                   <>💳 Process Payment</>
                 )}

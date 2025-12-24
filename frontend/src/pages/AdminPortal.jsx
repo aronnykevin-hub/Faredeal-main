@@ -2027,82 +2027,95 @@ const AdminPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-4 sm:space-y-8">
-      {/* Enhanced Master Dashboard Header - Mobile Optimized */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-xl sm:rounded-2xl p-4 sm:p-8 text-white shadow-2xl">
+    <div className="space-y-3 md:space-y-4 lg:space-y-8">
+      {/* Enhanced Master Dashboard Header - Mobile Optimized with Accordion */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-lg md:rounded-2xl p-3 md:p-4 lg:p-8 text-white shadow-xl md:shadow-2xl">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
         
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex-1">
-            <h2 className="text-2xl sm:text-4xl font-bold mb-2 sm:mb-3 flex items-center">
-              <span className="mr-2 sm:mr-4 text-3xl sm:text-5xl animate-bounce">🎯</span>
-              <span className="leading-tight">Master Admin Dashboard</span>
-            </h2>
-            <p className="text-blue-100 text-sm sm:text-lg mb-3 sm:mb-4">Complete system oversight and operational control</p>
-            
-            {/* Mobile: Compact badges */}
-            <div className="flex flex-wrap gap-2 sm:gap-4">
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className="text-blue-100 text-xs sm:text-sm font-medium">All Systems</span>
-              </div>
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
-                <FiDatabase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-300" />
-                <span className="text-purple-100 text-xs sm:text-sm font-medium">Real-time</span>
-              </div>
-              <div className="flex items-center space-x-1.5 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full border border-white/20">
-                <FiShield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-300" />
-                <span className="text-pink-100 text-xs sm:text-sm font-medium">Secure</span>
+        <div className="relative">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4 lg:gap-6">
+            <div className="flex-1">
+              <h2 className="text-lg md:text-2xl lg:text-4xl font-bold mb-1 md:mb-2 lg:mb-3 flex items-center gap-1 md:gap-2 lg:gap-4">
+                <span className="text-xl md:text-2xl lg:text-5xl animate-bounce flex-shrink-0">🎯</span>
+                <span className="leading-tight">Master Admin Dashboard</span>
+              </h2>
+              <p className="text-blue-100 text-xs md:text-sm lg:text-lg mb-1 md:mb-2 lg:mb-3">Complete system oversight and operational control</p>
+              
+              {/* Mobile: Ultra-compact badges - Hidden on mobile, shown on sm+ */}
+              <div className="flex flex-wrap gap-0.5 md:gap-2 lg:gap-4 hidden sm:flex">
+                <div className="flex items-center gap-0.5 md:gap-1 bg-white/10 backdrop-blur-sm px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-full border border-white/20">
+                  <div className="w-1 md:w-1.5 h-1 md:h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-blue-100 text-xs font-medium">All Systems</span>
+                </div>
+                <div className="flex items-center gap-0.5 md:gap-1 bg-white/10 backdrop-blur-sm px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-full border border-white/20">
+                  <FiDatabase className="h-2.5 md:h-3 w-2.5 md:w-3 text-purple-300" />
+                  <span className="text-purple-100 text-xs font-medium">Real-time</span>
+                </div>
+                <div className="flex items-center gap-0.5 md:gap-1 bg-white/10 backdrop-blur-sm px-1.5 md:px-2.5 py-0.5 md:py-1 rounded-full border border-white/20">
+                  <FiShield className="h-2.5 md:h-3 w-2.5 md:w-3 text-pink-300" />
+                  <span className="text-pink-100 text-xs font-medium">Secure</span>
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Mobile: Compact power indicator */}
-          <div className="flex sm:block items-center gap-4 sm:text-right">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl sm:rounded-2xl p-3 sm:p-4 border-2 border-white/20">
-              <div className="text-4xl sm:text-6xl font-bold animate-pulse">∞</div>
-              <div className="text-blue-200 text-sm sm:text-xl font-semibold mt-1">Admin Power</div>
-              <div className="text-blue-300 text-xs sm:text-sm">Unlimited Access</div>
+            
+            {/* Mobile: Compact power indicator */}
+            <div className="flex md:block items-center gap-2 md:gap-3 lg:text-right flex-shrink-0">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg md:rounded-xl lg:rounded-2xl p-1.5 md:p-2 lg:p-4 border-2 border-white/20">
+                <div className="text-2xl md:text-3xl lg:text-6xl font-bold animate-pulse">∞</div>
+                <div className="text-blue-200 text-xs md:text-xs lg:text-xl font-semibold mt-0.5">Admin Power</div>
+                <div className="text-blue-300 text-xs hidden md:block">Unlimited Access</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Quick Access to All Sections */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl shadow-2xl p-6 border-2 border-purple-200">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -mr-32 -mt-32 animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-pink-400/20 to-yellow-400/20 rounded-full blur-3xl -ml-24 -mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+      {/* Admin Access Status Banner - Ultra Mobile Optimized */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg md:rounded-xl p-2 md:p-4 shadow-md">
+        <div className="flex items-start gap-1.5 md:gap-3">
+          <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0 text-base md:text-lg">
+            <span>✅</span>
+            <span>🛡️</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xs md:text-base font-bold text-green-900 leading-tight">Admin Access Enabled</h3>
+            <p className="text-xs text-green-700 mt-0.5 line-clamp-2 md:line-clamp-none">Full control. Edit pricing, manage stock, apply bulk updates.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Access Hub - Mobile Optimized Accordion */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-lg md:rounded-2xl shadow-lg md:shadow-2xl p-3 md:p-6 border-2 border-purple-200">
+        <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -mr-24 md:-mr-32 -mt-24 md:-mt-32 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-36 md:w-48 h-36 md:h-48 bg-gradient-to-tr from-pink-400/20 to-yellow-400/20 rounded-full blur-3xl -ml-18 md:-ml-24 -mb-18 md:-mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
         
+        {/* Toggle Button - Compact */}
         <div 
-          className="relative flex items-center justify-between cursor-pointer hover:bg-white/50 p-3 rounded-xl transition-all duration-300 backdrop-blur-sm group"
+          className="relative flex items-center justify-between gap-2 md:gap-4 cursor-pointer hover:bg-white/50 p-2 md:p-3 rounded-lg transition-all duration-300 backdrop-blur-sm group"
           onClick={() => setShowQuickAccess(!showQuickAccess)}
         >
-          <h3 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center">
-            <span className="mr-3 text-2xl sm:text-3xl animate-bounce">🚀</span>
-            Quick Access Hub - All Sections
+          <h3 className="text-base md:text-lg lg:text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-1 md:gap-2 lg:gap-3 flex-1 min-w-0">
+            <span className="text-lg md:text-2xl lg:text-3xl animate-bounce flex-shrink-0">🚀</span>
+            <span className="truncate">Quick Access Hub</span>
           </h3>
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110">
+          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-1.5 md:p-2 rounded-lg shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 flex-shrink-0">
             {showQuickAccess ? (
-              <FiChevronUp className="h-5 w-5 text-white" />
+              <FiChevronUp className="h-4 md:h-5 w-4 md:w-5 text-white" />
             ) : (
-              <FiChevronDown className="h-5 w-5 text-white" />
+              <FiChevronDown className="h-4 md:h-5 w-4 md:w-5 text-white" />
             )}
           </div>
         </div>
-        
+
+        {/* Quick Access Grid - Collapsible */}
         {showQuickAccess && (
-          <div className="relative mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fadeIn">
+          <div className="relative mt-3 md:mt-6 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-1.5 md:gap-3 lg:gap-4 animate-slideDown">
             {[
               { id: 'inventory', label: 'Inventory', icon: '📦', stats: '6 Products', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50/80', border: 'border-emerald-300', bullet: 'text-emerald-500' },
               { id: 'orders', label: 'Orders', icon: '📋', stats: '2,847 Orders', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-50/80', border: 'border-orange-300', bullet: 'text-orange-500' },
               { id: 'payments', label: 'Payments', icon: '💳', stats: '$127K Revenue', gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-50/80', border: 'border-green-300', bullet: 'text-green-500' },
               { id: 'suppliers', label: 'Suppliers', icon: '🏭', stats: '24 Suppliers', gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50/80', border: 'border-purple-300', bullet: 'text-purple-500' },
-              { id: 'users', label: 'Users', icon: '👥', stats: '1,234 Users', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50/80', border: 'border-blue-300', bullet: 'text-blue-500' },
-              { id: 'analytics', label: 'Analytics', icon: '📈', stats: '+22% Growth', gradient: 'from-pink-500 to-rose-500', bg: 'bg-pink-50/80', border: 'border-pink-300', bullet: 'text-pink-500' },
-              { id: 'operations', label: 'Operations', icon: '⚙️', stats: '99.9% Uptime', gradient: 'from-gray-600 to-slate-600', bg: 'bg-gray-50/80', border: 'border-gray-300', bullet: 'text-gray-600' },
-              { id: 'settings', label: 'Settings', icon: '🛠️', stats: 'Configuration', gradient: 'from-indigo-500 to-blue-500', bg: 'bg-indigo-50/80', border: 'border-indigo-300', bullet: 'text-indigo-500' },
-              { id: 'security', label: 'Security', icon: '🛡️', stats: 'Protected', gradient: 'from-red-500 to-orange-500', bg: 'bg-red-50/80', border: 'border-red-300', bullet: 'text-red-500' },
-              { id: 'monitoring', label: 'Monitoring', icon: '📡', stats: 'Live Data', gradient: 'from-yellow-500 to-orange-500', bg: 'bg-yellow-50/80', border: 'border-yellow-300', bullet: 'text-yellow-600' }
+              { id: 'users', label: 'Users', icon: '👥', stats: '1,234 Users', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50/80', border: 'border-blue-300', bullet: 'text-blue-500' }
             ].map((section, index) => (
               <button
                 key={section.id}
@@ -2110,24 +2123,18 @@ const AdminPortal = () => {
                   setActiveSection(section.id);
                   setShowQuickAccess(false);
                 }}
-                className={`relative flex items-start space-x-3 p-4 ${section.bg} backdrop-blur-sm rounded-xl border-2 ${section.border} hover:shadow-xl transition-all duration-300 group text-left transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
+                className={`relative flex flex-col items-center text-center gap-1 p-2 md:p-3 lg:p-4 ${section.bg} backdrop-blur-sm rounded-lg md:rounded-xl border-2 ${section.border} hover:shadow-lg transition-all duration-300 group transform hover:scale-105 hover:-translate-y-1 animate-fadeInUp overflow-hidden`}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
                 <div className={`absolute inset-0 bg-gradient-to-r ${section.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
                 <div className="relative">
-                  <span className={`${section.bullet} text-2xl font-bold animate-pulse`}>•</span>
+                  <span className="text-lg md:text-2xl group-hover:scale-125 transition-transform duration-300 block">{section.icon}</span>
                 </div>
                 <div className="relative flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-2xl group-hover:scale-125 transition-transform duration-300 animate-bounce" style={{ animationDelay: `${index * 100}ms` }}>{section.icon}</span>
-                    <span className={`font-bold text-gray-800 group-hover:bg-gradient-to-r group-hover:${section.gradient} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300`}>{section.label}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 font-medium">{section.stats}</span>
-                    <div className={`w-2 h-2 rounded-full bg-gradient-to-r ${section.gradient} animate-ping`}></div>
-                  </div>
+                  <span className={`font-bold text-xs md:text-sm text-gray-800 group-hover:bg-gradient-to-r group-hover:${section.gradient} group-hover:bg-clip-text group-hover:text-transparent transition-all duration-300 block truncate`}>{section.label}</span>
+                  <span className="text-xs text-gray-600 font-medium hidden md:block line-clamp-1">{section.stats}</span>
                 </div>
-                <FiChevronRight className={`h-5 w-5 ${section.bullet} opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300`} />
+                <div className={`w-1.5 md:w-2 h-1.5 md:h-2 rounded-full bg-gradient-to-r ${section.gradient}`}></div>
               </button>
             ))}
           </div>
@@ -3360,8 +3367,8 @@ const AdminPortal = () => {
 
     return (
       <div className="space-y-6">
-        {/* Creative Header with Live Stats */}
-        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-2xl shadow-2xl p-8 relative overflow-hidden">
+        {/* Creative Header with Live Stats - Mobile Optimized */}
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-lg md:rounded-2xl shadow-lg md:shadow-2xl p-4 md:p-8 relative overflow-hidden">
           {/* Animated background elements */}
           <div className="absolute inset-0 overflow-hidden">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -3369,56 +3376,56 @@ const AdminPortal = () => {
           </div>
 
           <div className="relative z-10">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-3xl font-bold text-white mb-2 flex items-center">
-                  <FiUsers className="mr-3" />
-                  {viewMode === 'pending' ? 'User Verification Center' : 'All Registered Users'}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 md:gap-6 mb-4 md:mb-6">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base md:text-2xl lg:text-3xl font-bold text-white mb-1 md:mb-2 flex items-center gap-2 truncate">
+                  <FiUsers className="flex-shrink-0" />
+                  <span className="truncate">{viewMode === 'pending' ? 'User Verification' : 'All Users'}</span>
                   {/* Real-time indicator */}
-                  <span className="ml-3 flex items-center space-x-2 bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-sm">
-                    <span className="relative flex h-3 w-3">
+                  <span className="flex-shrink-0 flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2 md:px-3 py-1 rounded-full text-xs md:text-sm whitespace-nowrap">
+                    <span className="relative flex h-2 w-2 md:h-3 md:w-3">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 md:h-3 md:w-3 bg-green-500"></span>
                     </span>
-                    <span>Live</span>
+                    <span className="hidden sm:inline">Live</span>
                   </span>
                 </h2>
-                <p className="text-purple-100 text-lg">
+                <p className="text-purple-100 text-xs md:text-sm lg:text-base truncate md:truncate">
                   {viewMode === 'pending' 
-                    ? 'Review and approve pending applications • Auto-updates when new registrations arrive'
-                    : 'View all registered users across all portals • Check email verification status'}
+                    ? 'Review & approve pending • Auto-updates'
+                    : 'View all registered users'}
                 </p>
               </div>
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
                 {/* View Mode Toggle */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-1 flex space-x-1">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg md:rounded-xl p-1 flex gap-0.5 md:gap-1">
                   <button
                     onClick={() => setViewMode('pending')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2 ${
+                    className={`px-2 md:px-4 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 ${
                       viewMode === 'pending'
                         ? 'bg-white text-purple-600 shadow-lg'
                         : 'text-white hover:bg-white/10'
                     }`}
                   >
-                    <FiUserCheck className="h-4 w-4" />
-                    <span>Pending</span>
+                    <FiUserCheck className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Pending</span>
                     {pendingUsers.length > 0 && (
-                      <span className="bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full text-xs font-bold">
+                      <span className="bg-yellow-400 text-yellow-900 px-1.5 md:px-2 py-0.5 rounded-full text-xs font-bold">
                         {pendingUsers.length}
                       </span>
                     )}
                   </button>
                   <button
                     onClick={() => setViewMode('all')}
-                    className={`px-4 py-2 rounded-lg font-semibold transition-all duration-300 flex items-center space-x-2 ${
+                    className={`px-2 md:px-4 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 ${
                       viewMode === 'all'
                         ? 'bg-white text-purple-600 shadow-lg'
                         : 'text-white hover:bg-white/10'
                     }`}
                   >
-                    <FiUsers className="h-4 w-4" />
-                    <span>All Users</span>
-                    <span className="bg-blue-400 text-blue-900 px-2 py-0.5 rounded-full text-xs font-bold">
+                    <FiUsers className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">All</span>
+                    <span className="bg-blue-400 text-blue-900 px-1.5 md:px-2 py-0.5 rounded-full text-xs font-bold">
                       {allUsers.length}
                     </span>
                   </button>
@@ -3427,16 +3434,16 @@ const AdminPortal = () => {
                 <button
                   onClick={viewMode === 'pending' ? loadPendingUsers : loadAllUsers}
                   disabled={currentLoading}
-                  className="px-6 py-3 bg-white text-purple-600 rounded-xl hover:bg-gray-50 transition-all duration-300 font-semibold flex items-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="px-2 md:px-6 py-1.5 md:py-3 bg-white text-purple-600 rounded-lg md:rounded-xl hover:bg-gray-50 transition-all duration-300 font-semibold flex items-center gap-1 md:gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 text-xs md:text-sm flex-shrink-0"
                 >
-                  <FiRefreshCw className={`h-5 w-5 ${currentLoading ? 'animate-spin' : ''}`} />
-                  <span>Refresh</span>
+                  <FiRefreshCw className={`h-4 w-4 md:h-5 md:w-5 flex-shrink-0 ${currentLoading ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Refresh</span>
                 </button>
               </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {/* Stats Cards - Mobile Optimized */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
               {['all', 'admin', 'manager', 'cashier', 'supplier'].map(role => {
                 const count = role === 'all' 
                   ? currentUserList.length 
@@ -3444,18 +3451,18 @@ const AdminPortal = () => {
                 const icon = getRoleIcon(role);
                 
                 return (
-                  <button
+                      <button
                     key={role}
                     onClick={() => setFilterRole(role)}
-                    className={`p-4 rounded-xl transition-all duration-300 transform ${
+                    className={`p-2 md:p-4 rounded-lg md:rounded-xl transition-all duration-300 transform ${
                       filterRole === role
                         ? 'bg-white text-gray-900 shadow-2xl scale-105'
                         : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 hover:scale-102'
                     }`}
                   >
-                    <div className="text-3xl mb-2">{icon}</div>
-                    <p className="text-sm font-medium capitalize mb-1">{role}</p>
-                    <p className="text-2xl font-bold">{count}</p>
+                    <div className="text-2xl md:text-3xl mb-1 md:mb-2">{icon}</div>
+                    <p className="text-xs md:text-sm font-medium capitalize mb-0.5 md:mb-1 truncate">{role}</p>
+                    <p className="text-lg md:text-2xl font-bold">{count}</p>
                   </button>
                 );
               })}
@@ -3463,17 +3470,17 @@ const AdminPortal = () => {
           </div>
         </div>
 
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-lg p-4 space-y-4">
+        {/* Search and Filters - Mobile Optimized */}
+        <div className="bg-white rounded-lg md:rounded-xl shadow-lg p-3 md:p-4 space-y-3 md:space-y-4">
           {/* Search Bar */}
           <div className="relative">
-            <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+            <FiSearch className="absolute left-3 md:left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 md:h-5 w-4 md:w-5" />
             <input
               type="text"
-              placeholder="Search by name, email, or employee ID..."
+              placeholder="Search name, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
+              className="w-full pl-10 md:pl-12 pr-3 md:pr-4 py-2 md:py-3 text-sm md:text-base border-2 border-gray-200 rounded-lg md:rounded-xl focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all"
             />
             {searchQuery && (
               <button
@@ -3485,16 +3492,16 @@ const AdminPortal = () => {
             )}
           </div>
 
-          {/* Additional Filters for All Users View */}
+          {/* Additional Filters for All Users View - Mobile Optimized */}
           {viewMode === 'all' && (
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4">
               {/* Status Filter */}
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Account Status</label>
+              <div className="flex-1 w-full">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1 md:mb-2">Status</label>
                 <select
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                 >
                   <option value="all">All Status</option>
                   <option value="active">Active</option>
@@ -3503,16 +3510,16 @@ const AdminPortal = () => {
               </div>
 
               {/* Email Verification Filter */}
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Email Verification</label>
+              <div className="flex-1 w-full">
+                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1 md:mb-2">Email</label>
                 <select
                   value={filterVerification}
                   onChange={(e) => setFilterVerification(e.target.value)}
-                  className="w-full px-4 py-2 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
                 >
                   <option value="all">All</option>
                   <option value="verified">✅ Verified</option>
-                  <option value="unverified">⏳ Pending Verification</option>
+                  <option value="unverified">⏳ Pending</option>
                 </select>
               </div>
 
@@ -3524,7 +3531,7 @@ const AdminPortal = () => {
                     setFilterVerification('all');
                     setFilterRole('all');
                   }}
-                  className="mt-7 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+                  className="w-full md:w-auto md:mt-7 px-3 md:px-4 py-2 text-sm md:text-base bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center justify-center gap-1 md:gap-2"
                 >
                   <FiX className="h-4 w-4" />
                   <span>Clear</span>
@@ -3534,30 +3541,30 @@ const AdminPortal = () => {
           )}
         </div>
 
-        {/* Users Grid */}
+        {/* Users Grid - Mobile Optimized */}
         {currentLoading ? (
-          <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-500 mx-auto"></div>
-            <p className="text-gray-600 mt-4 text-lg">
-              {viewMode === 'pending' ? 'Loading pending applications...' : 'Loading all registered users...'}
+          <div className="bg-white rounded-lg md:rounded-2xl p-8 md:p-12 text-center">
+            <div className="animate-spin rounded-full h-12 md:h-16 w-12 md:w-16 border-b-4 border-purple-500 mx-auto"></div>
+            <p className="text-gray-600 mt-3 md:mt-4 text-sm md:text-lg">
+              {viewMode === 'pending' ? 'Loading pending...' : 'Loading users...'}
             </p>
           </div>
         ) : filteredUsers.length === 0 ? (
-          <div className="bg-white rounded-2xl p-12 text-center">
-            <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FiUsers className="h-12 w-12 text-gray-400" />
+          <div className="bg-white rounded-lg md:rounded-2xl p-6 md:p-12 text-center">
+            <div className="w-16 md:w-24 h-16 md:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 md:mb-4">
+              <FiUsers className="h-8 md:h-12 w-8 md:w-12 text-gray-400" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
-              {searchQuery ? 'No Results Found' : 'No Pending Applications'}
+            <h3 className="text-lg md:text-2xl font-bold text-gray-900 mb-1 md:mb-2">
+              {searchQuery ? 'No Results' : 'No Pending'}
             </h3>
-            <p className="text-gray-600">
+            <p className="text-sm md:text-base text-gray-600">
               {searchQuery 
-                ? 'Try adjusting your search terms' 
-                : 'All applications have been processed. New applications will appear here.'}
+                ? 'Adjust your search' 
+                : 'All applications processed'}
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
             {filteredUsers.map((user) => {
               const roleColor = getRoleColor(user.role);
               const roleIcon = getRoleIcon(user.role);
@@ -3567,45 +3574,45 @@ const AdminPortal = () => {
               return (
                 <div 
                   key={user.id} 
-                  className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-yellow-200 hover:border-yellow-300 transform hover:scale-102"
+                  className="bg-white rounded-lg md:rounded-2xl shadow-md md:shadow-lg hover:shadow-lg md:hover:shadow-2xl transition-all duration-300 overflow-hidden border-2 border-yellow-200 hover:border-yellow-300 transform hover:scale-102"
                 >
-                  {/* Card Header with Gradient */}
-                  <div className={`bg-gradient-to-r ${roleGradient} p-6`}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-4">
+                  {/* Card Header with Gradient - Mobile Optimized */}
+                  <div className={`bg-gradient-to-r ${roleGradient} p-3 md:p-6`}>
+                    <div className="flex items-start justify-between gap-2 md:gap-4">
+                      <div className="flex items-center gap-2 md:gap-4 min-w-0">
                         {/* Avatar */}
-                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg">
-                          <span className="text-4xl">{roleIcon}</span>
+                        <div className="w-12 md:w-16 h-12 md:h-16 bg-white rounded-lg md:rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+                          <span className="text-2xl md:text-4xl">{roleIcon}</span>
                         </div>
                         
                         {/* User Info */}
-                        <div className="text-white">
-                          <h3 className="text-xl font-bold mb-1">{user.full_name}</h3>
-                          <p className="text-sm opacity-90 mb-2">{user.email}</p>
-                          <div className="flex items-center space-x-2">
+                        <div className="text-white min-w-0 flex-1">
+                          <h3 className="text-sm md:text-xl font-bold mb-0.5 md:mb-1 truncate">{user.full_name}</h3>
+                          <p className="text-xs md:text-sm opacity-90 mb-1 md:mb-2 truncate">{user.email}</p>
+                          <div className="flex items-center flex-wrap gap-1">
                             {viewMode === 'pending' ? (
-                              <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900 animate-pulse">
-                                ⏳ Pending Review
+                              <span className="inline-flex items-center px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs font-bold bg-yellow-400 text-yellow-900 animate-pulse">
+                                ⏳ Pending
                               </span>
                             ) : (
                               <>
                                 {/* Email Verification Badge */}
                                 {user.email_verified ? (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-400 text-green-900">
-                                    ✅ Email Verified
+                                  <span className="inline-flex items-center px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs font-bold bg-green-400 text-green-900">
+                                    ✅ Email
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-orange-400 text-orange-900">
-                                    📧 Pending Verification
+                                  <span className="inline-flex items-center px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs font-bold bg-orange-400 text-orange-900">
+                                    📧 Pending
                                   </span>
                                 )}
                                 {/* Account Status Badge */}
                                 {user.is_active ? (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-blue-400 text-blue-900">
+                                  <span className="inline-flex items-center px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs font-bold bg-blue-400 text-blue-900">
                                     🟢 Active
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-400 text-gray-900">
+                                  <span className="inline-flex items-center px-2 md:px-3 py-0.5 md:py-1 rounded-full text-xs font-bold bg-gray-400 text-gray-900">
                                     ⚪ Inactive
                                   </span>
                                 )}
@@ -3616,61 +3623,60 @@ const AdminPortal = () => {
                       </div>
                       
                       {/* Role Badge */}
-                      <span className="px-4 py-2 bg-white/20 backdrop-blur-sm rounded-xl text-white font-bold uppercase text-xs tracking-wider shadow-lg">
+                      <span className="px-2 md:px-4 py-1 md:py-2 bg-white/20 backdrop-blur-sm rounded-lg md:rounded-xl text-white font-bold uppercase text-xs tracking-wider shadow-lg flex-shrink-0">
                         {user.role}
                       </span>
                     </div>
                   </div>
 
-                  {/* Card Body */}
-                  <div className="p-6">
+                  {/* Card Body - Mobile Optimized */}
+                  <div className="p-3 md:p-6">
                     {/* User Details */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 mb-3 md:mb-4 text-sm md:text-base">
                       {user.phone && (
-                        <div className="flex items-center space-x-2">
-                          <FiPhone className={`h-4 w-4 text-${roleColor}-500`} />
-                          <span className="text-sm text-gray-700">{user.phone}</span>
+                        <div className="flex items-center gap-2">
+                          <FiPhone className={`h-3 md:h-4 w-3 md:w-4 text-${roleColor}-500 flex-shrink-0`} />
+                          <span className="text-xs md:text-sm text-gray-700 truncate">{user.phone}</span>
                         </div>
                       )}
                       
                       {user.employee_id && (
-                        <div className="flex items-center space-x-2">
-                          <FiUser className={`h-4 w-4 text-${roleColor}-500`} />
-                          <span className="text-sm text-gray-700 font-mono bg-gray-100 px-2 py-1 rounded">
+                        <div className="flex items-center gap-2">
+                          <FiUser className={`h-3 md:h-4 w-3 md:w-4 text-${roleColor}-500 flex-shrink-0`} />
+                          <span className="text-xs md:text-sm text-gray-700 font-mono bg-gray-100 px-2 py-1 rounded truncate">
                             {user.employee_id}
                           </span>
                         </div>
                       )}
                       
                       {user.department && (
-                        <div className="flex items-center space-x-2">
-                          <FiBriefcase className={`h-4 w-4 text-${roleColor}-500`} />
-                          <span className="text-sm text-gray-700">{user.department}</span>
+                        <div className="flex items-center gap-2">
+                          <FiBriefcase className={`h-3 md:h-4 w-3 md:w-4 text-${roleColor}-500 flex-shrink-0`} />
+                          <span className="text-xs md:text-sm text-gray-700 truncate">{user.department}</span>
                         </div>
                       )}
                       
-                      <div className="flex items-center space-x-2">
-                        <FiCalendar className={`h-4 w-4 text-${roleColor}-500`} />
-                        <span className="text-sm text-gray-700">
-                          Joined: {new Date(user.created_at).toLocaleDateString('en-US', {
+                      <div className="flex items-center gap-2">
+                        <FiCalendar className={`h-3 md:h-4 w-3 md:w-4 text-${roleColor}-500 flex-shrink-0`} />
+                        <span className="text-xs md:text-sm text-gray-700 truncate">
+                          {new Date(user.created_at).toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
-                            year: 'numeric'
+                            year: '2-digit'
                           })}
                         </span>
                       </div>
 
                       {/* Last Login - Only for All Users view */}
                       {viewMode === 'all' && user.last_sign_in_at && (
-                        <div className="flex items-center space-x-2 col-span-2">
-                          <FiActivity className={`h-4 w-4 text-${roleColor}-500`} />
-                          <span className="text-sm text-gray-700">
-                            Last login: {new Date(user.last_sign_in_at).toLocaleDateString('en-US', {
+                        <div className="flex items-center gap-2 col-span-1 md:col-span-2">
+                          <FiActivity className={`h-3 md:h-4 w-3 md:w-4 text-${roleColor}-500 flex-shrink-0`} />
+                          <span className="text-xs md:text-sm text-gray-700 truncate">
+                            Last: {new Date(user.last_sign_in_at).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric',
-                              year: 'numeric',
                               hour: '2-digit',
-                              minute: '2-digit'
+                              minute:'2-digit'
                             })}
                           </span>
                         </div>
@@ -4331,37 +4337,37 @@ const AdminPortal = () => {
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-gradient-to-tr from-purple-400/20 to-pink-400/20 rounded-full blur-3xl -ml-36 -mb-36 animate-pulse" style={{ animationDelay: '1s' }}></div>
         
         <div 
-          className="relative cursor-pointer p-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-700 text-white hover:from-emerald-700 hover:via-blue-700 hover:to-purple-800 transition-all duration-300"
+          className="relative cursor-pointer p-3 md:p-4 lg:p-6 bg-gradient-to-r from-emerald-600 via-blue-600 to-purple-700 text-white hover:from-emerald-700 hover:via-blue-700 hover:to-purple-800 transition-all duration-300"
           onClick={() => setShowProductManagement(!showProductManagement)}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
             <div className="flex-1">
-              <h3 className="text-2xl font-bold flex items-center gap-3 mb-2">
-                <span className="bg-white/20 p-3 rounded-xl animate-bounce">📦</span>
-                Complete Product Management
+              <h3 className="text-base md:text-lg lg:text-2xl font-bold flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
+                <span className="bg-white/20 p-2 md:p-3 rounded-lg md:rounded-xl animate-bounce text-lg md:text-2xl lg:text-3xl">📦</span>
+                <span>Complete Product Management</span>
               </h3>
-              <p className="text-emerald-100">Full administrative access to all inventory functions</p>
+              <p className="text-emerald-100 text-xs md:text-sm">Full administrative access to all inventory functions</p>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="hidden md:flex items-center gap-4">
-                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
-                  <div className="text-2xl font-bold">{dashboardData.inventory?.totalProducts || 0}</div>
-                  <div className="text-emerald-200 text-xs font-medium">Total Products</div>
+            <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-2 lg:gap-4">
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg md:rounded-xl px-2 md:px-4 py-2 md:py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-lg md:text-2xl font-bold">{dashboardData.inventory?.totalProducts || 0}</div>
+                  <div className="text-emerald-200 text-xs font-medium hidden md:block">Total Products</div>
                 </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
-                  <div className="text-2xl font-bold">{dashboardData.inventory?.lowStock || 0}</div>
-                  <div className="text-yellow-200 text-xs font-medium">Low Stock</div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg md:rounded-xl px-2 md:px-4 py-2 md:py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-lg md:text-2xl font-bold">{dashboardData.inventory?.lowStock || 0}</div>
+                  <div className="text-yellow-200 text-xs font-medium hidden md:block">Low Stock</div>
                 </div>
-                <div className="bg-white/20 backdrop-blur-sm rounded-xl px-4 py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
-                  <div className="text-2xl font-bold">∞</div>
-                  <div className="text-blue-200 text-xs font-medium">Admin Access</div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg md:rounded-xl px-2 md:px-4 py-2 md:py-3 text-center border border-white/30 hover:bg-white/30 transition-all">
+                  <div className="text-lg md:text-2xl font-bold">∞</div>
+                  <div className="text-blue-200 text-xs font-medium hidden md:block">Admin Access</div>
                 </div>
               </div>
-              <div className="bg-gradient-to-r from-white/30 to-white/20 p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
+              <div className="bg-gradient-to-r from-white/30 to-white/20 p-2 md:p-3 rounded-lg md:rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-110">
                 {showProductManagement ? (
-                  <FiChevronUp className="h-6 w-6 text-white" />
+                  <FiChevronUp className="h-5 md:h-6 w-5 md:w-6 text-white" />
                 ) : (
-                  <FiChevronDown className="h-6 w-6 text-white" />
+                  <FiChevronDown className="h-5 md:h-6 w-5 md:w-6 text-white" />
                 )}
               </div>
             </div>
@@ -4370,8 +4376,8 @@ const AdminPortal = () => {
 
         {showProductManagement && (
           <div className="relative animate-fadeIn">
-            {/* Quick Product Stats */}
-            <div className="p-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Quick Product Stats - Mobile Optimized */}
+            <div className="p-3 md:p-4 lg:p-6 grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-4">
               {[
                 { 
                   label: 'Total Products', 
@@ -4404,24 +4410,24 @@ const AdminPortal = () => {
               ].map((stat, index) => (
                 <div 
                   key={index} 
-                  className={`relative group bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 p-4 rounded-xl border-2 border-${stat.color}-200 hover:shadow-lg transition-all duration-300 hover:scale-105 overflow-hidden`}
+                  className={`relative group bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 p-2 md:p-3 lg:p-4 rounded-lg md:rounded-xl border-2 border-${stat.color}-200 hover:shadow-lg transition-all duration-300 hover:scale-105 overflow-hidden`}
                 >
                   <div className={`absolute inset-0 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
-                  <div className="relative flex items-start justify-between">
+                  <div className="relative flex items-start justify-between gap-1 md:gap-2">
                     <div>
-                      <p className="text-xs text-gray-600 font-medium mb-1">{stat.label}</p>
-                      <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                      <p className="text-xs text-gray-600 font-medium mb-0.5 md:mb-1">{stat.label}</p>
+                      <p className="text-lg md:text-2xl font-bold text-gray-900">{stat.value}</p>
                     </div>
-                    <span className="text-3xl group-hover:scale-125 transition-transform duration-300">{stat.icon}</span>
+                    <span className="text-2xl md:text-3xl group-hover:scale-125 transition-transform duration-300 flex-shrink-0">{stat.icon}</span>
                   </div>
-                  <div className={`mt-2 h-1 bg-gradient-to-r ${stat.gradient} rounded-full`}></div>
+                  <div className={`mt-1 md:mt-2 h-1 bg-gradient-to-r ${stat.gradient} rounded-full`}></div>
                 </div>
               ))}
             </div>
 
             {/* Enhanced Product Interface */}
-            <div className="px-6 pb-6">
-              <div className="bg-white rounded-xl shadow-inner border-2 border-gray-100 overflow-hidden">
+            <div className="px-3 md:px-4 lg:px-6 pb-3 md:pb-4 lg:pb-6">
+              <div className="bg-white rounded-lg md:rounded-xl shadow-inner border-2 border-gray-100 overflow-hidden">
                 <ProductInventoryInterface />
               </div>
             </div>
@@ -4429,22 +4435,22 @@ const AdminPortal = () => {
         )}
       </div>
 
-      {/* System-wide Inventory Reports */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* System-wide Inventory Reports - Mobile Optimized */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
         {/* Inventory Trends */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-blue-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-              <span className="mr-3 text-2xl">📈</span>
-              Inventory Trends
+        <div className="bg-white rounded-lg md:rounded-2xl shadow-lg md:shadow-xl p-4 md:p-6 border-2 border-blue-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 mb-4 md:mb-6">
+            <h3 className="text-base md:text-lg lg:text-xl font-bold text-gray-900 flex items-center gap-1 md:gap-2 lg:gap-3">
+              <span className="text-lg md:text-2xl">📈</span>
+              <span>Inventory Trends</span>
             </h3>
-            <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm">
+            <select className="border border-gray-300 rounded-lg px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm w-full sm:w-auto">
               <option>Last 7 days</option>
               <option>Last 30 days</option>
               <option>Last 90 days</option>
             </select>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-3">
             {[
               { product: 'Premium Rice 25kg', trend: 'up', value: '+15%', color: 'green' },
               { product: 'Organic Beans 10kg', trend: 'up', value: '+8%', color: 'green' },
@@ -4452,30 +4458,30 @@ const AdminPortal = () => {
               { product: 'Cooking Oil 2L', trend: 'up', value: '+22%', color: 'green' },
               { product: 'Maize Flour 10kg', trend: 'stable', value: '0%', color: 'gray' }
             ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-3 h-3 rounded-full bg-${item.color}-500`}></div>
-                  <span className="font-medium text-gray-900">{item.product}</span>
+              <div key={index} className="flex items-center justify-between p-2 md:p-3 lg:p-4 rounded-lg hover:bg-gray-50 transition-colors">
+                <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                  <div className={`w-2 md:w-3 h-2 md:h-3 rounded-full bg-${item.color}-500 flex-shrink-0`}></div>
+                  <span className="font-medium text-xs md:text-sm text-gray-900 truncate">{item.product}</span>
                 </div>
-                <div className={`flex items-center space-x-2 text-${item.color}-600`}>
-                  <span>{item.trend === 'up' ? '↗' : item.trend === 'down' ? '↘' : '→'}</span>
-                  <span className="font-semibold">{item.value}</span>
+                <div className={`flex items-center gap-1 md:gap-2 text-${item.color}-600 flex-shrink-0`}>
+                  <span className="text-xs md:text-sm">{item.trend === 'up' ? '↗' : item.trend === 'down' ? '↘' : '→'}</span>
+                  <span className="font-semibold text-xs md:text-sm">{item.value}</span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Critical Alerts */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 border-2 border-red-100">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-              <span className="mr-3 text-2xl">🚨</span>
-              Critical Alerts
+        {/* Critical Alerts - Mobile Optimized */}
+        <div className="bg-white rounded-lg md:rounded-2xl shadow-lg md:shadow-xl p-4 md:p-6 border-2 border-red-100">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 md:gap-4 mb-4 md:mb-6">
+            <h3 className="text-base md:text-lg lg:text-xl font-bold text-gray-900 flex items-center gap-1 md:gap-2 lg:gap-3">
+              <span className="text-lg md:text-2xl">🚨</span>
+              <span>Critical Alerts</span>
             </h3>
-            <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-medium">3 Active</span>
+            <span className="bg-red-100 text-red-800 px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-medium w-fit">3 Active</span>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-2 md:space-y-3">
             {[
               {
                 type: 'Critical Stock',
@@ -4499,18 +4505,18 @@ const AdminPortal = () => {
                 action: 'Update Prices'
               }
             ].map((alert, index) => (
-              <div key={index} className={`p-4 rounded-xl border-l-4 ${
+              <div key={index} className={`p-3 md:p-4 rounded-lg md:rounded-xl border-l-4 ${
                 alert.severity === 'high' ? 'border-red-500 bg-red-50' :
                 alert.severity === 'medium' ? 'border-yellow-500 bg-yellow-50' :
                 'border-blue-500 bg-blue-50'
               }`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{alert.type}</h4>
-                    <p className="text-gray-700 text-sm mt-1">{alert.message}</p>
-                    <p className="text-gray-500 text-xs mt-2">{alert.time}</p>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 md:gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-xs md:text-sm text-gray-900">{alert.type}</h4>
+                    <p className="text-gray-700 text-xs md:text-sm mt-0.5 md:mt-1">{alert.message}</p>
+                    <p className="text-gray-500 text-xs mt-1 md:mt-2">{alert.time}</p>
                   </div>
-                  <button className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                  <button className={`px-2 md:px-3 py-1 rounded-lg text-xs font-medium flex-shrink-0 w-full sm:w-auto ${
                     alert.severity === 'high' ? 'bg-red-600 text-white' :
                     alert.severity === 'medium' ? 'bg-yellow-600 text-white' :
                     'bg-blue-600 text-white'
@@ -4590,99 +4596,99 @@ const AdminPortal = () => {
 
     return (
       <div className="space-y-6">
-        {/* Order Management Header - Collapsible */}
-        <div className="bg-gradient-to-r from-orange-500 via-red-600 to-pink-700 rounded-xl p-6 text-white shadow-xl cursor-pointer hover:shadow-2xl transition-all duration-300"
+        {/* Order Management Header - Collapsible - Mobile Optimized */}
+        <div className="bg-gradient-to-r from-orange-500 via-red-600 to-pink-700 rounded-lg md:rounded-xl p-4 md:p-6 text-white shadow-lg md:shadow-xl cursor-pointer hover:shadow-xl md:hover:shadow-2xl transition-all duration-300"
              onClick={() => setExpandedCard(expandedCard === 'header' ? null : 'header')}>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-2 flex items-center">
-                <span className="mr-3 text-3xl">📋</span>
-                Complete Order Management
-                <FiChevronDown className={`ml-3 transition-transform duration-300 ${expandedCard === 'header' ? 'rotate-180' : ''}`} />
+          <div className="flex items-center justify-between gap-3 md:gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg md:text-2xl font-bold mb-1 md:mb-2 flex items-center gap-2">
+                <span className="text-2xl md:text-3xl flex-shrink-0">📋</span>
+                <span className="truncate">Order Management</span>
+                <FiChevronDown className={`ml-2 transition-transform duration-300 flex-shrink-0 ${expandedCard === 'header' ? 'rotate-180' : ''}`} />
               </h2>
-              <p className="text-orange-100">Full administrative control over all order operations and workflows</p>
+              <p className="text-orange-100 text-xs md:text-sm">Full administrative control over all order operations</p>
             </div>
-            <div className="text-right ml-4">
-              <div className="text-4xl font-bold">{orderStats.loading ? '...' : orderStats.total.toLocaleString()}</div>
-              <div className="text-orange-200">Total Orders</div>
+            <div className="text-right ml-2 md:ml-4 flex-shrink-0">
+              <div className="text-2xl md:text-4xl font-bold">{orderStats.loading ? '...' : orderStats.total.toLocaleString()}</div>
+              <div className="text-orange-200 text-xs md:text-sm">Total Orders</div>
             </div>
           </div>
           
           {expandedCard === 'header' && (
-            <div className="mt-6 pt-6 border-t border-white/20 animate-fadeIn">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="bg-white/10 rounded-lg p-3">
-                  <div className="text-orange-200">System Status</div>
+            <div className="mt-4 md:mt-6 pt-4 md:pt-6 border-t border-white/20 animate-fadeIn">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 text-xs md:text-sm">
+                <div className="bg-white/10 rounded-lg p-2 md:p-3">
+                  <div className="text-orange-200 text-xs md:text-sm">System Status</div>
                   <div className="font-bold mt-1">🟢 Active</div>
                 </div>
-                <div className="bg-white/10 rounded-lg p-3">
-                  <div className="text-orange-200">Last Updated</div>
-                  <div className="font-bold mt-1">{new Date().toLocaleTimeString()}</div>
+                <div className="bg-white/10 rounded-lg p-2 md:p-3">
+                  <div className="text-orange-200 text-xs md:text-sm">Last Updated</div>
+                  <div className="font-bold mt-1 text-xs md:text-sm">{new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</div>
                 </div>
-                <div className="bg-white/10 rounded-lg p-3">
-                  <div className="text-orange-200">Data Source</div>
+                <div className="bg-white/10 rounded-lg p-2 md:p-3">
+                  <div className="text-orange-200 text-xs md:text-sm">Data Source</div>
                   <div className="font-bold mt-1">Supabase</div>
                 </div>
-                <div className="bg-white/10 rounded-lg p-3">
-                  <div className="text-orange-200">Auto Refresh</div>
-                  <div className="font-bold mt-1">Every 5min</div>
+                <div className="bg-white/10 rounded-lg p-2 md:p-3">
+                  <div className="text-orange-200 text-xs md:text-sm">Auto Refresh</div>
+                  <div className="font-bold mt-1 text-xs md:text-sm">Every 5min</div>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Order Stats - List Format with Collapsible Cards */}
-        <div className="space-y-4">
+        {/* Order Stats - List Format with Collapsible Cards - Mobile Optimized */}
+        <div className="space-y-3 md:space-y-4">
           {orderCards.map((card) => (
             <div 
               key={card.id}
-              className={`bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer border-l-4 border-${card.color}-500`}
+              className={`bg-white rounded-lg md:rounded-xl shadow-md md:shadow-lg hover:shadow-lg md:hover:shadow-xl transition-all duration-300 cursor-pointer border-l-4 border-${card.color}-500`}
               onClick={() => setExpandedCard(expandedCard === card.id ? null : card.id)}
             >
-              <div className="p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center flex-1">
-                    <div className={`p-3 bg-${card.color}-100 rounded-xl mr-4`}>
-                      <span className="text-2xl">{card.icon}</span>
+              <div className="p-3 md:p-5">
+                <div className="flex items-center justify-between gap-2 md:gap-4">
+                  <div className="flex items-center flex-1 gap-2 md:gap-4">
+                    <div className={`p-2 md:p-3 bg-${card.color}-100 rounded-lg md:rounded-xl flex-shrink-0`}>
+                      <span className="text-xl md:text-2xl">{card.icon}</span>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold text-gray-900">{card.title}</h3>
-                      <p className="text-sm text-gray-600">{card.description}</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm md:text-lg font-bold text-gray-900 truncate">{card.title}</h3>
+                      <p className="text-xs md:text-sm text-gray-600 truncate">{card.description}</p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
                     <div className="text-right">
-                      <div className="text-3xl font-bold text-gray-900">
+                      <div className="text-lg md:text-3xl font-bold text-gray-900">
                         {orderStats.loading ? '...' : card.value}
                       </div>
                     </div>
-                    <FiChevronDown className={`text-gray-400 transition-transform duration-300 ${expandedCard === card.id ? 'rotate-180' : ''}`} />
+                    <FiChevronDown className={`text-gray-400 transition-transform duration-300 flex-shrink-0 ${expandedCard === card.id ? 'rotate-180' : ''}`} />
                   </div>
                 </div>
 
                 {/* Expanded Content */}
                 {expandedCard === card.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-200 animate-fadeIn">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="text-sm text-gray-600 mb-1">Details</div>
-                        <div className="font-medium text-gray-900">{card.details}</div>
+                  <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t border-gray-200 animate-fadeIn">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                      <div className="bg-gray-50 rounded-lg p-3 md:p-4">
+                        <div className="text-xs md:text-sm text-gray-600 mb-1">Details</div>
+                        <div className="font-medium text-sm md:text-base text-gray-900">{card.details}</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-4">
-                        <div className="text-sm text-gray-600 mb-1">Last Updated</div>
-                        <div className="font-medium text-gray-900 flex items-center">
-                          <FiRefreshCw className="mr-2 text-green-500" />
-                          {new Date().toLocaleString()}
+                      <div className="bg-gray-50 rounded-lg p-3 md:p-4">
+                        <div className="text-xs md:text-sm text-gray-600 mb-1">Last Updated</div>
+                        <div className="font-medium text-sm md:text-base text-gray-900 flex items-center gap-2">
+                          <FiRefreshCw className="text-green-500 flex-shrink-0" />
+                          <span className="truncate">{new Date().toLocaleString()}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-4 flex justify-end space-x-2">
-                      <button className={`px-4 py-2 bg-${card.color}-600 text-white rounded-lg hover:bg-${card.color}-700 transition-colors flex items-center`}>
-                        <FiEye className="mr-2" /> View Details
+                    <div className="mt-3 md:mt-4 flex justify-end gap-2 flex-wrap">
+                      <button className={`px-3 md:px-4 py-2 text-sm md:text-base bg-${card.color}-600 text-white rounded-lg hover:bg-${card.color}-700 transition-colors flex items-center gap-1 md:gap-2`}>
+                        <FiEye className="flex-shrink-0" /> <span className="hidden sm:inline">View Details</span>
                       </button>
-                      <button className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center">
-                        <FiDownload className="mr-2" /> Export
+                      <button className="px-3 md:px-4 py-2 text-sm md:text-base bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-1 md:gap-2">
+                        <FiDownload className="flex-shrink-0" /> <span className="hidden sm:inline">Export</span>
                       </button>
                     </div>
                   </div>
@@ -4692,119 +4698,175 @@ const AdminPortal = () => {
           ))}
         </div>
 
-      {/* Order Control Panel */}
-      <div className="bg-white rounded-2xl shadow-xl p-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <span className="mr-3 text-3xl">🎛️</span>
-          Order Control Panel
+      {/* Order Control Panel - Mobile Optimized */}
+      <div className="bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-xl p-4 md:p-8">
+        <h3 className="text-lg md:text-2xl font-bold text-gray-900 mb-4 md:mb-6 flex items-center gap-2 md:gap-3">
+          <span className="text-2xl md:text-3xl">🎛️</span>
+          <span className="truncate">Order Control Panel</span>
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4">
           {[
-            { title: 'Bulk Actions', icon: '🔄', action: 'Process multiple orders' },
-            { title: 'Priority Queue', icon: '⚡', action: 'Manage urgent orders' },
-            { title: 'Auto-Assignment', icon: '🤖', action: 'Automated order routing' },
-            { title: 'Cancel Orders', icon: '❌', action: 'Mass cancellation tools' },
+            { title: 'Bulk Actions', icon: '🔄', action: 'Process multiple' },
+            { title: 'Priority Queue', icon: '⚡', action: 'Manage urgent' },
+            { title: 'Auto-Assignment', icon: '🤖', action: 'Automated routing' },
+            { title: 'Cancel Orders', icon: '❌', action: 'Mass cancel' },
             { title: 'Refund Control', icon: '💸', action: 'Process refunds' },
-            { title: 'Delivery Tracking', icon: '🚚', action: 'Monitor deliveries' },
-            { title: 'Customer Alerts', icon: '📱', action: 'Send notifications' },
-            { title: 'Order Analytics', icon: '📊', action: 'Generate reports' }
+            { title: 'Delivery Tracking', icon: '🚚', action: 'Monitor' },
+            { title: 'Customer Alerts', icon: '📱', action: 'Send notify' },
+            { title: 'Order Analytics', icon: '📊', action: 'Generate' }
           ].map((control, index) => (
-            <button key={index} className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-4 rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-center">
-              <div className="text-2xl mb-2">{control.icon}</div>
-              <div className="font-semibold text-sm">{control.title}</div>
-              <div className="text-xs text-white/80 mt-1">{control.action}</div>
+            <button key={index} className="bg-gradient-to-r from-orange-600 to-red-600 text-white p-2 md:p-4 rounded-lg md:rounded-xl hover:shadow-lg transform hover:scale-105 transition-all duration-300 text-center flex flex-col items-center justify-center">
+              <div className="text-lg md:text-2xl mb-1">{control.icon}</div>
+              <div className="font-semibold text-xs md:text-sm line-clamp-2">{control.title}</div>
+              <div className="text-xs text-white/70 mt-0.5 line-clamp-1">{control.action}</div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Detailed Orders List - Real data from database */}
-      <div className="bg-white rounded-2xl shadow-xl p-8">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <span className="mr-3 text-3xl">📜</span>
-          Recent Orders (Real Data from Database)
+      {/* Detailed Orders List - Real data from database - Mobile Optimized */}
+      <div className="bg-white rounded-xl md:rounded-2xl shadow-lg md:shadow-xl p-4 md:p-8">
+        <h3 className="text-lg md:text-2xl font-bold text-gray-900 mb-4 md:mb-6 flex items-center gap-2 md:gap-3">
+          <span className="text-2xl md:text-3xl">📜</span>
+          <span>Recent Orders</span>
         </h3>
         
         {loadingDetailedOrders ? (
           <div className="text-center py-8">
-            <div className="animate-spin text-4xl mb-3">⏳</div>
-            <p className="text-gray-600">Loading orders from database...</p>
+            <div className="animate-spin text-3xl md:text-4xl mb-3">⏳</div>
+            <p className="text-sm md:text-base text-gray-600">Loading orders...</p>
           </div>
         ) : detailedOrders.length === 0 ? (
           <div className="text-center py-8 bg-gray-50 rounded-lg">
-            <p className="text-gray-500">No orders found in database</p>
+            <p className="text-sm md:text-base text-gray-500">No orders found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-gray-300 bg-gray-50">
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Order ID</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Type</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Status</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Customer/Supplier</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Amount</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Items</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Date</th>
-                  <th className="px-4 py-3 text-left font-bold text-gray-900">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detailedOrders.slice(0, 10).map((order, index) => (
-                  <tr key={order.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-mono font-bold text-blue-600">{order.id.slice(0, 8)}...</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        order.type === 'sale' 
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {order.type === 'sale' ? '💰 Sale' : '📦 Purchase'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        order.status === 'completed' 
-                          ? 'bg-green-100 text-green-800'
-                          : order.status === 'pending' || order.status === 'pending_approval'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {order.status === 'completed' && '✅ Completed'}
-                        {order.status === 'pending' && '⏳ Pending'}
-                        {order.status === 'pending_approval' && '⏳ Pending Approval'}
-                        {order.status === 'sent_to_supplier' && '🚚 Sent'}
-                        {!['completed', 'pending', 'pending_approval', 'sent_to_supplier'].includes(order.status) && order.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {order.customer || order.supplier || 'N/A'}
-                    </td>
-                    <td className="px-4 py-3 font-bold text-gray-900">
-                      UGX {(order.amount || 0).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-center font-semibold text-gray-700">
-                      {order.items}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 text-xs">
-                      {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </td>
-                    <td className="px-4 py-3">
-                      <button className="text-blue-600 hover:text-blue-800 font-semibold text-xs px-3 py-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
-                        View
-                      </button>
-                    </td>
+          <div className="space-y-3 md:space-y-0 md:overflow-x-auto">
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-3">
+              {detailedOrders.slice(0, 10).map((order, index) => (
+                <div key={order.id} className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-600">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Order ID</div>
+                      <div className="font-mono text-sm font-bold text-blue-600">{order.id.slice(0, 8)}...</div>
+                    </div>
+                    <span className={`px-2 py-1 rounded text-xs font-bold ${
+                      order.status === 'completed' 
+                        ? 'bg-green-100 text-green-800'
+                        : order.status === 'pending' || order.status === 'pending_approval'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {order.status === 'completed' && '✅ Done'}
+                      {order.status === 'pending' && '⏳ Pending'}
+                      {order.status === 'pending_approval' && '⏳ Await'}
+                      {order.status === 'sent_to_supplier' && '🚚 Sent'}
+                    </span>
+                  </div>
+                  
+                  <div className="space-y-2 text-sm mb-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Type</span>
+                      <span className="font-semibold">{order.type === 'sale' ? '💰 Sale' : '📦 Purchase'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Customer/Supplier</span>
+                      <span className="font-semibold truncate ml-2">{order.customer || order.supplier || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Amount</span>
+                      <span className="font-bold text-gray-900">UGX {(order.amount || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Items</span>
+                      <span className="font-semibold text-gray-700">{order.items}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Date</span>
+                      <span className="text-xs font-medium">{new Date(order.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  
+                  <button className="w-full text-sm text-blue-600 hover:text-blue-800 font-semibold py-2 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
+                    View Details
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-gray-300 bg-gray-50">
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Order ID</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Type</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Status</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Customer/Supplier</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Amount</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Items</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Date</th>
+                    <th className="px-4 py-3 text-left font-bold text-gray-900">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-4 flex justify-between items-center">
-              <p className="text-sm text-gray-600">
+                </thead>
+                <tbody>
+                  {detailedOrders.slice(0, 10).map((order, index) => (
+                    <tr key={order.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-blue-600">{order.id.slice(0, 8)}...</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          order.type === 'sale' 
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {order.type === 'sale' ? '💰 Sale' : '📦 Purchase'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          order.status === 'completed' 
+                            ? 'bg-green-100 text-green-800'
+                            : order.status === 'pending' || order.status === 'pending_approval'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {order.status === 'completed' && '✅ Completed'}
+                          {order.status === 'pending' && '⏳ Pending'}
+                          {order.status === 'pending_approval' && '⏳ Pending Approval'}
+                          {order.status === 'sent_to_supplier' && '🚚 Sent'}
+                          {!['completed', 'pending', 'pending_approval', 'sent_to_supplier'].includes(order.status) && order.status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-gray-900">
+                        {order.customer || order.supplier || 'N/A'}
+                      </td>
+                      <td className="px-4 py-3 font-bold text-gray-900">
+                        UGX {(order.amount || 0).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-center font-semibold text-gray-700">
+                        {order.items}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 text-xs">
+                        {new Date(order.created_at).toLocaleDateString()} {new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button className="text-blue-600 hover:text-blue-800 font-semibold text-xs px-3 py-1 bg-blue-50 rounded hover:bg-blue-100 transition-colors">
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+              <p className="text-xs sm:text-sm text-gray-600">
                 Showing 1-{Math.min(10, detailedOrders.length)} of {detailedOrders.length} orders
               </p>
-              <button className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-sm flex items-center">
-                <FiDownload className="mr-2" />
-                Export All Orders
+              <button className="w-full sm:w-auto px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
+                <FiDownload /> <span>Export All</span>
               </button>
             </div>
           </div>
@@ -6831,39 +6893,39 @@ const AdminPortal = () => {
       )}
 
       {/* Main Content Area */}
-      <div className={`${isMobile ? 'pt-16' : 'ml-64'} p-4 sm:p-8`}>
-        {/* Header */}
-        <div className="container-glass rounded-2xl shadow-lg p-6 mb-8 animate-fadeInUp">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Admin Portal - System Administration</h1>
-              <p className="text-gray-600">Welcome back to FareDeal Uganda, admin</p>
+      <div className={`${isMobile ? 'pt-16' : 'ml-64'} p-3 md:p-4 lg:p-8`}>
+        {/* Header - Compact for mobile */}
+        <div className="container-glass rounded-lg md:rounded-2xl shadow-lg p-3 md:p-4 lg:p-6 mb-4 md:mb-6 lg:mb-8 animate-fadeInUp">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 truncate">Admin Portal - System Administration</h1>
+              <p className="text-xs md:text-sm text-gray-600 mt-0.5 md:mt-1">Welcome back to FareDeal Uganda, admin</p>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-1 md:gap-2 lg:gap-4 flex-shrink-0">
               <button 
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Notifications"
               >
-                <FiBell className="h-6 w-6" />
+                <FiBell className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
               </button>
               <button 
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 title="Settings"
               >
-                <FiSettings className="h-6 w-6" />
+                <FiSettings className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
               </button>
               
-              {/* Admin Profile Dropdown */}
+              {/* Admin Profile Dropdown - Compact */}
               <div className="relative">
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center space-x-3 bg-gray-50 rounded-lg px-4 py-2 hover:bg-gray-100 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 bg-gray-50 rounded-lg px-2 md:px-3 py-1.5 md:py-2 hover:bg-gray-100 transition-colors cursor-pointer"
                   title="Admin Profile"
                 >
-                  <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white">
-                    <FiShield className="h-5 w-5" />
+                  <div className="w-6 md:w-8 h-6 md:h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
+                    <FiShield className="h-3 md:h-5 w-3 md:w-5" />
                   </div>
-                  <div className="text-sm text-left">
+                  <div className="text-xs md:text-sm text-left hidden md:block">
                     <div className="font-medium text-gray-900">admin</div>
                     <div className="text-gray-500 text-xs">Administrator</div>
                   </div>
@@ -6997,15 +7059,17 @@ const AdminPortal = () => {
             {/* 🧾 TRANSACTION HISTORY - Admin View */}
             {activeSection === 'transactions' && (
               <div>
-                <div className={`bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl ${isMobile ? 'p-4' : 'p-6'} text-white shadow-xl mb-6`}>
-                  <h2 className={`${isMobile ? 'text-xl' : 'text-3xl'} font-bold flex items-center`}>
-                    🧾 All Transactions & Financial Reports 🇺🇬
+                <div className={`bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-lg md:rounded-xl ${isMobile ? 'p-3 md:p-6' : 'p-6'} text-white shadow-lg md:shadow-xl mb-4 md:mb-6`}>
+                  <h2 className={`${isMobile ? 'text-base md:text-2xl' : 'text-3xl'} font-bold flex items-center gap-2`}>
+                    <span className="text-lg md:text-2xl flex-shrink-0">🧾</span>
+                    <span className="truncate">All Transactions</span>
+                    <span className="text-sm md:text-lg flex-shrink-0">🇺🇬</span>
                   </h2>
-                  <p className={`text-yellow-100 mt-2 ${isMobile ? 'text-sm' : 'text-base'}`}>
+                  <p className={`text-yellow-100 mt-2 ${isMobile ? 'text-xs md:text-sm' : 'text-base'}`}>
                     Complete transaction history with advanced analytics and financial insights
                   </p>
                 </div>
-                <div className={isMobile ? 'space-y-4' : ''}>
+                <div className={isMobile ? 'space-y-3 md:space-y-4' : ''}>
                   <TransactionHistory viewMode="admin" />
                 </div>
               </div>

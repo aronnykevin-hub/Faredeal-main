@@ -1487,177 +1487,167 @@ const CashierPortal = () => {
   };
 
   const renderPOS = () => (
-    <div className="space-y-6 animate-fadeInUp container-glass shadow-xl rounded-2xl p-8 border border-yellow-200">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Product Selection */}
-        <div className="lg:col-span-2 bg-white rounded-xl p-6 shadow-lg">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-900 flex items-center">
-              🛒 Product Selection
+    <div className="space-y-4 md:space-y-6 animate-fadeInUp container-glass shadow-xl rounded-lg md:rounded-2xl p-4 md:p-8 border border-yellow-200">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 h-screen md:h-auto flex flex-col md:flex-row">
+        {/* Product Selection - Optimized for mobile */}
+        <div className="lg:col-span-2 bg-white rounded-lg md:rounded-xl p-3 md:p-6 shadow-lg flex flex-col">
+          <div className="flex items-center justify-between mb-3 md:mb-6 flex-shrink-0">
+            <h3 className="text-base md:text-xl font-bold text-gray-900 flex items-center gap-2">
+              🛒 <span>Products</span>
             </h3>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-1 md:gap-2">
               <button
                 onClick={() => setShowAddProductModal(true)}
-                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
+                className="px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-xs md:text-sm font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-1 md:gap-2 shadow-lg"
               >
-                <FiPlus className="h-5 w-5" />
-                <span>Add Product</span>
+                <FiPlus className="h-4 md:h-5 w-4 md:w-5" />
+                <span className="hidden md:inline">Add</span>
               </button>
               <button
                 onClick={() => setShowDualScanner(true)}
-                className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-bold hover:from-cyan-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg animate-pulse"
-                title="Smart dual scanner - camera + hand gun"
+                className="px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg text-xs md:text-sm font-bold hover:from-cyan-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-1 md:gap-2 shadow-lg animate-pulse"
+                title="Smart dual scanner"
               >
-                <FiZap className="h-5 w-5" />
-                <span>🔍 Smart Scan</span>
-              </button>
-              <button
-                onClick={() => setShowBarcodeScanner(true)}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-green-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg"
-              >
-                <FiCamera className="h-5 w-5" />
-                <span>📱 Scan Barcode</span>
+                <FiZap className="h-4 md:h-5 w-4 md:w-5" />
+                <span className="hidden md:inline">Scan</span>
               </button>
             </div>
           </div>
           
-          {/* 🔥 SUPABASE PRODUCTS GRID - Real-time inventory */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
-            {productsLoading ? (
-              <div className="col-span-3 text-center py-8">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-gray-500 mt-2">Loading products from database...</p>
-              </div>
-            ) : products.length === 0 ? (
-              <div className="col-span-3 text-center py-8">
-                <p className="text-gray-500">No products available</p>
-                <button 
-                  onClick={loadProductsFromSupabase}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <FiRefreshCw className="inline mr-2" />
-                  Reload Products
-                </button>
-              </div>
-            ) : (
-              products.map((product) => {
-                const productPrice = product.selling_price || product.price || 0;
-                const productStock = product.stock || product.available_stock || 0;
-                const categoryName = product.categoryName || product.category || 'General';
-                const isLowStock = productStock <= (product.minStock || 10);
-                const isOutOfStock = productStock === 0;
-                
-                return (
-                  <div
-                    key={product.id}
-                    onClick={() => !isOutOfStock && addItemToTransaction(product)}
-                    className={`border rounded-lg p-4 hover:shadow-md transition-all duration-300 ${
-                      isOutOfStock 
-                        ? 'cursor-not-allowed opacity-50 bg-gray-100 border-gray-300' 
-                        : 'cursor-pointer hover:bg-yellow-50 border-gray-200 hover:border-yellow-300'
-                    }`}
+          {/* Products Grid - Optimized for mobile */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid grid-cols-3 md:grid-cols-4 gap-2 md:gap-4">
+              {productsLoading ? (
+                <div className="col-span-3 md:col-span-4 text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="text-gray-500 mt-2 text-sm">Loading products...</p>
+                </div>
+              ) : products.length === 0 ? (
+                <div className="col-span-3 md:col-span-4 text-center py-8">
+                  <p className="text-gray-500 text-sm">No products available</p>
+                  <button 
+                    onClick={loadProductsFromSupabase}
+                    className="mt-2 px-3 md:px-4 py-1 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                   >
-                    <div className="text-center">
-                      <div className="text-2xl mb-2">
+                    <FiRefreshCw className="inline mr-1" />
+                    Reload
+                  </button>
+                </div>
+              ) : (
+                products.map((product) => {
+                  const productPrice = product.selling_price || product.price || 0;
+                  const productStock = product.stock || product.available_stock || 0;
+                  const categoryName = product.categoryName || product.category || 'General';
+                  const isLowStock = productStock <= (product.minStock || 10);
+                  const isOutOfStock = productStock === 0;
+                  
+                  return (
+                    <div
+                      key={product.id}
+                      onClick={() => !isOutOfStock && addItemToTransaction(product)}
+                      className={`border rounded-lg p-2 md:p-4 hover:shadow-md transition-all duration-300 text-center ${
+                        isOutOfStock 
+                          ? 'cursor-not-allowed opacity-50 bg-gray-100 border-gray-300' 
+                          : 'cursor-pointer hover:bg-yellow-50 border-gray-200 hover:border-yellow-300'
+                      }`}
+                    >
+                      <div className="text-xl md:text-2xl mb-1 md:mb-2">
                         {categoryName.toLowerCase().includes('produce') ? '🥬' :
                          categoryName.toLowerCase().includes('dairy') ? '🥛' :
                          categoryName.toLowerCase().includes('bakery') ? '🍞' :
                          categoryName.toLowerCase().includes('personal') ? '🧼' :
                          categoryName.toLowerCase().includes('electronics') ? '📱' : '🌾'}
                       </div>
-                      <h4 className="font-semibold text-sm text-gray-900 mb-1">{product.name}</h4>
-                      <p className="text-green-600 font-bold">{formatUGX(productPrice)}</p>
-                      <div className="flex items-center justify-center space-x-1 text-xs mt-1">
+                      <h4 className="font-semibold text-xs md:text-sm text-gray-900 mb-0.5 md:mb-1 line-clamp-2">{product.name}</h4>
+                      <p className="text-green-600 font-bold text-xs md:text-base">{formatUGX(productPrice)}</p>
+                      <div className="flex items-center justify-center text-xs mt-0.5 md:mt-1">
                         {isOutOfStock ? (
-                          <span className="text-red-600 font-semibold">❌ Out of Stock</span>
+                          <span className="text-red-600 font-semibold">❌</span>
                         ) : isLowStock ? (
-                          <span className="text-orange-600 font-semibold">⚠️ Low: {productStock}</span>
+                          <span className="text-orange-600 font-semibold">⚠️ {productStock}</span>
                         ) : (
-                          <span className="text-gray-500">✓ Stock: {productStock}</span>
+                          <span className="text-gray-500">✓ {productStock}</span>
                         )}
                       </div>
-                      {product.sku && (
-                        <p className="text-xs text-gray-400 mt-1">SKU: {product.sku}</p>
-                      )}
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Transaction Summary */}
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-            🧾 Current Transaction
+        {/* Transaction Summary - Optimized for mobile */}
+        <div className="bg-white rounded-lg md:rounded-xl p-3 md:p-6 shadow-lg flex flex-col h-auto md:h-auto">
+          <h3 className="text-base md:text-xl font-bold text-gray-900 mb-3 md:mb-6 flex items-center gap-2 flex-shrink-0">
+            🧾 <span>Transaction</span>
           </h3>
           
-          {/* Transaction Items */}
-          <div className="space-y-3 max-h-64 overflow-y-auto mb-6">
+          {/* Transaction Items - Compact */}
+          <div className="flex-1 space-y-2 md:space-y-3 max-h-48 md:max-h-64 overflow-y-auto mb-3 md:mb-6">
             {currentTransaction.items.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No items added</p>
+              <p className="text-gray-500 text-center py-6 md:py-8 text-sm">No items</p>
             ) : (
               currentTransaction.items.map((item) => {
                 const itemPrice = item.selling_price || item.price || 0;
                 return (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 text-sm">{item.name}</h4>
-                      <p className="text-sm text-gray-600">{formatUGX(itemPrice)} x {item.quantity}</p>
+                  <div key={item.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-gray-900 text-xs md:text-sm truncate">{item.name}</h4>
+                      <p className="text-xs md:text-sm text-gray-600">{formatUGX(itemPrice)} x {item.quantity}</p>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
                       <button
                         onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                        className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
-                    >
-                      <FiMinus />
-                    </button>
-                    <span className="w-8 text-center font-semibold">{item.quantity}</span>
-                    <button
-                      onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                      className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-green-600"
-                    >
-                      <FiPlus />
-                    </button>
+                        className="w-5 md:w-6 h-5 md:h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                      >
+                        <FiMinus className="h-3 md:h-4 w-3 md:w-4" />
+                      </button>
+                      <span className="w-6 md:w-8 text-center font-semibold text-xs md:text-sm">{item.quantity}</span>
+                      <button
+                        onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
+                        className="w-5 md:w-6 h-5 md:h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-green-600"
+                      >
+                        <FiPlus className="h-3 md:h-4 w-3 md:w-4" />
+                      </button>
+                      <button
+                        onClick={() => removeItemFromTransaction(item.id)}
+                        className="text-red-500 hover:text-red-700 flex-shrink-0"
+                      >
+                        <FiX className="h-3 md:h-4 w-3 md:w-4" />
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => removeItemFromTransaction(item.id)}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                  >
-                    <FiX className="h-4 w-4" />
-                  </button>
-                </div>
                 );
               })
             )}
           </div>
 
-          {/* Transaction Totals */}
+          {/* Transaction Totals - Compact */}
           {currentTransaction.items.length > 0 && (
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-2 md:pt-4 space-y-2 md:space-y-3 flex-shrink-0">
               {/* Subtotal and Tax */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
+              <div className="space-y-1 md:space-y-2">
+                <div className="flex justify-between text-xs md:text-sm">
                   <span className="text-gray-600">Subtotal:</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs md:text-sm">
                   <span className="text-gray-600">VAT (18%):</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.tax)}</span>
                 </div>
               </div>
               
               {/* Total Amount Due */}
-              <div className="flex justify-between text-2xl font-bold border-t-2 border-b-2 border-gray-300 py-3 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex justify-between text-lg md:text-2xl font-bold border-t-2 border-b-2 border-gray-300 py-2 md:py-3 bg-gradient-to-r from-green-50 to-emerald-50">
                 <span className="text-gray-900">TOTAL:</span>
                 <span className="text-green-600">{formatUGX(currentTransaction.total)}</span>
               </div>
               
-              {/* Cash Received Input */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 space-y-3">
-                <label className="block text-sm font-semibold text-blue-900 mb-2">
-                  💵 Cash Received (UGX)
+              {/* Cash Received Input - Compact */}
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg md:rounded-xl p-2 md:p-4 space-y-2 md:space-y-3">
+                <label className="block text-xs md:text-sm font-semibold text-blue-900">
+                  💵 Cash Received
                 </label>
                 <input
                   type="number"
@@ -1667,25 +1657,25 @@ const CashierPortal = () => {
                     setCashReceived(value);
                   }}
                   onFocus={(e) => e.target.select()}
-                  placeholder="Enter amount..."
-                  className="w-full px-4 py-3 text-2xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  placeholder="Enter..."
+                  className="w-full px-2 md:px-4 py-2 md:py-3 text-xl md:text-2xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm md:text-base"
                 />
                 
-                {/* Quick Cash Buttons */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* Quick Cash Buttons - Responsive */}
+                <div className="grid grid-cols-3 gap-1 md:gap-2">
                   {[
-                    Math.ceil(currentTransaction.total / 1000) * 1000, // Round up to nearest 1000
-                    Math.ceil(currentTransaction.total / 5000) * 5000, // Round up to nearest 5000
-                    Math.ceil(currentTransaction.total / 10000) * 10000, // Round up to nearest 10000
+                    Math.ceil(currentTransaction.total / 1000) * 1000,
+                    Math.ceil(currentTransaction.total / 5000) * 5000,
+                    Math.ceil(currentTransaction.total / 10000) * 10000,
                   ].filter((amount, index, arr) => arr.indexOf(amount) === index && amount >= currentTransaction.total)
                    .slice(0, 3)
                    .map((amount) => (
                     <button
                       key={amount}
                       onClick={() => setCashReceived(amount.toString())}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-sm font-semibold transform hover:scale-105"
+                      className="px-1 md:px-3 py-1 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs md:text-sm font-semibold transform hover:scale-105"
                     >
-                      {formatUGX(amount)}
+                      {formatUGX(amount).replace('USh ', '')}
                     </button>
                   ))}
                 </div>
@@ -1693,18 +1683,18 @@ const CashierPortal = () => {
                 {/* Exact Amount Button */}
                 <button
                   onClick={() => setCashReceived(currentTransaction.total.toString())}
-                  className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-sm font-semibold"
+                  className="w-full px-2 md:px-3 py-1 md:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-xs md:text-sm font-semibold"
                 >
-                  ✓ Exact Amount
+                  ✓ Exact
                 </button>
               </div>
               
-              {/* Change Calculator */}
+              {/* Change Calculator - Compact */}
               {cashReceived && parseFloat(cashReceived) >= currentTransaction.total && (
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-xl p-4 animate-pulse">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-lg font-bold text-yellow-900">💰 CHANGE TO GIVE:</span>
-                    <span className="text-3xl font-bold text-orange-600">
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg md:rounded-xl p-2 md:p-4 animate-pulse">
+                  <div className="flex items-center justify-between mb-1 md:mb-2">
+                    <span className="text-sm md:text-lg font-bold text-yellow-900">💰 CHANGE:</span>
+                    <span className="text-xl md:text-3xl font-bold text-orange-600">
                       {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}
                     </span>
                   </div>
@@ -1725,13 +1715,13 @@ const CashierPortal = () => {
                     });
                     
                     return breakdown.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-yellow-300">
-                        <p className="text-xs font-semibold text-yellow-900 mb-2">💵 Change Breakdown:</p>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="mt-1 md:mt-3 pt-1 md:pt-3 border-t border-yellow-300">
+                        <p className="text-xs font-semibold text-yellow-900 mb-1">💵 Breakdown:</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-1 md:gap-2 text-xs">
                           {breakdown.map(({ denom, count }) => (
-                            <div key={denom} className="flex justify-between bg-white/50 rounded px-2 py-1">
-                              <span className="font-semibold">{formatUGX(denom)}:</span>
-                              <span className="text-yellow-900">{count} note{count > 1 ? 's' : ''}</span>
+                            <div key={denom} className="flex justify-between bg-white/50 rounded px-1 md:px-2 py-0.5 md:py-1">
+                              <span className="font-semibold">{formatUGX(denom).replace('USh ', '')}</span>
+                              <span className="text-yellow-900">x{count}</span>
                             </div>
                           ))}
                         </div>
@@ -1743,10 +1733,10 @@ const CashierPortal = () => {
               
               {/* Warning if insufficient cash */}
               {cashReceived && parseFloat(cashReceived) < currentTransaction.total && (
-                <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 flex items-center space-x-2">
-                  <FiAlertTriangle className="h-5 w-5 text-red-600" />
-                  <span className="text-sm font-semibold text-red-900">
-                    Insufficient! Need {formatUGX(currentTransaction.total - parseFloat(cashReceived))} more
+                <div className="bg-red-50 border-2 border-red-300 rounded-lg md:rounded-xl p-2 md:p-3 flex items-center gap-2">
+                  <FiAlertTriangle className="h-4 md:h-5 w-4 md:w-5 text-red-600 flex-shrink-0" />
+                  <span className="text-xs md:text-sm font-semibold text-red-900">
+                    Need {formatUGX(currentTransaction.total - parseFloat(cashReceived))} more
                   </span>
                 </div>
               )}
@@ -1755,16 +1745,16 @@ const CashierPortal = () => {
               <button
                 onClick={() => setPaymentModal(true)}
                 disabled={cashReceived && parseFloat(cashReceived) < currentTransaction.total}
-                className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 mt-4 transform hover:scale-105 shadow-lg ${
+                className={`w-full py-2 md:py-4 rounded-lg md:rounded-xl font-bold text-sm md:text-lg transition-all duration-300 mt-2 md:mt-4 transform hover:scale-105 shadow-lg ${
                   cashReceived && parseFloat(cashReceived) >= currentTransaction.total
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
                     : 'bg-gradient-to-r from-yellow-500 to-red-600 text-white hover:from-yellow-600 hover:to-red-700'
                 }`}
               >
                 {cashReceived && parseFloat(cashReceived) >= currentTransaction.total ? (
-                  <>✅ Complete Sale - Change: {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}</>
+                  <>✅ Confirm - Change: {formatUGX(parseFloat(cashReceived) - currentTransaction.total).replace('USh ', '')}</>
                 ) : (
-                  <>💳 Process Payment</>
+                  <>💳 Process</>
                 )}
               </button>
             </div>
@@ -1775,49 +1765,50 @@ const CashierPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-6 animate-slideInLeft container-3d bg-white rounded-2xl p-8 shadow-2xl">
-      {/* Ugandan-themed Welcome Section */}
-      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl p-6 text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">
+    <div className="space-y-3 md:space-y-6 animate-slideInLeft container-3d bg-white rounded-lg md:rounded-2xl p-4 md:p-8 shadow-2xl">
+      {/* Ugandan-themed Welcome Section - Responsive */}
+      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-lg md:rounded-xl p-3 md:p-6 text-white shadow-lg">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
+          <div className="flex-1">
+            <h1 className="text-xl md:text-3xl font-bold mb-1 md:mb-2">
               {getGreeting()}, {cashierProfile.name}! 🇺🇬
             </h1>
-            <p className="text-yellow-100 text-lg">
+            <p className="text-yellow-100 text-sm md:text-lg mb-2 md:mb-4">
               Welcome to your cashier portal - Ready to serve customers!
             </p>
-            <div className="flex items-center mt-4 space-x-6">
-              <div className="flex items-center space-x-2">
-                <FiClock className="h-5 w-5" />
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 md:gap-6 text-xs md:text-base">
+              <div className="flex items-center gap-1 md:gap-2">
+                <FiClock className="h-4 md:h-5 w-4 md:w-5 flex-shrink-0" />
                 <span>{currentTime.toLocaleTimeString('en-UG')}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FiMapPin className="h-5 w-5" />
+              <div className="flex items-center gap-1 md:gap-2">
+                <FiMapPin className="h-4 md:h-5 w-4 md:w-5 flex-shrink-0" />
                 <span>{cashierProfile.location}</span>
               </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 <span className={`font-semibold ${getShiftStatus().color}`}>
                   {getShiftStatus().icon} {getShiftStatus().status}
                 </span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FiShoppingCart className="h-5 w-5" />
+              <div className="flex items-center gap-1 md:gap-2">
+                <FiShoppingCart className="h-4 md:h-5 w-4 md:w-5 flex-shrink-0" />
                 <span>{cashierProfile.register}</span>
               </div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-6xl mb-2">🏪</div>
-            <p className="text-yellow-100 font-semibold">FAREDEAL Uganda</p>
-            <p className="text-yellow-200 text-sm">Supermarket</p>
+          <div className="text-center md:text-right flex-shrink-0">
+            <div className="text-4xl md:text-6xl mb-1 md:mb-2">🏪</div>
+            <p className="text-yellow-100 font-semibold text-sm md:text-base">FAREDEAL Uganda</p>
+            <p className="text-yellow-200 text-xs md:text-sm">Supermarket</p>
             
             {/* Quick Scanner Access */}
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="mt-4 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg border border-white/30"
+              className="mt-2 md:mt-4 px-3 md:px-6 py-2 md:py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-lg md:rounded-xl font-bold transition-all duration-300 transform hover:scale-105 flex items-center justify-center md:justify-start gap-1 md:gap-2 shadow-lg border border-white/30 text-sm md:text-base w-full md:w-auto"
             >
-              <FiCamera className="h-6 w-6" />
-              <span>📱 Quick Scan</span>
+              <FiCamera className="h-4 md:h-6 w-4 md:w-6" />
+              <span className="hidden sm:inline">📱 Quick Scan</span>
+              <span className="sm:hidden">Scan</span>
             </button>
           </div>
         </div>
@@ -1828,18 +1819,18 @@ const CashierPortal = () => {
 
       </div>
 
-      {/* Ugandan Performance Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* Ugandan Performance Metrics - Responsive Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-4 lg:gap-6">
         {[
           { title: 'Today\'s Sales', value: formatUGX(performanceMetrics.todaySales), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '+15.2%', desc: 'vs yesterday' },
-          { title: 'Customers Served', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '+12.3%', desc: 'customers' },
-          { title: 'Avg Basket Size', value: formatUGX(performanceMetrics.averageBasketSize), icon: FiShoppingBag, color: 'from-purple-500 to-purple-600', change: '+8.2%', desc: 'per customer' },
+          { title: 'Customers', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '+12.3%', desc: 'customers' },
+          { title: 'Avg Basket', value: formatUGX(performanceMetrics.averageBasketSize), icon: FiShoppingBag, color: 'from-purple-500 to-purple-600', change: '+8.2%', desc: 'per customer' },
           { title: 'Mobile Money', value: `${performanceMetrics.mobileMoneyTransactions}`, icon: FiPhone, color: 'from-orange-500 to-orange-600', change: '+18.7%', desc: 'transactions' },
-          { title: 'Efficiency Score', value: `${performanceMetrics.efficiency}%`, icon: FiTarget, color: 'from-indigo-500 to-indigo-600', change: '+2.1%', desc: 'accuracy' },
-          { title: 'Loyalty Signups', value: performanceMetrics.loyaltySignups, icon: FiAward, color: 'from-pink-500 to-pink-600', change: '+6', desc: 'new members' },
-          { title: 'Return Rate', value: `${performanceMetrics.returnRate}%`, icon: FiRefreshCw, color: 'from-red-500 to-red-600', change: '-0.5%', desc: 'returns' },
+          { title: 'Efficiency', value: `${performanceMetrics.efficiency}%`, icon: FiTarget, color: 'from-indigo-500 to-indigo-600', change: '+2.1%', desc: 'accuracy' },
+          { title: 'Loyalty', value: performanceMetrics.loyaltySignups, icon: FiAward, color: 'from-pink-500 to-pink-600', change: '+6', desc: 'new members' },
+          { title: 'Returns', value: `${performanceMetrics.returnRate}%`, icon: FiRefreshCw, color: 'from-red-500 to-red-600', change: '-0.5%', desc: 'returns' },
           { 
-            title: 'Quick Scanner', 
+            title: 'Quick Scan', 
             value: '📱', 
             icon: FiCamera, 
             color: 'from-green-500 to-blue-600', 
@@ -1851,89 +1842,87 @@ const CashierPortal = () => {
         ].map((metric, index) => (
           <div 
             key={index} 
-            className={`bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+            className={`bg-white rounded-lg md:rounded-xl p-3 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
               metric.isButton ? 'cursor-pointer border-2 border-green-200 hover:border-green-400' : ''
             }`}
             onClick={metric.onClick || (() => {})}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-gray-600 text-sm font-medium">{metric.title}</p>
-                <p className={`text-2xl font-bold text-gray-900 mt-1 ${metric.isButton ? 'text-center' : ''}`}>
-                  {metric.value}
-                </p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className={`text-sm font-medium ${
-                    metric.isButton ? 'text-green-600' : 'text-green-600'
-                  }`}>
-                    {metric.change}
-                  </span>
-                  <span className="text-gray-500 text-xs">{metric.desc}</span>
-                </div>
+            <div className="flex flex-col items-start gap-1 md:gap-3">
+              <p className="text-gray-600 text-xs md:text-sm font-medium">{metric.title}</p>
+              <p className={`text-lg md:text-2xl font-bold text-gray-900 ${metric.isButton ? 'text-center w-full' : ''}`}>
+                {metric.value}
+              </p>
+              <div className="flex flex-col gap-0.5 w-full">
+                <span className={`text-xs md:text-sm font-medium ${
+                  metric.isButton ? 'text-green-600' : 'text-green-600'
+                }`}>
+                  {metric.change}
+                </span>
+                <span className="text-gray-500 text-xs">{metric.desc}</span>
               </div>
-              <div className={`p-3 rounded-lg bg-gradient-to-r ${metric.color} ml-4 ${
+              <div className={`p-2 md:p-3 rounded-lg bg-gradient-to-r ${metric.color} w-full flex justify-center md:block ${
                 metric.isButton ? 'animate-pulse' : ''
               }`}>
-                <metric.icon className="h-6 w-6 text-white" />
+                <metric.icon className="h-4 md:h-6 w-4 md:w-6 text-white" />
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Payment Methods - Ugandan Focus (Real-time data from Supabase) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Payment Methods - Ugandan Focus - Responsive */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         {[
           { title: 'MTN Mobile Money', count: performanceMetrics.mobileMoneyTransactions, icon: '📱', color: 'bg-yellow-600 hover:bg-yellow-700' },
           { title: 'Cash (UGX)', count: performanceMetrics.cashTransactions, icon: '💵', color: 'bg-green-600 hover:bg-green-700' },
           { title: 'Airtel Money', count: performanceMetrics.mobileMoneyTransactions, icon: '📲', color: 'bg-red-600 hover:bg-red-700' },
           { title: 'Card Payments', count: performanceMetrics.cardTransactions, icon: '💳', color: 'bg-blue-600 hover:bg-blue-700' }
         ].map((method, index) => (
-          <div key={index} className={`${method.color} text-white p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105`}>
+          <div key={index} className={`${method.color} text-white p-3 md:p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105`}>
             <div className="text-center">
-              <div className="text-2xl mb-2">{method.icon}</div>
-              <div className="text-2xl font-bold">{method.count}</div>
-              <div className="text-sm opacity-90">{method.title}</div>
+              <div className="text-2xl md:text-3xl mb-1 md:mb-2">{method.icon}</div>
+              <div className="text-xl md:text-2xl font-bold">{method.count}</div>
+              <div className="text-xs md:text-sm opacity-90">{method.title}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Daily Tasks */}
-      <div className="bg-white rounded-xl p-6 shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900">📋 Daily Cashier Tasks</h3>
+      {/* Daily Tasks - Responsive */}
+      <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6 gap-2 sm:gap-4">
+          <h3 className="text-lg md:text-xl font-bold text-gray-900">📋 Daily Cashier Tasks</h3>
           {dailyTasks.length > 0 && (
-            <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+            <span className="text-xs md:text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full w-fit">
               {dailyTasks.filter(t => t.completed).length} of {dailyTasks.length} completed
             </span>
           )}
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2 md:space-y-3">
           {dailyTasks && dailyTasks.length > 0 ? (
             dailyTasks.map((task) => (
-              <div key={task.id} className={`flex items-center p-4 border rounded-lg transition-all duration-300 ${
+              <div key={task.id} className={`flex items-start md:items-center gap-2 md:gap-4 p-3 md:p-4 border rounded-lg transition-all duration-300 ${
                 task.completed ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200 hover:border-gray-300'
               }`}>
                 <button
                   onClick={() => toggleTask(task.id)}
-                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all duration-300 ${
+                  className={`w-5 md:w-6 h-5 md:h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
                     task.completed 
                       ? 'bg-green-500 border-green-500 text-white' 
                       : 'border-gray-300 hover:border-green-500'
                   }`}
                 >
-                  {task.completed && <FiCheck className="h-4 w-4" />}
+                  {task.completed && <FiCheck className="h-3 md:h-4 w-3 md:w-4" />}
                 </button>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h4 className={`font-medium ${task.completed ? 'text-green-800 line-through' : 'text-gray-900'}`}>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4">
+                    <h4 className={`font-medium text-sm md:text-base ${task.completed ? 'text-green-800 line-through' : 'text-gray-900'}`}>
                       {task.title}
                     </h4>
-                    <span className="text-sm text-gray-500 font-mono">{task.time}</span>
+                    <span className="text-xs md:text-sm text-gray-500 font-mono flex-shrink-0">{task.time}</span>
                   </div>
                   <div className="flex items-center mt-1">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    <span className={`inline-flex px-2 py-0.5 md:py-1 text-xs font-semibold rounded-full ${
                       task.priority === 'high' ? 'bg-red-100 text-red-800' :
                       task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                       'bg-green-100 text-green-800'
@@ -1945,31 +1934,31 @@ const CashierPortal = () => {
               </div>
             ))
           ) : (
-            <div className="text-center py-8">
-              <span className="text-4xl mb-2 block">📋</span>
-              <p className="text-gray-500 font-medium">Loading daily tasks...</p>
-              <p className="text-sm text-gray-400">Your shift tasks will appear shortly</p>
+            <div className="text-center py-6 md:py-8">
+              <span className="text-3xl md:text-4xl mb-2 block">📋</span>
+              <p className="text-gray-500 font-medium text-sm md:text-base">Loading daily tasks...</p>
+              <p className="text-xs md:text-sm text-gray-400">Your shift tasks will appear shortly</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Recent Transactions & Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">💳 Recent Transactions (Real-time from Supabase)</h3>
-          <div className="space-y-3">
+      {/* Recent Transactions & Top Products - Responsive Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+          <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4 md:mb-6">💳 Recent Transactions (Real-time from Supabase)</h3>
+          <div className="space-y-2 md:space-y-3 max-h-96 overflow-y-auto">
             {recentTransactions.length > 0 ? (
               recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-all duration-300">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center">
-                      <FiShoppingCart className="h-5 w-5 text-white" />
+                <div key={transaction.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 md:p-4 border rounded-lg hover:shadow-md transition-all duration-300">
+                  <div className="flex items-start sm:items-center gap-2 md:gap-4 flex-1 min-w-0">
+                    <div className="w-8 md:w-10 h-8 md:h-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <FiShoppingCart className="h-4 md:h-5 w-4 md:w-5 text-white" />
                     </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">{transaction.id}</span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-gray-900 text-xs md:text-sm truncate">{transaction.id}</span>
+                        <span className={`inline-flex px-2 py-0.5 md:py-1 text-xs font-semibold rounded-full flex-shrink-0 ${
                           transaction.method.includes('MoMo') || transaction.method.includes('Money') ? 'bg-orange-100 text-orange-800' :
                           transaction.method === 'Cash' ? 'bg-green-100 text-green-800' :
                           'bg-blue-100 text-blue-800'
@@ -1977,52 +1966,52 @@ const CashierPortal = () => {
                           {transaction.method}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500">{transaction.items} items • {transaction.time}</p>
+                      <p className="text-xs md:text-sm text-gray-500">{transaction.items} items • {transaction.time}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatUGX(transaction.amount)}</p>
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-semibold text-sm md:text-base text-gray-900">{formatUGX(transaction.amount)}</p>
+                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                       {transaction.status}
                     </span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8">
-                <FiShoppingCart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No transactions yet</p>
-                <p className="text-sm text-gray-400">Start processing sales to see them here</p>
+              <div className="text-center py-6 md:py-8">
+                <FiShoppingCart className="h-10 md:h-12 w-10 md:w-12 text-gray-300 mx-auto mb-2 md:mb-3" />
+                <p className="text-gray-500 font-medium text-sm md:text-base">No transactions yet</p>
+                <p className="text-xs md:text-sm text-gray-400">Start processing sales to see them here</p>
               </div>
             )}
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">🥇 Top Selling Products (Today - Supabase)</h3>
-          <div className="space-y-4">
+        <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+          <h3 className="text-lg md:text-xl font-bold text-gray-900 mb-4 md:mb-6">🥇 Top Selling Products (Today - Supabase)</h3>
+          <div className="space-y-2 md:space-y-4 max-h-96 overflow-y-auto">
             {topProducts.length > 0 ? (
               topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold">
+                <div key={index} className="flex items-center justify-between gap-2 md:gap-3 p-2 md:p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
+                    <div className="w-7 md:w-8 h-7 md:h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 text-sm md:text-base">
                       {index + 1}
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-900">{product.name}</p>
-                      <p className="text-sm text-gray-500">{product.sales} units sold</p>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 text-sm md:text-base truncate">{product.name}</p>
+                      <p className="text-xs md:text-sm text-gray-500">{product.sales} units sold</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatUGX(product.revenue)}</p>
+                  <div className="text-right flex-shrink-0">
+                    <p className="font-semibold text-sm md:text-base text-gray-900">{formatUGX(product.revenue)}</p>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-8">
-                <FiShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">No sales data yet</p>
-                <p className="text-sm text-gray-400">Make some sales to see top products</p>
+              <div className="text-center py-6 md:py-8">
+                <FiShoppingBag className="h-10 md:h-12 w-10 md:w-12 text-gray-300 mx-auto mb-2 md:mb-3" />
+                <p className="text-gray-500 font-medium text-sm md:text-base">No sales data yet</p>
+                <p className="text-xs md:text-sm text-gray-400">Make some sales to see top products</p>
               </div>
             )}
           </div>
