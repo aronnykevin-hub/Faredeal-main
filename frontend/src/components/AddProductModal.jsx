@@ -7,10 +7,11 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FiX, FiSave, FiPackage, FiDollarSign, FiHash, FiTag,
-  FiBox, FiTruck, FiMapPin, FiAlertCircle, FiCheck, FiUpload, FiZap
+  FiBox, FiTruck, FiMapPin, FiAlertCircle, FiCheck, FiUpload, FiZap, FiCamera
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import inventoryService from '../services/inventorySupabaseService';
+import DualScannerInterface from './DualScannerInterface';
 
 const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }) => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +21,9 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
 
   // Quick add mode for fast product entry
   const [quickAddMode, setQuickAddMode] = useState(true);
+  
+  // Scanner state
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -186,6 +190,13 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
     }
   };
 
+  // Handle barcode scanned from scanner
+  const handleBarcodeScanned = (barcode) => {
+    setFormData(prev => ({ ...prev, barcode }));
+    setShowBarcodeScanner(false);
+    toast.success(`✅ Barcode scanned: ${barcode}`);
+  };
+
   // Validate form
   const validateForm = () => {
     const newErrors = {};
@@ -299,7 +310,8 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-xl flex items-center justify-between">
@@ -423,14 +435,25 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
                       <FiHash className="inline mr-1" />
                       Barcode <span className="text-xs text-gray-500">(Optional)</span>
                     </label>
-                    <input
-                      type="text"
-                      name="barcode"
-                      value={formData.barcode}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 1234567890123"
-                    />
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        name="barcode"
+                        value={formData.barcode}
+                        onChange={handleChange}
+                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 1234567890123"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowBarcodeScanner(true)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                        title="Scan barcode with camera or barcode gun"
+                      >
+                        <FiCamera className="h-4 w-4" />
+                        <span className="text-xs">Scan</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Product Name */}
@@ -750,7 +773,16 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
           </div>
         </form>
       </div>
-    </div>
+      </div>
+      
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <DualScannerInterface
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
+    </>
   );
 };
 

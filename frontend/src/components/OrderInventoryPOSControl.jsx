@@ -10,10 +10,11 @@ import React, { useState, useEffect } from 'react';
 import {
   FiSearch, FiEdit, FiSave, FiX, FiTrendingUp, FiTrendingDown,
   FiBox, FiAlertTriangle, FiCheckCircle, FiDownload, FiRefreshCw,
-  FiPlus, FiTrash2, FiDollarSign, FiBarChart2, FiLock, FiAlertCircle
+  FiPlus, FiTrash2, FiDollarSign, FiBarChart2, FiLock, FiAlertCircle, FiCamera, FiHash
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabase';
+import DualScannerInterface from './DualScannerInterface';
 
 const OrderInventoryPOSControl = () => {
   // Admin Authorization Check
@@ -35,15 +36,100 @@ const OrderInventoryPOSControl = () => {
   const [bulkPriceMultiplier, setBulkPriceMultiplier] = useState(1.1);
   const [inventoryMap, setInventoryMap] = useState({}); // Map product_id to inventory data
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: '',
     sku: '',
+    barcode: '',
     cost_price: 0,
     selling_price: 0,
     tax_rate: 18,
     category_id: null
   });
   const [expandedId, setExpandedId] = useState(null); // Track which product row is expanded
+
+  // Handle barcode scanned from scanner
+  const handleBarcodeScanned = async (barcode) => {
+    setShowBarcodeScanner(false);
+    
+    try {
+      // Check if product with this barcode already exists
+      const { data: existingProduct, error: searchError } = await supabase
+        .from('products')
+        .select('id, name, sku, barcode, cost_price, selling_price, tax_rate')
+        .eq('barcode', barcode)
+        .maybeSingle();
+
+      if (searchError) {
+        console.error('❌ Error searching for barcode:', searchError);
+        toast.error('Failed to check barcode: ' + searchError.message);
+        return;
+      }
+
+      if (existingProduct) {
+        // Product found - show in the form for editing
+        toast.success(`✅ Product found: ${existingProduct.name}`);
+        setNewProduct({
+          name: existingProduct.name,
+          sku: existingProduct.sku || '',
+          barcode: existingProduct.barcode,
+          cost_price: existingProduct.cost_price || 0,
+          selling_price: existingProduct.selling_price || 0,
+          tax_rate: existingProduct.tax_rate || 18,
+          category_id: null
+        });
+        return;
+      }
+
+      // Product NOT found - Auto-register with just the barcode
+      toast.info(`📝 Barcode not found. Auto-registering: ${barcode}`);
+      
+      // Create a new product with just the barcode
+      const newProductData = {
+        barcode: barcode,
+        name: `Product-${barcode.substring(0, 8)}`, // Generate a temporary name
+        sku: `SKU-${barcode.substring(0, 6)}`, // Generate SKU from barcode
+        cost_price: 0,
+        selling_price: 0,
+        tax_rate: 18,
+        category_id: null,
+        is_active: true
+      };
+
+      const { data: createdProduct, error: createError } = await supabase
+        .from('products')
+        .insert([newProductData])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('❌ Error auto-registering product:', createError);
+        toast.error('Failed to auto-register product: ' + createError.message);
+        return;
+      }
+
+      // Product auto-registered successfully
+      toast.success(`✅ Product auto-registered with barcode: ${barcode}`);
+      
+      // Pre-fill the form with the new product
+      setNewProduct({
+        name: createdProduct.name,
+        sku: createdProduct.sku,
+        barcode: createdProduct.barcode,
+        cost_price: 0,
+        selling_price: 0,
+        tax_rate: 18,
+        category_id: null
+      });
+
+      // Reload products list
+      loadData();
+
+    } catch (error) {
+      console.error('❌ Barcode scanning error:', error);
+      toast.error('Error processing barcode: ' + error.message);
+    }
+  };
 
   // Load products and categories
   useEffect(() => {
@@ -942,6 +1028,31 @@ const OrderInventoryPOSControl = () => {
                 </div>
 
                 <div>
+                  <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
+                    <FiHash className="inline mr-1" />
+                    Barcode (Optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newProduct.barcode}
+                      onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
+                      placeholder="e.g., 1234567890123"
+                      className="flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowBarcodeScanner(true)}
+                      className="px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 whitespace-nowrap text-sm"
+                      title="Scan barcode with camera or barcode gun"
+                    >
+                      <FiCamera className="h-4 w-4" />
+                      <span className="hidden sm:inline">Scan</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
                     Cost Price (USh) *
                   </label>
@@ -1051,6 +1162,14 @@ const OrderInventoryPOSControl = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Barcode Scanner Modal */}
+      {showBarcodeScanner && (
+        <DualScannerInterface
+          onBarcodeScanned={handleBarcodeScanned}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
       )}
     </div>
   );
