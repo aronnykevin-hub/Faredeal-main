@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiX, FiCamera, FiZap, FiVolume2, FiCheck, FiAlertCircle, FiClock, FiSmartphone } from 'react-icons/fi';
+import { FiX, FiCamera, FiZap, FiVolume2, FiCheck, FiAlertCircle, FiClock, FiSmartphone, FiCpu } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import jsQR from 'jsqr';
+import Quagga from '@ericblade/quagga2';
 import { supabase } from '../services/supabase';
+import geminiAIService from '../services/geminiAIService';
 
 const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [] }) => {
   const [scanMode, setScanMode] = useState('camera'); // 'smart', 'camera', 'gun' - CAMERA ACTIVE BY DEFAULT
@@ -22,6 +24,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const [noActivityTimer, setNoActivityTimer] = useState(null); // 4-second timer
   const [showNoActivityWarning, setShowNoActivityWarning] = useState(false);
   const [inactivityProduct, setInactivityProduct] = useState(null); // Product to show after 4 seconds
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [lastFrameData, setLastFrameData] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -98,20 +104,65 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
 
       console.log('📸 Requesting camera permissions...');
       
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
+      // Try with ideal constraints first, but fail gracefully
+      let stream = null;
+      let constraintsFailed = false;
+      
+      try {
+        // Attempt 1: Full HD with environment facingMode
+        stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          }),
+          // Timeout after 5 seconds
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 5000)
+          )
+        ]);
+      } catch (error) {
+        console.warn('⚠️ Ideal constraints failed, trying fallback...');
+        constraintsFailed = true;
+        
+        try {
+          // Attempt 2: No specific facingMode, relaxed constraints
+          stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              },
+              audio: false
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 5000)
+            )
+          ]);
+        } catch (error2) {
+          console.warn('⚠️ Relaxed constraints failed, trying minimal...');
+          
+          // Attempt 3: Absolutely minimal constraints
+          stream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: false
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), 5000)
+            )
+          ]);
+        }
+      }
       
       if (!stream || !stream.active) {
         throw new Error('Failed to get active camera stream');
       }
 
-      console.log('✅ Camera stream obtained');
+      console.log('✅ Camera stream obtained' + (constraintsFailed ? ' (with fallback constraints)' : ''));
       
       // Double-check video ref still exists
       if (!videoRef.current) {
@@ -201,25 +252,34 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       
       console.log('📺 Video element ready, waiting for media to load...');
       
-      // Timeout if neither event fires within 8 seconds
+      // Timeout if neither event fires within 10 seconds
       timeoutId = setTimeout(() => {
         if (!cameraActive) {
           console.error('❌ Camera initialization timeout - no media event fired');
-          console.warn('⚠️ Trying fallback without constraints...');
-          toast.error('Camera initialization timeout - retrying with fallback');
+          console.warn('⚠️ Force-starting video playback...');
           cleanupHandlers();
-          setCameraActive(false);
           
-          // Clean up current stream
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-          }
-          
-          // Try fallback
-          retryWithFallbackConstraints();
+          // Try to play anyway - sometimes video plays without events
+          video.play()
+            .then(() => {
+              console.log('✅ Video playback started (forced)');
+              setCameraActive(true);
+              toast.success('📸 Camera activated - point at barcode');
+              startBarcodeDetection();
+            })
+            .catch(err => {
+              console.error('❌ Force-play failed:', err);
+              toast.error('Camera timeout - please try again');
+              setCameraActive(false);
+              
+              // Clean up current stream
+              if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+              }
+            });
         }
-      }, 8000);
+      }, 10000);
       
     } catch (error) {
       console.error('📸 Camera Error:', error);
@@ -236,6 +296,9 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         toast.error('❌ Camera constraints not supported. Retrying...');
         retryWithFallbackConstraints();
         return;
+      } else if (error.name === 'AbortError') {
+        console.error('❌ Camera timeout or aborted:', error.message);
+        toast.error('❌ Camera timeout - device may be busy. Please try again.');
       } else {
         toast.error('❌ Camera error: ' + (error.message || 'Unknown error'));
       }
@@ -370,10 +433,12 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     const video = videoRef.current;
     let frameCount = 0;
     let isDetecting = true; // Use local flag instead of stale closure
+    let noDetectionStartTime = Date.now();
+    let aiTriggered = false; // Prevent multiple AI triggers
 
     console.log('🎬 Starting barcode detection loop...');
 
-    const detectFrame = () => {
+    const detectFrame = async () => {
       try {
         // Process every frame for maximum sensitivity
         frameCount++;
@@ -397,16 +462,28 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             return;
           }
           
-          // Try jsQR detection ONLY (don't use pattern detection for actual barcodes)
+          // Try jsQR detection FIRST (fastest for QR codes)
           let detectedBarcode = null;
+          let detectedFormat = 'QR';
           try {
             const code = jsQR(imageData.data, imageData.width, imageData.height);
             if (code && code.data && code.data.trim()) {
               detectedBarcode = code.data.trim();
+              detectedFormat = 'QR Code';
               console.log('✅ QR Code Detected:', detectedBarcode);
             }
           } catch (e) {
             console.warn('⚠️ jsQR detection error:', e.message);
+          }
+          
+          // If no QR found, try Quagga2 for other barcode formats (every 5th frame to save CPU)
+          if (!detectedBarcode && frameCount % 5 === 0) {
+            const quaggaResult = await detectBarcodeWithQuagga(canvas);
+            if (quaggaResult && quaggaResult.barcode) {
+              detectedBarcode = quaggaResult.barcode;
+              detectedFormat = quaggaResult.format;
+              console.log(`✅ ${quaggaResult.format} Detected:`, detectedBarcode);
+            }
           }
           
           // Also check pattern to give FEEDBACK but don't use it as barcode data
@@ -415,10 +492,14 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             patternDetected = detectBarcodePattern(imageData);
           }
           
-          // Process detected barcode (only from jsQR)
+          // Process detected barcode (from jsQR or Quagga2)
           if (detectedBarcode) {
             const now = Date.now();
             const timeSinceLastDetection = now - lastDetectionTimeRef.current;
+            
+            // Reset no-detection timer on successful barcode
+            noDetectionStartTime = Date.now();
+            aiTriggered = false;
             
             // IMMEDIATE feedback if different barcode or enough time passed
             if (lastDetectedRef.current !== detectedBarcode || timeSinceLastDetection > 300) {
@@ -454,6 +535,28 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               
               // Play detection sound for feedback
               playSound('detect');
+              
+              // Reset no-detection timer
+              noDetectionStartTime = Date.now();
+            }
+          }
+          // ✨ AUTO-TRIGGER AI ANALYSIS if no barcode detected for 10 seconds
+          else {
+            const noDetectionDuration = Date.now() - noDetectionStartTime;
+            if (noDetectionDuration > 10000 && !aiTriggered && geminiAIService.isInitialized()) {
+              console.log('⏰ No barcode detected for 10 seconds, triggering AI analysis...');
+              aiTriggered = true;
+              
+              // Save current frame for AI analysis
+              setLastFrameData(canvas.toDataURL('image/jpeg', 0.9));
+              
+              // Auto-trigger AI analysis with a small delay
+              setTimeout(() => {
+                if (canvas && canvasRef.current) {
+                  toast.info('💡 Switching to AI analysis to identify the product...');
+                  analyzeImageWithAI(canvas);
+                }
+              }, 200);
             }
           }
         }
@@ -538,6 +641,93 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     }
     
     return false;
+  };
+
+  // Enhanced barcode detection using Quagga2 for multiple barcode formats
+  const detectBarcodeWithQuagga = async (canvas) => {
+    try {
+      return new Promise((resolve) => {
+        // Improve image quality before detection - increase contrast and brightness
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        
+        // Enhance image - increase contrast
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          
+          // Calculate brightness
+          const brightness = (r + g + b) / 3;
+          
+          // Enhance contrast - darker values get darker, lighter get lighter
+          const enhanced = brightness < 128 ? brightness * 0.7 : 128 + (brightness - 128) * 1.5;
+          const contrast = enhanced - brightness;
+          
+          data[i] = Math.min(255, Math.max(0, r + contrast * 0.5));
+          data[i + 1] = Math.min(255, Math.max(0, g + contrast * 0.5));
+          data[i + 2] = Math.min(255, Math.max(0, b + contrast * 0.5));
+        }
+        
+        ctx.putImageData(imageData, 0, 0);
+        
+        // Try Quagga detection with enhanced image
+        try {
+          Quagga.decodeSingle(
+            {
+              src: canvas.toDataURL('image/png', 0.95),
+              numOfWorkers: 2,
+              inputStream: {
+                size: 1200
+              },
+              decoder: {
+                readers: [
+                  'code_128_reader',
+                  'ean_reader',
+                  'ean_8_reader',
+                  'code_39_reader',
+                  'codabar_reader',
+                  'upc_reader',
+                  'upc_e_reader',
+                  'i2of5_reader'
+                ],
+                debug: {
+                  showCanvas: false,
+                  showPatternRectangle: false,
+                  showBoundingBox: false,
+                  showScanline: false
+                }
+              }
+            },
+            (result) => {
+              if (result && result.codeResult && result.codeResult.code) {
+                const barcode = result.codeResult.code.trim();
+                const format = result.codeResult.format;
+                const confidence = result.codeResult.confidence || 0;
+                
+                // Only accept if confidence is reasonable
+                if (confidence > 0.3 || barcode.length >= 8) {
+                  console.log(`✅ Barcode Detected [${format}]: ${barcode} (Confidence: ${confidence.toFixed(2)})`);
+                  resolve({ barcode, format, confidence });
+                } else {
+                  console.warn('⚠️ Low confidence detection, rejecting');
+                  resolve(null);
+                }
+              } else {
+                resolve(null);
+              }
+            }
+          );
+        } catch (quaggaError) {
+          console.warn('⚠️ Quagga error:', quaggaError.message);
+          resolve(null);
+        }
+      });
+    } catch (error) {
+      console.warn('⚠️ Barcode detection error:', error.message);
+      return null;
+    }
   };
 
   const initializeGunScanner = () => {
@@ -1092,6 +1282,57 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     }
   };
 
+  // 🤖 Analyze image with AI when barcode not found - with smart retries
+  const analyzeImageWithAI = async (canvasElement, retryCount = 0) => {
+    if (!geminiAIService.isInitialized()) {
+      toast.error('❌ AI service not initialized. Check Gemini API key.');
+      return;
+    }
+
+    const maxRetries = 3;
+
+    try {
+      setAiAnalyzing(true);
+      setShowAIAnalysis(true);
+
+      // Convert canvas to blob
+      const blob = await geminiAIService.canvasToBlob(canvasElement);
+      
+      // Analyze with Gemini AI - attempt with retry count for smarter prompting
+      const result = await geminiAIService.identifyProduct(blob, 'image/jpeg', retryCount + 1);
+      
+      if (result.success && result.data) {
+        setAiResult({
+          ...result.data,
+          confidence: result.confidence,
+          attempt: result.attempt
+        });
+        
+        const confidencePercent = Math.round(result.confidence);
+        const confidenceEmoji = result.confidence >= 80 ? '✅' : result.confidence >= 50 ? '⚠️' : '🔍';
+        
+        toast.success(`${confidenceEmoji} AI identified product (${confidencePercent}% confidence)`);
+      } else {
+        throw new Error('No product data returned');
+      }
+    } catch (error) {
+      console.error(`AI analysis error (Attempt ${retryCount + 1}):`, error);
+      
+      // Auto-retry with different prompt strategy
+      if (retryCount < maxRetries - 1) {
+        toast.info(`🔄 Retrying with different analysis method...`);
+        // Wait briefly before retry
+        await new Promise(resolve => setTimeout(resolve, 800));
+        return analyzeImageWithAI(canvasElement, retryCount + 1);
+      } else {
+        toast.error('❌ Could not identify product after multiple attempts');
+        setAiResult(null);
+      }
+    } finally {
+      setAiAnalyzing(false);
+    }
+  };
+
   const manualBarcodeScan = (barcode) => {
     if (!barcode.trim()) {
       toast.warning('⚠️ Please enter a barcode');
@@ -1112,51 +1353,81 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-96 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-white text-lg sm:text-2xl font-bold flex items-center space-x-2">
-            <FiZap className="h-5 w-5 sm:h-6 sm:w-6" />
-            <span className="hidden sm:inline">🔍 Dual Scanner Interface</span>
-            <span className="sm:hidden">🔍 Scanner</span>
-          </h2>
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+      <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col border border-white/20">
+        {/* ✨ Modern Gradient Header */}
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between flex-shrink-0 relative overflow-hidden">
+          {/* Animated background elements */}
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse"></div>
+            <div className="absolute bottom-0 left-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse delay-1000"></div>
+          </div>
+          
+          <div className="flex items-center space-x-3 relative z-10">
+            <div className="p-2 bg-white/20 rounded-full backdrop-blur-md">
+              <FiZap className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-white text-xl sm:text-2xl font-bold tracking-tight">Smart Scanner</h2>
+              <p className="text-white/80 text-xs sm:text-sm">Barcode • Camera • AI Recognition</p>
+            </div>
+          </div>
+          
           <button
             onClick={onClose}
-            className="text-white hover:bg-white hover:bg-opacity-20 rounded-lg p-2 transition-all active:scale-90"
+            className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90"
           >
-            <FiX className="h-5 w-5 sm:h-6 sm:w-6" />
+            <FiX className="h-6 w-6 text-white" />
           </button>
         </div>
 
+        {/* Main Content Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 p-2 sm:p-6 flex-1 overflow-y-auto">
           {/* Left: Scanner Modes */}
           <div className="space-y-2 sm:space-y-4">
             <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center space-x-2">
-              <FiSmartphone className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span>Scanner Mode</span>
+              <FiSmartphone className="h-5 w-5 text-blue-600 sm:h-6 sm:w-6" />
+              <span className="font-semibold">Scanner Mode</span>
             </h3>
 
-            {/* Mode Selection */}
-            <div className="space-y-1 sm:space-y-2">
+            {/* Mode Selection - Enhanced Cards */}
+            <div className="space-y-2 sm:space-y-3">
               {[
-                { id: 'smart', label: '🧠 Smart Mode', desc: 'Both sources' },
-                { id: 'camera', label: '📱 Camera Scan', desc: 'Phone camera' },
-                { id: 'gun', label: '🔫 Gun Scan', desc: 'Hand scanner' }
+                { id: 'smart', label: '🧠 Smart Mode', desc: 'Both sources', color: 'from-blue-500 to-blue-600' },
+                { id: 'camera', label: '📱 Camera Scan', desc: 'Phone camera', color: 'from-purple-500 to-purple-600' },
+                { id: 'gun', label: '🔫 Gun Scan', desc: 'Hand scanner', color: 'from-green-500 to-green-600' }
               ].map(mode => (
                 <button
                   key={mode.id}
                   onClick={() => setScanMode(mode.id)}
-                  className={`w-full p-2 sm:p-3 rounded-lg border-2 transition-all active:scale-95 ${
+                  className={`w-full p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 active:scale-95 ${
                     scanMode === mode.id
-                      ? 'border-blue-600 bg-blue-50 shadow-md'
-                      : 'border-gray-200 bg-white hover:border-blue-300'
+                      ? `bg-gradient-to-r ${mode.color} border-white shadow-lg text-white scale-105`
+                      : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md text-gray-900'
                   }`}
                 >
-                  <p className="font-bold text-gray-900 text-sm sm:text-base">{mode.label}</p>
-                  <p className="text-xs text-gray-600">{mode.desc}</p>
+                  <p className={`font-bold text-sm sm:text-base ${scanMode === mode.id ? 'text-white' : 'text-gray-900'}`}>{mode.label}</p>
+                  <p className={`text-xs ${scanMode === mode.id ? 'text-blue-50' : 'text-gray-600'}`}>{mode.desc}</p>
                 </button>
               ))}
+              
+              {/* 🤖 AI Analysis Button - Fallback when barcode detection fails */}
+              {cameraActive && geminiAIService.isInitialized() && (
+                <button
+                  onClick={() => {
+                    if (canvasRef.current) {
+                      analyzeImageWithAI(canvasRef.current);
+                    } else {
+                      toast.error('No camera frame available');
+                    }
+                  }}
+                  className="w-full p-3 sm:p-4 rounded-xl border-2 border-gradient-to-r from-purple-400 to-pink-400 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 font-bold group"
+                  title="Use AI to identify product from camera image"
+                >
+                  <p className="text-gray-900 text-sm sm:text-base group-hover:text-purple-700 transition-colors">🤖 AI Analysis</p>
+                  <p className="text-xs text-purple-700 group-hover:text-purple-900">Identify product visually</p>
+                </button>
+              )}
               
               {/* Creative No Activity Notification - Show after 4 seconds */}
               {showNoActivityWarning && inactivityProduct && (
@@ -1179,11 +1450,18 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                       </div>
                     </div>
                   ) : (
-                    // 🏇 Ready to Scan Prompt
-                    <div className="w-full p-3 sm:p-4 rounded-lg border-2 border-blue-400 bg-gradient-to-r from-blue-50 to-cyan-50 animate-bounce">
-                      <p className="font-bold text-blue-900 text-center text-base sm:text-lg">{inactivityProduct.emoji}</p>
-                      <p className="font-bold text-blue-900 text-center text-sm sm:text-base">{inactivityProduct.message}</p>
-                      <p className="text-xs text-blue-700 text-center mt-1">📱 Point camera at barcode or use 🔫 gun scanner</p>
+                    // 🏇 Ready to Scan Prompt - Enhanced with animation
+                    <div className="w-full p-4 sm:p-5 rounded-xl border-2 border-gradient-to-r from-blue-400 to-cyan-400 bg-gradient-to-br from-blue-50 via-white to-cyan-50 animate-pulse shadow-lg">
+                      <p className="font-bold text-blue-900 text-center text-3xl sm:text-4xl mb-2">{inactivityProduct.emoji}</p>
+                      <p className="font-bold text-blue-900 text-center text-sm sm:text-base leading-relaxed">{inactivityProduct.message}</p>
+                      <div className="mt-3 flex items-center justify-center space-x-2">
+                        <div className="flex space-x-1">
+                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
+                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100"></div>
+                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200"></div>
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-700 text-center mt-3 font-medium">📱 Point camera at barcode or use 🔫 gun scanner</p>
                     </div>
                   )}
                 </div>
@@ -1272,15 +1550,15 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             </div>
           </div>
 
-          {/* Center: Camera Feed or Manual Entry */}
-          <div className="bg-gray-900 rounded-lg overflow-hidden flex flex-col items-center justify-center relative h-full min-h-[300px] sm:min-h-[400px]">
+          {/* Center: Camera Feed - Enhanced Modern Design */}
+          <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative h-full min-h-[300px] sm:min-h-[400px] border border-gray-700 shadow-2xl">
             {scanMode === 'camera' || scanMode === 'smart' ? (
               <>
                 <video
                   ref={videoRef}
                   autoPlay
                   playsInline
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover rounded-lg"
                 />
                 <canvas
                   ref={canvasRef}
@@ -1288,32 +1566,37 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                 />
                 {cameraActive && (
                   <>
-                    {/* Active scanning border */}
-                    <div className="absolute inset-0 border-4 border-green-500 opacity-50 rounded-lg pointer-events-none animate-pulse">
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent animate-pulse"></div>
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent animate-pulse"></div>
+                    {/* Enhanced scanning border with glow */}
+                    <div className="absolute inset-0 border-3 border-blue-500/60 rounded-xl pointer-events-none shadow-xl shadow-blue-500/20">
+                      {/* Top scanning line */}
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"></div>
+                      {/* Bottom scanning line */}
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"></div>
                     </div>
                     
-                    {/* Corner scan points */}
-                    <div className="absolute top-4 left-4 w-8 h-8 border-t-2 border-l-2 border-green-400 rounded-tl-lg"></div>
-                    <div className="absolute top-4 right-4 w-8 h-8 border-t-2 border-r-2 border-green-400 rounded-tr-lg"></div>
-                    <div className="absolute bottom-4 left-4 w-8 h-8 border-b-2 border-l-2 border-green-400 rounded-bl-lg"></div>
-                    <div className="absolute bottom-4 right-4 w-8 h-8 border-b-2 border-r-2 border-green-400 rounded-br-lg"></div>
+                    {/* Animated corner markers */}
+                    <div className="absolute top-6 left-6 w-12 h-12 border-t-3 border-l-3 border-cyan-400 rounded-tl-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                    <div className="absolute top-6 right-6 w-12 h-12 border-t-3 border-r-3 border-cyan-400 rounded-tr-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                    <div className="absolute bottom-6 left-6 w-12 h-12 border-b-3 border-l-3 border-cyan-400 rounded-bl-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                    <div className="absolute bottom-6 right-6 w-12 h-12 border-b-3 border-r-3 border-cyan-400 rounded-br-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
                   </>
                 )}
                 
-                {/* Status indicator */}
+                {/* Status indicator - Enhanced */}
                 {showScanningIndicator && (
-                  <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-black bg-opacity-70 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm flex items-center space-x-2 animate-bounce">
-                    <div className="h-2 w-2 bg-green-400 rounded-full animate-pulse"></div>
-                    <span>🔍 Scanning...</span>
+                  <div className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-full text-xs sm:text-sm flex items-center space-x-2 shadow-2xl shadow-cyan-500/50 font-bold">
+                    <div className="h-2.5 w-2.5 bg-white rounded-full animate-pulse"></div>
+                    <span>✨ Scanning...</span>
                   </div>
                 )}
                 
-                {/* Instructions */}
-                <div className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-4 bg-black bg-opacity-70 text-white px-2 sm:px-3 py-1 sm:py-2 rounded-lg text-xs sm:text-sm text-center space-y-1">
-                  <p>📱 Point camera at QR code or barcode</p>
-                  <p className="text-green-400 font-bold text-xs">✓ Automatic detection active</p>
+                {/* Instructions - Enhanced modern card */}
+                <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 bg-gradient-to-r from-black/80 to-gray-900/80 backdrop-blur-md text-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl text-center space-y-2 border border-gray-700/50 shadow-2xl">
+                  <p className="text-sm sm:text-base font-semibold">📱 Point camera at barcode</p>
+                  <p className="text-cyan-400 font-bold text-xs sm:text-sm flex items-center justify-center space-x-1">
+                    <FiCheck className="h-4 w-4" />
+                    <span>Automatic detection active</span>
+                  </p>
                 </div>
               </>
             ) : (
@@ -1462,6 +1745,128 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             </div>
           </div>
         </div>
+
+        {/* 🤖 AI Analysis Modal - Product Identification */}
+        {showAIAnalysis && (
+          <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4">
+              {aiAnalyzing ? (
+                // Loading state with progress
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <div className="relative h-16 w-16">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-full animate-spin opacity-75"></div>
+                    <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
+                      <FiCpu className="h-8 w-8 text-blue-600 animate-pulse" />
+                    </div>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="font-bold text-lg text-gray-900 mb-2">🤖 AI Analysis</h3>
+                    <p className="text-sm text-gray-600 mb-2">Analyzing product image with Gemini AI...</p>
+                    <div className="h-1 w-24 mx-auto bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 animate-pulse rounded-full"></div>
+                    </div>
+                  </div>
+                </div>
+              ) : aiResult ? (
+                // Success state with confidence indicator
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                      <FiCheck className="h-5 w-5 text-green-600" />
+                      Product Identified
+                    </h3>
+                    {aiResult.confidence && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-bold text-gray-600">Confidence:</span>
+                        <div className="px-2 py-1 rounded-full text-xs font-bold"
+                          style={{
+                            backgroundColor: aiResult.confidence >= 80 ? '#dcfce7' : 
+                                            aiResult.confidence >= 50 ? '#fef3c7' : '#fee2e2',
+                            color: aiResult.confidence >= 80 ? '#166534' : 
+                                   aiResult.confidence >= 50 ? '#b45309' : '#991b1b'
+                          }}>
+                          {Math.round(aiResult.confidence)}%
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-lg space-y-3 border border-blue-100">
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Brand</p>
+                      <p className="text-sm font-bold text-gray-900">{aiResult.brand}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Product Name</p>
+                      <p className="text-sm font-bold text-gray-900">{aiResult.name}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Category</p>
+                        <p className="text-sm font-bold text-blue-600">{aiResult.category}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Est. Price</p>
+                        <p className="text-sm font-bold text-green-600">UGX {aiResult.estimatedPrice}</p>
+                      </div>
+                    </div>
+                    {aiResult.packageSize && (
+                      <div>
+                        <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Package Size</p>
+                        <p className="text-sm font-bold text-gray-900">{aiResult.packageSize}</p>
+                      </div>
+                    )}
+                    {aiResult.keyFeatures && aiResult.keyFeatures.length > 0 && (
+                      <div>
+                        <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide mb-2">Features</p>
+                        <div className="flex flex-wrap gap-2">
+                          {aiResult.keyFeatures.map((feature, idx) => (
+                            <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
+                              ✓ {feature}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      onClick={() => {
+                        setShowAIAnalysis(false);
+                        toast.success('✅ Product identified and ready to add');
+                      }}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold transition-all active:scale-95"
+                    >
+                      Use This Product
+                    </button>
+                    <button
+                      onClick={() => setShowAIAnalysis(false)}
+                      className="flex-1 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 font-bold transition-all active:scale-95"
+                    >
+                      Retry Scan
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Error state
+                <div className="text-center space-y-4">
+                  <FiAlertCircle className="h-12 w-12 text-red-600 mx-auto" />
+                  <div>
+                    <h3 className="font-bold text-lg text-gray-900">Analysis Failed</h3>
+                    <p className="text-sm text-gray-600 mt-2">Could not identify the product. Please try again.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowAIAnalysis(false)}
+                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold transition-all active:scale-95"
+                  >
+                    Close
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

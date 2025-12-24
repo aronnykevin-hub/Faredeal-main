@@ -12,6 +12,7 @@ import {
 import { toast } from 'react-toastify';
 import inventoryService from '../services/inventorySupabaseService';
 import DualScannerInterface from './DualScannerInterface';
+import { supabase } from '../services/supabase';
 
 const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }) => {
   const [loading, setLoading] = useState(false);
@@ -191,10 +192,45 @@ const AddProductModal = ({ isOpen, onClose, onProductAdded, prefilledData = {} }
   };
 
   // Handle barcode scanned from scanner
-  const handleBarcodeScanned = (barcode) => {
-    setFormData(prev => ({ ...prev, barcode }));
+  const handleBarcodeScanned = async (barcode) => {
     setShowBarcodeScanner(false);
-    toast.success(`✅ Barcode scanned: ${barcode}`);
+    
+    try {
+      // Check if product with this barcode already exists
+      const { data: existingProduct, error: searchError } = await supabase
+        .from('products')
+        .select('id, name, barcode, sku, cost_price, selling_price, tax_rate, category_id')
+        .eq('barcode', barcode)
+        .maybeSingle();
+
+      if (searchError && searchError.code !== 'PGRST116') {
+        console.error('Error searching for product:', searchError);
+        toast.error('Error checking for existing product');
+        return;
+      }
+
+      if (existingProduct) {
+        // Product already exists - show details and ask if user wants to edit
+        toast.warning(`⚠️ Product already exists: ${existingProduct.name}`);
+        toast.info(`SKU: ${existingProduct.sku || 'N/A'} | Price: UGX ${existingProduct.selling_price}`);
+        setShowBarcodeScanner(false);
+        return;
+      }
+
+      // Product doesn't exist - auto-fill the barcode
+      setFormData(prev => ({
+        ...prev,
+        barcode: barcode,
+        sku: `SKU-${barcode.substring(0, 8)}`
+      }));
+      
+      toast.success(`✅ Barcode scanned & registered: ${barcode}`);
+      toast.info('Please fill in the product details to complete registration');
+      
+    } catch (error) {
+      console.error('Error handling barcode:', error);
+      toast.error('Error processing barcode');
+    }
   };
 
   // Validate form

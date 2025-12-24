@@ -56,78 +56,69 @@ const OrderInventoryPOSControl = () => {
       // Check if product with this barcode already exists
       const { data: existingProduct, error: searchError } = await supabase
         .from('products')
-        .select('id, name, sku, barcode, cost_price, selling_price, tax_rate')
+        .select('id, name, barcode, sku')
         .eq('barcode', barcode)
         .maybeSingle();
 
-      if (searchError) {
-        console.error('❌ Error searching for barcode:', searchError);
-        toast.error('Failed to check barcode: ' + searchError.message);
+      if (searchError && searchError.code !== 'PGRST116') {
+        console.error('Error searching for product:', searchError);
+        toast.error('Error checking for existing product');
         return;
       }
 
       if (existingProduct) {
-        // Product found - show in the form for editing
-        toast.success(`✅ Product found: ${existingProduct.name}`);
-        setNewProduct({
-          name: existingProduct.name,
-          sku: existingProduct.sku || '',
-          barcode: existingProduct.barcode,
-          cost_price: existingProduct.cost_price || 0,
-          selling_price: existingProduct.selling_price || 0,
-          tax_rate: existingProduct.tax_rate || 18,
-          category_id: null
-        });
+        // Product already exists
+        toast.info(`📦 Product found: ${existingProduct.name} (SKU: ${existingProduct.sku || 'N/A'})`);
         return;
       }
 
-      // Product NOT found - Auto-register with just the barcode
-      toast.info(`📝 Barcode not found. Auto-registering: ${barcode}`);
+      // Product doesn't exist - auto-register it
+      toast.info('🔍 Barcode not found in inventory. Auto-registering...');
       
-      // Create a new product with just the barcode
-      const newProductData = {
-        barcode: barcode,
-        name: `Product-${barcode.substring(0, 8)}`, // Generate a temporary name
-        sku: `SKU-${barcode.substring(0, 6)}`, // Generate SKU from barcode
-        cost_price: 0,
-        selling_price: 0,
-        tax_rate: 18,
-        category_id: null,
-        is_active: true
-      };
+      // Auto-create product with scanned barcode
+      const generatedName = `Product - ${barcode}`;
+      const generatedSKU = `SKU-${barcode.substring(0, 8)}`;
 
-      const { data: createdProduct, error: createError } = await supabase
+      const { data: newProduct, error: createError } = await supabase
         .from('products')
-        .insert([newProductData])
+        .insert([{
+          name: generatedName,
+          barcode: barcode,
+          sku: generatedSKU,
+          cost_price: 0,
+          selling_price: 0,
+          tax_rate: 18,
+          is_active: true,
+          created_at: new Date()
+        }])
         .select()
         .single();
 
       if (createError) {
-        console.error('❌ Error auto-registering product:', createError);
-        toast.error('Failed to auto-register product: ' + createError.message);
+        console.error('Error creating product:', createError);
+        toast.error('Failed to register barcode: ' + createError.message);
         return;
       }
 
-      // Product auto-registered successfully
-      toast.success(`✅ Product auto-registered with barcode: ${barcode}`);
+      // Pre-fill the form with the scanned barcode for user to complete details
+      setNewProduct(prev => ({
+        ...prev,
+        barcode: barcode,
+        name: '',
+        sku: generatedSKU
+      }));
       
-      // Pre-fill the form with the new product
-      setNewProduct({
-        name: createdProduct.name,
-        sku: createdProduct.sku,
-        barcode: createdProduct.barcode,
-        cost_price: 0,
-        selling_price: 0,
-        tax_rate: 18,
-        category_id: null
-      });
-
+      setShowAddProductModal(true);
+      toast.success(`✅ Barcode registered! Please complete the product details.`);
+      
       // Reload products list
-      loadData();
+      setTimeout(() => {
+        loadData();
+      }, 500);
 
     } catch (error) {
-      console.error('❌ Barcode scanning error:', error);
-      toast.error('Error processing barcode: ' + error.message);
+      console.error('Error handling barcode:', error);
+      toast.error('Error processing barcode');
     }
   };
 
