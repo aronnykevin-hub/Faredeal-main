@@ -68,36 +68,39 @@ class GeminiAIService {
 
       // Creative system prompts that get more flexible with retries
       const systemPrompts = [
-        // Attempt 1: Strict but detailed
-        `You are a supermarket inventory AI expert. Analyze the product image and extract:
-1. Brand Name (or "Generic" if no brand visible)
-2. Product Name including variant (flavor, size, scent, color, etc.)
-3. Category (Snacks, Beverages, Cleaning, Dairy, Personal Care, Electronics, Groceries, Household, Beauty, Health, Office, Other)
-4. Estimated Price Range (in local currency, or best guess based on typical prices)
-5. Key Features (organic, sugar-free, natural, premium, budget, etc.)
-6. Package Size/Quantity (if visible)
-7. Description (2-3 word summary)
+        // Attempt 1: ENHANCED - Focus on reading visible text, barcodes, and product details FIRST
+        `You are a supermarket inventory AI expert specializing in product identification from images.
+IMPORTANT: First, try to READ any visible text on the product (brand, product name, barcodes, labels).
+Then extract:
+1. Brand Name - READ if visible, or "Generic" if unclear
+2. Product Name - READ visible text, include size/flavor/variant if shown
+3. Barcode Number - If you can see a barcode, try to read the number
+4. Category - Snacks, Beverages, Cleaning, Dairy, Personal Care, Electronics, Groceries, Household, Beauty, Health, Office, Other
+5. Estimated Price - Based on packaging quality and typical market prices
+6. Key Features - What's visible (organic, sugar-free, natural, premium, budget, etc.)
+7. Package Size - If visible on packaging
+8. Description - 2-3 word summary
 
-Return ONLY valid JSON: {"brand":"","productName":"","category":"","estimatedPrice":"","keyFeatures":[],"packageSize":"","description":""}`,
+Always return ONLY valid JSON: {"brand":"","barcode":"","productName":"","category":"","estimatedPrice":"","keyFeatures":[],"packageSize":"","description":""}`,
 
         // Attempt 2: More creative, focus on what you see
-        `You are a creative product identifier. Even if you can't read all text clearly, describe what you see:
-- What's the dominant color or design?
-- What type of product is this (food, cleaning, beauty, etc.)?
+        `You are a creative product identifier. Even if you cannot read all text clearly, describe what you see:
+- What is the dominant color or design?
+- What type of product is this (food, cleaning, beauty, electronics)?
 - Can you infer the brand from logos or colors?
-- What's a reasonable product name based on the appearance?
+- What is a reasonable product name based on the appearance?
 - Estimate price based on packaging quality and type
 
-Return JSON: {"brand":"","productName":"","category":"","estimatedPrice":"","keyFeatures":[],"packageSize":"","description":""}`,
+Return JSON: {"brand":"","barcode":"","productName":"","category":"","estimatedPrice":"","keyFeatures":[],"packageSize":"","description":""}`,
 
         // Attempt 3: Ultra flexible - identify by any visible clue
         `Identify this product using ANY visible information:
 - Logos, colors, text fragments, packaging style
 - Similar products you know about
-- Context clues from what's visible
+- Context clues from what is visible
 - Make your best educated guess
 
-Return JSON: {"brand":"Best guess","productName":"Product type + features visible","category":"Best category match","estimatedPrice":"Estimated range","keyFeatures":["Any visible feature"],"packageSize":"Any size info","description":"Simple description"}`
+Return JSON: {"brand":"Best guess","barcode":"","productName":"Product type + features visible","category":"Best category match","estimatedPrice":"Estimated range","keyFeatures":["Any visible feature"],"packageSize":"Any size info","description":"Simple description"}`
       ];
 
       const selectedPrompt = Math.min(attemptNumber - 1, systemPrompts.length - 1);
@@ -213,6 +216,7 @@ Return JSON: {"brand":"Best guess","productName":"Product type + features visibl
   normalizeProductData(parsed) {
     return {
       brand: this.cleanString(parsed.brand || parsed.Brand || 'Unknown Brand'),
+      barcode: this.cleanString(parsed.barcode || parsed.Barcode || ''), // NEW: Support barcode reading
       name: this.cleanString(parsed.productName || parsed.name || parsed.Product || 'Unknown Product'),
       category: this.cleanString(parsed.category || parsed.Category || 'General'),
       estimatedPrice: this.cleanString(parsed.estimatedPrice || parsed.price || parsed.Price || '0'),
@@ -233,6 +237,7 @@ Return JSON: {"brand":"Best guess","productName":"Product type + features visibl
     
     return {
       brand: this.extractValue(text, ['Brand:', 'brand:', 'Brand Name:', 'brand name:'], 'Unknown Brand'),
+      barcode: this.extractValue(text, ['Barcode:', 'barcode:', 'Barcode Number:', 'barcode number:'], ''),
       name: this.extractValue(text, ['Product Name:', 'product name:', 'Name:', 'name:'], 'Unknown Product'),
       category: this.extractValue(text, ['Category:', 'category:'], 'General'),
       estimatedPrice: this.extractValue(text, ['Price:', 'price:', 'Estimated Price:', 'estimated price:'], '0'),

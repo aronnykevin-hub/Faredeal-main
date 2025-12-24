@@ -540,23 +540,24 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               noDetectionStartTime = Date.now();
             }
           }
-          // ✨ AUTO-TRIGGER AI ANALYSIS if no barcode detected for 10 seconds
+          // ✨ AUTO-TRIGGER AI ANALYSIS if no barcode detected for 3 seconds (more aggressive)
           else {
             const noDetectionDuration = Date.now() - noDetectionStartTime;
-            if (noDetectionDuration > 10000 && !aiTriggered && geminiAIService.isInitialized()) {
-              console.log('⏰ No barcode detected for 10 seconds, triggering AI analysis...');
+            // Reduced from 10 seconds to 3 seconds for faster AI reading on first try
+            if (noDetectionDuration > 3000 && !aiTriggered && geminiAIService.isInitialized()) {
+              console.log('⏰ No barcode detected for 3 seconds, triggering AI analysis...');
               aiTriggered = true;
               
               // Save current frame for AI analysis
-              setLastFrameData(canvas.toDataURL('image/jpeg', 0.9));
+              setLastFrameData(canvas.toDataURL('image/jpeg', 0.95));
               
               // Auto-trigger AI analysis with a small delay
               setTimeout(() => {
                 if (canvas && canvasRef.current) {
-                  toast.info('💡 Switching to AI analysis to identify the product...');
-                  analyzeImageWithAI(canvas);
+                  toast.info('💡 Analyzing image with AI to identify the product...');
+                   analyzeImageWithAI(canvas);
                 }
-              }, 200);
+              }, 100);
             }
           }
         }
@@ -1282,6 +1283,64 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     }
   };
 
+  // ✨ ENHANCE IMAGE FOR AI ANALYSIS - improves barcode/text readability
+  const enhanceImageForAI = (canvasElement) => {
+    // Create a new canvas for enhanced image
+    const enhancedCanvas = document.createElement('canvas');
+    enhancedCanvas.width = canvasElement.width;
+    enhancedCanvas.height = canvasElement.height;
+    
+    const ctx = enhancedCanvas.getContext('2d', { willReadFrequently: true });
+    const sourceCtx = canvasElement.getContext('2d', { willReadFrequently: true });
+    
+    // Copy and enhance image data
+    const imageData = sourceCtx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+    const data = imageData.data;
+    
+    // Apply multiple enhancement techniques
+    for (let i = 0; i < data.length; i += 4) {
+      let r = data[i];
+      let g = data[i + 1];
+      let b = data[i + 2];
+      
+      // 1. INCREASE CONTRAST - makes text and barcodes more readable
+      const brightness = (r + g + b) / 3;
+      const contrast = brightness < 128 ? brightness * 0.65 : 128 + (brightness - 128) * 1.6;
+      const contrastDiff = contrast - brightness;
+      
+      r = Math.min(255, Math.max(0, r + contrastDiff * 0.6));
+      g = Math.min(255, Math.max(0, g + contrastDiff * 0.6));
+      b = Math.min(255, Math.max(0, b + contrastDiff * 0.6));
+      
+      // 2. ADAPTIVE SHARPENING - enhances edges
+      const avg = (r + g + b) / 3;
+      const sharpness = 0.3;
+      r = Math.min(255, Math.max(0, r + (r - avg) * sharpness));
+      g = Math.min(255, Math.max(0, g + (g - avg) * sharpness));
+      b = Math.min(255, Math.max(0, b + (b - avg) * sharpness));
+      
+      // 3. BOOST SATURATION - makes product labels more visible
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      if (max !== min) {
+        const saturation = 1.2;
+        const delta = max - min;
+        r = Math.min(255, Math.max(0, r + (r > avg ? delta * saturation * 0.2 : -delta * saturation * 0.2)));
+        g = Math.min(255, Math.max(0, g + (g > avg ? delta * saturation * 0.2 : -delta * saturation * 0.2)));
+        b = Math.min(255, Math.max(0, b + (b > avg ? delta * saturation * 0.2 : -delta * saturation * 0.2)));
+      }
+      
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      // Keep alpha unchanged
+    }
+    
+    ctx.putImageData(imageData, 0, 0);
+    console.log('✨ Image enhanced for AI analysis - increased contrast and sharpness');
+    return enhancedCanvas;
+  };
+
   // 🤖 Analyze image with AI when barcode not found - with smart retries
   const analyzeImageWithAI = async (canvasElement, retryCount = 0) => {
     if (!geminiAIService.isInitialized()) {
@@ -1295,8 +1354,12 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       setAiAnalyzing(true);
       setShowAIAnalysis(true);
 
-      // Convert canvas to blob
-      const blob = await geminiAIService.canvasToBlob(canvasElement);
+      // ✨ ENHANCE IMAGE QUALITY BEFORE AI ANALYSIS
+      // This improves text readability and barcode visibility
+      const enhancedCanvas = enhanceImageForAI(canvasElement);
+      
+      // Convert enhanced canvas to blob
+      const blob = await geminiAIService.canvasToBlob(enhancedCanvas);
       
       // Analyze with Gemini AI - attempt with retry count for smarter prompting
       const result = await geminiAIService.identifyProduct(blob, 'image/jpeg', retryCount + 1);
@@ -1312,6 +1375,15 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         const confidenceEmoji = result.confidence >= 80 ? '✅' : result.confidence >= 50 ? '⚠️' : '🔍';
         
         toast.success(`${confidenceEmoji} AI identified product (${confidencePercent}% confidence)`);
+        
+        // 🔥 NEW: If AI read a barcode, automatically try to process it!
+        if (result.data.barcode && result.data.barcode.trim()) {
+          console.log('✅ AI read barcode:', result.data.barcode);
+          setTimeout(() => {
+            toast.info('📱 Using barcode read by AI to look up product...');
+            handleScannedBarcode(result.data.barcode, 'ai');
+          }, 500);
+        }
       } else {
         throw new Error('No product data returned');
       }
@@ -1373,12 +1445,22 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             </div>
           </div>
           
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90"
-          >
-            <FiX className="h-6 w-6 text-white" />
-          </button>
+          <div className="flex items-center space-x-3 relative z-10">
+            {/* 🤖 AI Badge - Shows AI capability */}
+            {geminiAIService.isInitialized() && (
+              <div className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md hover:bg-white/30 transition-all">
+                <FiCpu className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-300 animate-pulse" />
+                <span className="text-white text-xs sm:text-sm font-semibold">AI Ready</span>
+              </div>
+            )}
+            
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90"
+            >
+              <FiX className="h-6 w-6 text-white" />
+            </button>
+          </div>
         </div>
 
         {/* Main Content Grid */}
@@ -1424,7 +1506,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                   className="w-full p-3 sm:p-4 rounded-xl border-2 border-gradient-to-r from-purple-400 to-pink-400 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 font-bold group"
                   title="Use AI to identify product from camera image"
                 >
-                  <p className="text-gray-900 text-sm sm:text-base group-hover:text-purple-700 transition-colors">🤖 AI Analysis</p>
+                  <div className="flex items-center justify-center space-x-2 mb-1">
+                    <FiCpu className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 group-hover:text-purple-800 transition-colors" />
+                    <p className="text-gray-900 text-sm sm:text-base group-hover:text-purple-700 transition-colors">AI Analysis</p>
+                  </div>
                   <p className="text-xs text-purple-700 group-hover:text-purple-900">Identify product visually</p>
                 </button>
               )}
@@ -1760,7 +1845,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                     </div>
                   </div>
                   <div className="text-center">
-                    <h3 className="font-bold text-lg text-gray-900 mb-2">🤖 AI Analysis</h3>
+                    <h3 className="font-bold text-lg text-gray-900 mb-2 flex items-center justify-center gap-2">
+                      <FiCpu className="h-5 w-5 text-blue-600" />
+                      AI Analysis
+                    </h3>
                     <p className="text-sm text-gray-600 mb-2">Analyzing product image with Gemini AI...</p>
                     <div className="h-1 w-24 mx-auto bg-gray-200 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 animate-pulse rounded-full"></div>
