@@ -51,7 +51,7 @@ const OrderInventoryPOSControl = () => {
 
   // Handle barcode scanned from scanner
   const handleBarcodeScanned = async (barcode) => {
-    // ✅ IMMEDIATELY close scanner
+    // ✅ IMMEDIATELY close scanner (no waiting)
     setShowBarcodeScanner(false);
     
     // Validate barcode
@@ -61,13 +61,14 @@ const OrderInventoryPOSControl = () => {
     }
 
     try {
-      console.log('🔍 Checking barcode:', barcode);
+      console.log('⚡ Fast barcode processing:', barcode);
+      const trimmedBarcode = barcode.trim();
       
       // Check if product with this barcode already exists
       const { data: existingProduct, error: searchError } = await supabase
         .from('products')
         .select('id, name, barcode, sku, selling_price')
-        .eq('barcode', barcode.trim())
+        .eq('barcode', trimmedBarcode)
         .maybeSingle();
 
       if (searchError && searchError.code !== 'PGRST116') {
@@ -78,24 +79,24 @@ const OrderInventoryPOSControl = () => {
 
       if (existingProduct) {
         // Product already exists - show notification only
-        toast.success(`✅ Found: ${existingProduct.name} - UGX ${existingProduct.selling_price || '0'}`, {
-          autoClose: 2000
+        toast.success(`✅ Found: ${existingProduct.name}`, {
+          autoClose: 1500
         });
-        console.log('✅ Product exists:', existingProduct);
+        console.log('✅ Product exists:', existingProduct.id);
         return;
       }
 
-      // Product doesn't exist - AUTO REGISTER IT SILENTLY (no toast for this)
-      console.log('📝 Barcode not in inventory. Auto-registering...');
+      // Product doesn't exist - AUTO REGISTER IT FAST
+      console.log('⚡ Auto-registering new product...');
       
-      const generatedName = `Product - ${barcode}`;
-      const generatedSKU = `SKU-${barcode.substring(0, 8)}`;
+      const generatedName = `Product - ${trimmedBarcode}`;
+      const generatedSKU = `SKU-${trimmedBarcode.substring(0, 8)}`;
 
       const { data: newProduct, error: createError } = await supabase
         .from('products')
         .insert([{
           name: generatedName,
-          barcode: barcode.trim(),
+          barcode: trimmedBarcode,
           sku: generatedSKU,
           cost_price: 0,
           selling_price: 0,
@@ -109,12 +110,32 @@ const OrderInventoryPOSControl = () => {
 
       if (createError) {
         console.error('❌ Error creating product:', createError);
-        toast.error('❌ Failed to register barcode: ' + createError.message);
+        toast.error('❌ Failed to register barcode');
         return;
       }
 
-      console.log('✅ Product auto-registered:', newProduct);
+      console.log('⚡ Product created. Creating inventory in parallel...');
       
+      // ✅ CREATE INVENTORY RECORD IN PARALLEL (not waiting for this to finish)
+      // This makes the UI responsive immediately
+      supabase
+        .from('inventory')
+        .insert({
+          product_id: newProduct.id,
+          current_stock: 0,
+          reserved_stock: 0,
+          minimum_stock: 10,
+          reorder_point: 20,
+          reorder_quantity: 100
+        })
+        .then(() => {
+          console.log('✅ Inventory record created asynchronously');
+        })
+        .catch(err => {
+          console.warn('⚠️ Inventory creation failed:', err);
+        });
+      
+      // ⚡ IMMEDIATELY proceed - don't wait for inventory insert
       // Store the newly created product ID for later update
       setNewlyRegisteredProductId(newProduct.id);
       
@@ -122,7 +143,7 @@ const OrderInventoryPOSControl = () => {
       setNewProduct({
         name: '', // ✅ Admin MUST fill in product name
         sku: generatedSKU,
-        barcode: barcode.trim(), // Barcode locked in
+        barcode: trimmedBarcode, // Barcode locked in
         cost_price: 0,
         selling_price: 0,
         tax_rate: 18,
@@ -132,10 +153,10 @@ const OrderInventoryPOSControl = () => {
       // ✅ IMMEDIATELY open form modal for admin to complete details
       setShowAddProductModal(true);
       
-      // Reload products list in background (silent)
+      // Reload products list in background (silent, non-blocking)
       setTimeout(() => {
         loadData();
-      }, 500);
+      }, 100);
 
     } catch (error) {
       console.error('❌ Error handling barcode:', error);
