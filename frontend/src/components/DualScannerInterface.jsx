@@ -39,6 +39,8 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const detectionFrameCountRef = useRef(0);
   const indicatorTimeoutRef = useRef(null);
   const autoSaveTimeoutRef = useRef(null);
+  const lastProcessedBarcodeRef = useRef(null); // 🔒 Cooldown tracker
+  const barcodeProcessingTimeRef = useRef(0); // 🔒 Last processing time
 
   //  Initialize Camera Scanner
   useEffect(() => {
@@ -1221,6 +1223,20 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const handleScannedBarcode = (barcode, source = 'unknown') => {
     if (!barcode || barcode.length < 3) return;
 
+    // 🔒 DUPLICATE DETECTION COOLDOWN (1-second window)
+    // Prevent the same barcode from being processed twice in rapid succession
+    const now = Date.now();
+    const timeSinceLastProcess = now - barcodeProcessingTimeRef.current;
+    
+    if (lastProcessedBarcodeRef.current === barcode.trim() && timeSinceLastProcess < 1000) {
+      console.log(`⏸️ Ignoring duplicate barcode within 1-second cooldown: ${barcode}`);
+      return; // Skip processing - duplicate detected
+    }
+
+    // Update last processed barcode and time
+    lastProcessedBarcodeRef.current = barcode.trim();
+    barcodeProcessingTimeRef.current = now;
+
     const timestamp = new Date();
     setLastScanTime(timestamp);
     setScanBuffer('');
@@ -1500,190 +1516,245 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
       <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col border border-white/20">
-        {/* ✨ Modern Gradient Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 px-4 sm:px-8 py-4 sm:py-5 flex items-center justify-between flex-shrink-0 relative overflow-hidden">
+        {/* ✨ Modern Compact Header with Icon Bar */}
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 px-3 sm:px-6 py-3 sm:py-4 flex flex-col space-y-2 sm:space-y-3 flex-shrink-0 relative overflow-hidden">
           {/* Animated background elements */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse"></div>
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse delay-1000"></div>
           </div>
           
-          <div className="flex items-center space-x-3 relative z-10">
-            <div className="p-2 bg-white/20 rounded-full backdrop-blur-md">
-              <FiZap className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-            </div>
-            <div>
-              <h2 className="text-white text-xl sm:text-2xl font-bold tracking-tight">Smart Scanner</h2>
-              <p className="text-white/80 text-xs sm:text-sm">Barcode • Camera • AI Recognition</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-3 relative z-10">
-            {/* 🤖 AI Badge - Shows AI capability */}
-            {geminiAIService.isInitialized() && (
-              <div className="flex items-center space-x-1 px-3 py-1 bg-white/20 rounded-full backdrop-blur-md hover:bg-white/30 transition-all">
-                <FiCpu className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-300 animate-pulse" />
-                <span className="text-white text-xs sm:text-sm font-semibold">AI Ready</span>
+          {/* Title Row */}
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center space-x-2 sm:space-x-3">
+              <div className="p-2 bg-white/20 rounded-full backdrop-blur-md">
+                <FiZap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-            )}
+              <div>
+                <h2 className="text-white text-lg sm:text-2xl font-bold tracking-tight">Scanner</h2>
+                <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Smart Barcode Detection</p>
+              </div>
+            </div>
             
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90"
+              className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90 flex-shrink-0"
             >
-              <FiX className="h-6 w-6 text-white" />
+              <FiX className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </button>
+          </div>
+
+          {/* Control Badge Bar - Smart Layout */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 relative z-10 justify-between sm:justify-start">
+            {/* Smart Mode Badge */}
+            <button
+              onClick={() => setScanMode('smart')}
+              title="Smart Mode: Both Camera and Gun Scanner"
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                scanMode === 'smart'
+                  ? 'bg-white text-purple-600 shadow-lg scale-110'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              <FiSmartphone className="h-4 w-4" />
+              <span className="hidden sm:inline">Smart</span>
+            </button>
+
+            {/* Camera Scan Badge */}
+            <button
+              onClick={() => setScanMode('camera')}
+              title="Camera Mode: Phone Camera Only"
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                scanMode === 'camera'
+                  ? 'bg-white text-blue-600 shadow-lg scale-110'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              <FiCamera className="h-4 w-4" />
+              <span className="hidden sm:inline">Camera</span>
+            </button>
+
+            {/* Gun Scan Badge */}
+            <button
+              onClick={() => setScanMode('gun')}
+              title="Gun Mode: Barcode Gun Only"
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                scanMode === 'gun'
+                  ? 'bg-white text-green-600 shadow-lg scale-110'
+                  : 'bg-white/20 text-white hover:bg-white/30'
+              }`}
+            >
+              <span className="text-lg">🔫</span>
+              <span className="hidden sm:inline">Gun</span>
+            </button>
+
+            {/* AI Analysis Badge - Only when camera active and AI ready */}
+            {cameraActive && geminiAIService.isInitialized() && (
+              <button
+                onClick={() => {
+                  if (canvasRef.current) {
+                    analyzeImageWithAI(canvasRef.current);
+                  } else {
+                    toast.error('No camera frame available');
+                  }
+                }}
+                title="AI Vision: Analyze image with AI"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95 group"
+              >
+                <FiCpu className="h-4 w-4 animate-pulse" />
+                <span className="hidden sm:inline">AI</span>
+              </button>
+            )}
+
+            {/* USB Connect Badge - Only if USB API available */}
+            {navigator.usb && (
+              <button
+                onClick={requestUSBPermission}
+                title="Connect USB Device"
+                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                  usbDeviceConnected
+                    ? 'bg-white text-green-600 shadow-lg'
+                    : 'bg-white/20 text-white hover:bg-white/30'
+                }`}
+              >
+                <span className="text-lg">🔌</span>
+                <span className="hidden sm:inline">USB</span>
+              </button>
+            )}
+
+            {/* USB Help Badge - Only if USB API available */}
+            {navigator.usb && (
+              <button
+                onClick={() => {
+                  showUSBTroubleshootingGuide();
+                  toast.info('📱 Troubleshooting guide printed to console');
+                }}
+                title="USB Setup Help"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95"
+              >
+                <span className="text-lg">❓</span>
+                <span className="hidden sm:inline">Help</span>
+              </button>
+            )}
+
+            {/* AI Ready Badge - Shows when AI is enabled */}
+            {geminiAIService.isInitialized() && (
+              <div className="ml-auto flex items-center space-x-1 px-2 sm:px-3 py-1 sm:py-1.5 bg-white/20 rounded-full backdrop-blur-md animate-pulse">
+                <FiCpu className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-300" />
+                <span className="text-white text-xs sm:text-sm font-semibold hidden sm:inline">AI Ready</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 p-2 sm:p-6 flex-1 overflow-y-auto">
-          {/* Left: Scanner Modes */}
+          {/* Left: Status & Info */}
           <div className="space-y-2 sm:space-y-4">
             <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center space-x-2">
               <FiSmartphone className="h-5 w-5 text-blue-600 sm:h-6 sm:w-6" />
-              <span className="font-semibold">Scanner Mode</span>
+              <span className="font-semibold">Status & Info</span>
             </h3>
 
-            {/* Mode Selection - Enhanced Cards */}
-            <div className="space-y-2 sm:space-y-3">
-              {[
-                { id: 'smart', label: '🧠 Smart Mode', desc: 'Both sources', color: 'from-blue-500 to-blue-600' },
-                { id: 'camera', label: '📱 Camera Scan', desc: 'Phone camera', color: 'from-purple-500 to-purple-600' },
-                { id: 'gun', label: '🔫 Gun Scan', desc: 'Hand scanner', color: 'from-green-500 to-green-600' }
-              ].map(mode => (
-                <button
-                  key={mode.id}
-                  onClick={() => setScanMode(mode.id)}
-                  className={`w-full p-3 sm:p-4 rounded-xl border-2 transition-all duration-300 transform hover:scale-105 active:scale-95 ${
-                    scanMode === mode.id
-                      ? `bg-gradient-to-r ${mode.color} border-white shadow-lg text-white scale-105`
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md text-gray-900'
-                  }`}
-                >
-                  <p className={`font-bold text-sm sm:text-base ${scanMode === mode.id ? 'text-white' : 'text-gray-900'}`}>{mode.label}</p>
-                  <p className={`text-xs ${scanMode === mode.id ? 'text-blue-50' : 'text-gray-600'}`}>{mode.desc}</p>
-                </button>
-              ))}
-              
-              {/* 🤖 AI Analysis Button - Fallback when barcode detection fails */}
-              {cameraActive && geminiAIService.isInitialized() && (
-                <button
-                  onClick={() => {
-                    if (canvasRef.current) {
-                      analyzeImageWithAI(canvasRef.current);
-                    } else {
-                      toast.error('No camera frame available');
-                    }
-                  }}
-                  className="w-full p-3 sm:p-4 rounded-xl border-2 border-gradient-to-r from-purple-400 to-pink-400 bg-gradient-to-r from-purple-50 to-pink-50 hover:from-purple-100 hover:to-pink-100 hover:shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 font-bold group"
-                  title="Use AI to identify product from camera image"
-                >
-                  <div className="flex items-center justify-center space-x-2 mb-1">
-                    <FiCpu className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 group-hover:text-purple-800 transition-colors" />
-                    <p className="text-gray-900 text-sm sm:text-base group-hover:text-purple-700 transition-colors">AI Analysis</p>
-                  </div>
-                  <p className="text-xs text-purple-700 group-hover:text-purple-900">Identify product visually</p>
-                </button>
-              )}
-              
-              {/* Creative No Activity Notification - Show after 4 seconds */}
-              {showNoActivityWarning && inactivityProduct && (
-                <div className="w-full overflow-hidden">
-                  {inactivityProduct.type === 'summary' ? (
-                    // 📊 Transaction Summary Popup
-                    <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 animate-pulse">
-                      <p className="font-bold text-green-900 text-sm sm:text-base mb-2">📊 Transaction Summary</p>
-                      <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                        {inactivityProduct.items.map(item => (
-                          <div key={item.id} className="flex justify-between text-xs text-green-800 bg-white bg-opacity-50 px-2 py-1 rounded">
-                            <span className="font-semibold">{item.name}</span>
-                            <span>x{item.quantity} = <span className="font-bold text-green-700">${item.subtotal.toFixed(2)}</span></span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-green-300 flex justify-between items-center">
-                        <span className="font-bold text-green-900">💰 Total:</span>
-                        <span className="text-lg font-bold text-green-700">${inactivityProduct.total.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    // 🏇 Ready to Scan Prompt - Enhanced with animation
-                    <div className="w-full p-4 sm:p-5 rounded-xl border-2 border-gradient-to-r from-blue-400 to-cyan-400 bg-gradient-to-br from-blue-50 via-white to-cyan-50 animate-pulse shadow-lg">
-                      <p className="font-bold text-blue-900 text-center text-3xl sm:text-4xl mb-2">{inactivityProduct.emoji}</p>
-                      <p className="font-bold text-blue-900 text-center text-sm sm:text-base leading-relaxed">{inactivityProduct.message}</p>
-                      <div className="mt-3 flex items-center justify-center space-x-2">
-                        <div className="flex space-x-1">
-                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
-                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100"></div>
-                          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200"></div>
-                        </div>
-                      </div>
-                      <p className="text-xs text-blue-700 text-center mt-3 font-medium">📱 Point camera at barcode or use 🔫 gun scanner</p>
-                    </div>
-                  )}
+            {/* Current Mode Display */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
+              <p className="text-xs text-gray-600 font-semibold mb-2">ACTIVE MODE</p>
+              <p className="text-lg sm:text-xl font-bold text-blue-600 capitalize">
+                {scanMode === 'smart' && '🧠 Smart Mode'}
+                {scanMode === 'camera' && '📱 Camera Scan'}
+                {scanMode === 'gun' && '🔫 Gun Scan'}
+              </p>
+              <p className="text-xs text-gray-600 mt-2">
+                {scanMode === 'smart' && 'Both camera and gun scanner active'}
+                {scanMode === 'camera' && 'Phone camera scanning only'}
+                {scanMode === 'gun' && 'Barcode gun scanning only'}
+              </p>
+            </div>
+
+            {/* AI Ready Banner */}
+            {geminiAIService.isInitialized() && (
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
+                <div className="flex items-center space-x-2 mb-1">
+                  <FiCpu className="h-5 w-5 text-purple-600 animate-pulse" />
+                  <p className="text-sm sm:text-base font-bold text-purple-600">AI Vision Ready</p>
                 </div>
-              )}
-              
-              {/* Loading status */}
-              {loadingProducts && (
-                <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-blue-400 bg-blue-50">
-                  <p className="font-bold text-blue-900 text-sm sm:text-base">📥 Loading Products...</p>
-                  <p className="text-xs text-blue-700">Reading from Supabase</p>
+                <p className="text-xs text-gray-600">Advanced product identification enabled</p>
+              </div>
+            )}
+
+            {/* Status Indicators */}
+            <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-3 sm:p-4 border-2 border-gray-200 space-y-2 sm:space-y-3">
+              <p className="text-xs font-bold text-gray-700 uppercase">SENSORS</p>
+              <div className="flex items-center space-x-3">
+                <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${cameraActive ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
+                <div>
+                  <p className="text-xs sm:text-sm font-semibold text-gray-700">📱 Camera</p>
+                  <p className="text-xs text-gray-500">{cameraActive ? 'Ready' : 'Disabled'}</p>
                 </div>
-              )}
-              
-              {/* USB Mobile Device Connection Button */}
+              </div>
+              <div className="flex items-center space-x-3">
+                <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${gunListening ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
+                <div>
+                  <p className="text-xs sm:text-sm font-semibold text-gray-700">🔫 Gun</p>
+                  <p className="text-xs text-gray-500">{gunListening ? 'Listening' : 'Disabled'}</p>
+                </div>
+              </div>
               {navigator.usb && (
-                <div className="space-y-2">
-                  <button
-                    onClick={requestUSBPermission}
-                    className="w-full p-2 sm:p-3 rounded-lg border-2 border-green-400 bg-green-50 hover:bg-green-100 transition-all active:scale-95"
-                  >
-                    <p className="font-bold text-gray-900 text-sm sm:text-base">🔌 Connect USB</p>
-                    <p className="text-xs text-green-700">Mobile or scanner device</p>
-                  </button>
-                  
-                  {/* Phone Camera Scanning - Only show when USB device connected */}
-                  {usbDeviceConnected && (
-                    <button
-                      onClick={() => {
-                        setScanMode('camera');
-                        toast.success(`🎥 Phone Camera mode activated for ${usbDeviceName}`);
-                      }}
-                      className="w-full p-2 sm:p-3 rounded-lg border-2 border-purple-400 bg-purple-50 hover:bg-purple-100 transition-all active:scale-95 animate-pulse"
-                    >
-                      <p className="font-bold text-gray-900 text-sm sm:text-base">🎥 Phone Camera</p>
-                      <p className="text-xs text-purple-700">{usbDeviceName}</p>
-                    </button>
-                  )}
-                  
-                  {/* Troubleshooting Button */}
-                  <button
-                    onClick={() => {
-                      showUSBTroubleshootingGuide();
-                      toast.info('📱 Troubleshooting guide printed to console');
-                    }}
-                    className="w-full p-2 sm:p-3 rounded-lg border-2 border-yellow-400 bg-yellow-50 hover:bg-yellow-100 transition-all active:scale-95"
-                  >
-                    <p className="font-bold text-gray-900 text-sm sm:text-base">❓ USB Help</p>
-                    <p className="text-xs text-yellow-700">Setup instructions</p>
-                  </button>
+                <div className="flex items-center space-x-3">
+                  <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${usbDeviceConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-gray-700">🔌 USB</p>
+                    <p className="text-xs text-gray-500">{usbDeviceConnected ? usbDeviceName : 'Disconnected'}</p>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Status Indicators */}
-            <div className="bg-gray-50 rounded-lg p-2 sm:p-3 space-y-1 sm:space-y-2">
-              <p className="text-xs font-bold text-gray-700 hidden sm:block">STATUS</p>
-              <div className="flex items-center space-x-2">
-                <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full ${cameraActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                <span className="text-xs sm:text-sm text-gray-700">📱 {cameraActive ? 'Ready' : 'Off'}</span>
+            {/* Creative No Activity Notification - Show after 4 seconds */}
+            {showNoActivityWarning && inactivityProduct && (
+              <div className="w-full overflow-hidden">
+                {inactivityProduct.type === 'summary' ? (
+                  // 📊 Transaction Summary Popup
+                  <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 animate-pulse">
+                    <p className="font-bold text-green-900 text-sm sm:text-base mb-2">📊 Transaction Summary</p>
+                    <div className="space-y-1 max-h-[120px] overflow-y-auto">
+                      {inactivityProduct.items.map(item => (
+                        <div key={item.id} className="flex justify-between text-xs text-green-800 bg-white bg-opacity-50 px-2 py-1 rounded">
+                          <span className="font-semibold">{item.name}</span>
+                          <span>x{item.quantity} = <span className="font-bold text-green-700">${item.subtotal.toFixed(2)}</span></span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-green-300 flex justify-between items-center">
+                      <span className="font-bold text-green-900">💰 Total:</span>
+                      <span className="text-lg font-bold text-green-700">${inactivityProduct.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  // 🏇 Ready to Scan Prompt - Enhanced with animation
+                  <div className="w-full p-4 sm:p-5 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 animate-pulse shadow-lg">
+                    <p className="font-bold text-blue-900 text-center text-3xl sm:text-4xl mb-2">{inactivityProduct.emoji}</p>
+                    <p className="font-bold text-blue-900 text-center text-sm sm:text-base leading-relaxed">{inactivityProduct.message}</p>
+                    <div className="mt-3 flex items-center justify-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200"></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center space-x-2">
-                <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full ${gunListening ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                <span className="text-xs sm:text-sm text-gray-700">🔫 {gunListening ? 'Listen' : 'Off'}</span>
+            )}
+
+            {/* Loading status */}
+            {loadingProducts && (
+              <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100">
+                <p className="font-bold text-blue-900 text-sm sm:text-base">📥 Loading Products...</p>
+                <p className="text-xs text-blue-700">Reading from database</p>
               </div>
+            )}
+
               {/* USB Device Status */}
               {usbDeviceConnected && (
                 <div className="flex items-center space-x-2 pt-1 border-t border-gray-300">
@@ -1939,13 +2010,13 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                     {aiResult.confidence && (
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-bold text-gray-600">Confidence:</span>
-                        <div className="px-2 py-1 rounded-full text-xs font-bold"
+                        <div
+                          className="px-2 py-1 rounded-full text-xs font-bold"
                           style={{
-                            backgroundColor: aiResult.confidence >= 80 ? '#dcfce7' : 
-                                            aiResult.confidence >= 50 ? '#fef3c7' : '#fee2e2',
-                            color: aiResult.confidence >= 80 ? '#166534' : 
-                                   aiResult.confidence >= 50 ? '#b45309' : '#991b1b'
-                          }}>
+                            backgroundColor: aiResult.confidence >= 80 ? '#dcfce7' : aiResult.confidence >= 50 ? '#fef3c7' : '#fee2e2',
+                            color: aiResult.confidence >= 80 ? '#166534' : aiResult.confidence >= 50 ? '#b45309' : '#991b1b'
+                          }}
+                        >
                           {Math.round(aiResult.confidence)}%
                         </div>
                       </div>
@@ -2029,7 +2100,6 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
           </div>
         )}
       </div>
-    </div>
   );
 };
 

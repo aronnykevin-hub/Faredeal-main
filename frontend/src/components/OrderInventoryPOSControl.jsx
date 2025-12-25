@@ -37,6 +37,7 @@ const OrderInventoryPOSControl = () => {
   const [inventoryMap, setInventoryMap] = useState({}); // Map product_id to inventory data
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [newlyRegisteredProductId, setNewlyRegisteredProductId] = useState(null); // Track newly created product for update
   const [newProduct, setNewProduct] = useState({
     name: '',
     sku: '',
@@ -50,6 +51,7 @@ const OrderInventoryPOSControl = () => {
 
   // Handle barcode scanned from scanner
   const handleBarcodeScanned = async (barcode) => {
+    // ✅ IMMEDIATELY close scanner
     setShowBarcodeScanner(false);
     
     // Validate barcode
@@ -75,13 +77,15 @@ const OrderInventoryPOSControl = () => {
       }
 
       if (existingProduct) {
-        // Product already exists - show one notification and close scanner
-        toast.success(`✅ Found: ${existingProduct.name} - UGX ${existingProduct.selling_price || '0'}`);
+        // Product already exists - show notification only
+        toast.success(`✅ Found: ${existingProduct.name} - UGX ${existingProduct.selling_price || '0'}`, {
+          autoClose: 2000
+        });
         console.log('✅ Product exists:', existingProduct);
         return;
       }
 
-      // Product doesn't exist - AUTO REGISTER IT SILENTLY
+      // Product doesn't exist - AUTO REGISTER IT SILENTLY (no toast for this)
       console.log('📝 Barcode not in inventory. Auto-registering...');
       
       const generatedName = `Product - ${barcode}`;
@@ -105,32 +109,30 @@ const OrderInventoryPOSControl = () => {
 
       if (createError) {
         console.error('❌ Error creating product:', createError);
-        toast.error('❌ Failed to register: ' + createError.message);
+        toast.error('❌ Failed to register barcode: ' + createError.message);
         return;
       }
 
       console.log('✅ Product auto-registered:', newProduct);
       
+      // Store the newly created product ID for later update
+      setNewlyRegisteredProductId(newProduct.id);
+      
       // Pre-fill form with the scanned barcode for admin to complete details
       setNewProduct({
-        name: '',
+        name: '', // ✅ Admin MUST fill in product name
         sku: generatedSKU,
-        barcode: barcode.trim(),
+        barcode: barcode.trim(), // Barcode locked in
         cost_price: 0,
         selling_price: 0,
         tax_rate: 18,
         category_id: null
       });
       
-      // Show ONE confirmation notification only
-      toast.success(`✅ Barcode registered! Complete the product details.`, {
-        autoClose: 3000
-      });
-      
-      // Open form to complete details
+      // ✅ IMMEDIATELY open form modal for admin to complete details
       setShowAddProductModal(true);
       
-      // Reload products list in background
+      // Reload products list in background (silent)
       setTimeout(() => {
         loadData();
       }, 500);
@@ -466,25 +468,56 @@ const OrderInventoryPOSControl = () => {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .insert({
-          name: newProduct.name.trim(),
-          sku: newProduct.sku.trim() || null,
-          cost_price: newProduct.cost_price,
-          selling_price: newProduct.selling_price,
-          tax_rate: newProduct.tax_rate,
-          category_id: newProduct.category_id,
-          is_active: true,
-          barcode: `AUTO-${Date.now()}`
-        })
-        .select('*')
-        .single();
+      let data, error;
+      
+      // If product was auto-registered from barcode scan, UPDATE it
+      if (newlyRegisteredProductId) {
+        console.log('📝 Updating auto-registered product:', newlyRegisteredProductId);
+        
+        const { data: updated, error: updateError } = await supabase
+          .from('products')
+          .update({
+            name: newProduct.name.trim(),
+            sku: newProduct.sku.trim() || null,
+            cost_price: newProduct.cost_price,
+            selling_price: newProduct.selling_price,
+            tax_rate: newProduct.tax_rate,
+            category_id: newProduct.category_id
+          })
+          .eq('id', newlyRegisteredProductId)
+          .select('*')
+          .single();
+        
+        data = updated;
+        error = updateError;
+        
+      } else {
+        // Otherwise, CREATE new product (traditional add product flow)
+        console.log('➕ Creating new product from form');
+        
+        const { data: created, error: createError } = await supabase
+          .from('products')
+          .insert({
+            name: newProduct.name.trim(),
+            sku: newProduct.sku.trim() || null,
+            cost_price: newProduct.cost_price,
+            selling_price: newProduct.selling_price,
+            tax_rate: newProduct.tax_rate,
+            category_id: newProduct.category_id,
+            is_active: true,
+            barcode: newProduct.barcode || `AUTO-${Date.now()}` // ✅ Use scanned barcode if available
+          })
+          .select('*')
+          .single();
+        
+        data = created;
+        error = createError;
+      }
 
       if (error) throw error;
 
-      // ✅ CREATE INVENTORY RECORD FOR NEW PRODUCT
-      if (data && data.id) {
+      // ✅ CREATE INVENTORY RECORD FOR NEW PRODUCT (only if newly created)
+      if (data && data.id && !newlyRegisteredProductId) {
         const { error: inventoryError } = await supabase
           .from('inventory')
           .insert({
@@ -503,28 +536,41 @@ const OrderInventoryPOSControl = () => {
         }
       }
 
-      // Add to products list
-      setProducts([...products, data]);
-      setFilteredProducts([...filteredProducts, data]);
+      // Update products list
+      if (newlyRegisteredProductId) {
+        // Update existing product in list
+        setProducts(products.map(p => p.id === newlyRegisteredProductId ? data : p));
+        setFilteredProducts(filteredProducts.map(p => p.id === newlyRegisteredProductId ? data : p));
+      } else {
+        // Add new product to list
+        setProducts([...products, data]);
+        setFilteredProducts([...filteredProducts, data]);
+      }
       
-      // Reset form
+      // Reset form and state
       setNewProduct({
         name: '',
         sku: '',
         cost_price: 0,
         selling_price: 0,
         tax_rate: 18,
-        category_id: null
+        category_id: null,
+        barcode: ''
       });
       
+      setNewlyRegisteredProductId(null);
       setShowAddProductModal(false);
-      toast.success('✅ Product added successfully!');
+      
+      const successMsg = newlyRegisteredProductId 
+        ? '✅ Product updated successfully!' 
+        : '✅ Product added successfully!';
+      toast.success(successMsg);
       
       // Recalculate stats
       calculateStats([...products, data]);
     } catch (error) {
-      console.error('❌ Error adding product:', error);
-      toast.error('Failed to add product');
+      console.error('❌ Error saving product:', error);
+      toast.error('❌ Failed to save product: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -1001,7 +1047,19 @@ const OrderInventoryPOSControl = () => {
                 <p className="text-green-100 text-xs md:text-sm mt-1">Create a new product for your POS inventory</p>
               </div>
               <button
-                onClick={() => setShowAddProductModal(false)}
+                onClick={() => {
+                  setShowAddProductModal(false);
+                  setNewlyRegisteredProductId(null);
+                  setNewProduct({
+                    name: '',
+                    sku: '',
+                    barcode: '',
+                    cost_price: 0,
+                    selling_price: 0,
+                    tax_rate: 18,
+                    category_id: null
+                  });
+                }}
                 className="text-white hover:bg-white hover:bg-opacity-20 p-1 md:p-2 rounded-lg transition"
               >
                 <FiX className="h-5 w-5 md:h-6 md:w-6" />
@@ -1039,21 +1097,31 @@ const OrderInventoryPOSControl = () => {
                 <div>
                   <label className="block text-xs md:text-sm font-semibold text-gray-700 mb-1 md:mb-2">
                     <FiHash className="inline mr-1" />
-                    Barcode (Optional)
+                    Barcode {newlyRegisteredProductId ? '(Locked)' : '(Optional)'}
                   </label>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={newProduct.barcode}
-                      onChange={(e) => setNewProduct({ ...newProduct, barcode: e.target.value })}
+                      onChange={(e) => !newlyRegisteredProductId && setNewProduct({ ...newProduct, barcode: e.target.value })}
                       placeholder="e.g., 1234567890123"
-                      className="flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-green-500 text-sm"
+                      disabled={newlyRegisteredProductId} // ✅ Disable editing if from barcode scan
+                      className={`flex-1 px-3 md:px-4 py-1.5 md:py-2 border-2 rounded-lg focus:outline-none text-sm ${
+                        newlyRegisteredProductId 
+                          ? 'bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed' 
+                          : 'border-gray-300 focus:border-green-500'
+                      }`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowBarcodeScanner(true)}
-                      className="px-3 md:px-4 py-1.5 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1 whitespace-nowrap text-sm"
-                      title="Scan barcode with camera or barcode gun"
+                      disabled={newlyRegisteredProductId} // ✅ Disable scan button if barcode already scanned
+                      className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg transition-colors flex items-center gap-1 whitespace-nowrap text-sm ${
+                        newlyRegisteredProductId
+                          ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700'
+                      }`}
+                      title={newlyRegisteredProductId ? "Barcode is locked from scan" : "Scan barcode with camera or barcode gun"}
                     >
                       <FiCamera className="h-4 w-4" />
                       <span className="hidden sm:inline">Scan</span>
@@ -1157,11 +1225,27 @@ const OrderInventoryPOSControl = () => {
                   className="flex-1 bg-green-500 text-white px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-green-600 transition-colors font-semibold flex items-center justify-center gap-2 text-sm md:text-base"
                 >
                   <FiPlus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Add Product</span>
-                  <span className="sm:hidden">Add</span>
+                  <span className="hidden sm:inline">
+                    {newlyRegisteredProductId ? 'Save Product' : 'Add Product'}
+                  </span>
+                  <span className="sm:hidden">
+                    {newlyRegisteredProductId ? 'Save' : 'Add'}
+                  </span>
                 </button>
                 <button
-                  onClick={() => setShowAddProductModal(false)}
+                  onClick={() => {
+                    setShowAddProductModal(false);
+                    setNewlyRegisteredProductId(null);
+                    setNewProduct({
+                      name: '',
+                      sku: '',
+                      barcode: '',
+                      cost_price: 0,
+                      selling_price: 0,
+                      tax_rate: 18,
+                      category_id: null
+                    });
+                  }}
                   className="flex-1 bg-gray-400 text-white px-3 md:px-4 py-2 md:py-3 rounded-lg hover:bg-gray-500 transition-colors font-semibold flex items-center justify-center gap-2 text-sm md:text-base"
                 >
                   <FiX className="h-4 w-4" />
