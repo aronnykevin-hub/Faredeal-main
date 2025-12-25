@@ -1760,10 +1760,10 @@ const CashierPortal = () => {
               currentTransaction.items.map((item) => {
                 const itemPrice = item.selling_price || item.price || 0;
                 return (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={item.id} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <h4 className="font-medium text-gray-900 text-sm">{item.name}</h4>
-                      <p className="text-sm text-gray-600">{formatUGX(itemPrice)} x {item.quantity}</p>
+                      <h4 className="font-medium text-gray-900 text-xs md:text-sm">{item.name}</h4>
+                      <p className="text-xs md:text-sm text-gray-600">{formatUGX(itemPrice)} x {item.quantity}</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <button
@@ -1794,28 +1794,28 @@ const CashierPortal = () => {
 
           {/* Transaction Totals */}
           {currentTransaction.items.length > 0 && (
-            <div className="border-t pt-4 space-y-3">
+            <div className="border-t pt-2 md:pt-3 space-y-2 md:space-y-3">
               {/* Subtotal and Tax */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs md:text-sm">
+              <div className="space-y-1 md:space-y-2">
+                <div className="flex justify-between text-xs">
                   <span className="text-gray-600">Subtotal:</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.subtotal)}</span>
                 </div>
-                <div className="flex justify-between text-xs md:text-sm">
+                <div className="flex justify-between text-xs">
                   <span className="text-gray-600">VAT (18%):</span>
                   <span className="font-semibold text-gray-900">{formatUGX(currentTransaction.tax)}</span>
                 </div>
               </div>
               
               {/* Total Amount Due */}
-              <div className="flex justify-between text-lg md:text-2xl font-bold border-t-2 border-b-2 border-gray-300 py-3 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex justify-between text-base md:text-xl font-bold border-t-2 border-b-2 border-gray-300 py-2 md:py-3 bg-gradient-to-r from-green-50 to-emerald-50">
                 <span className="text-gray-900">TOTAL:</span>
                 <span className="text-green-600">{formatUGX(currentTransaction.total)}</span>
               </div>
               
               {/* Cash Received Input */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg md:rounded-xl p-3 md:p-4 space-y-3">
-                <label className="block text-xs md:text-sm font-semibold text-blue-900 mb-2">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg md:rounded-xl p-2 md:p-3 space-y-2 md:space-y-3">
+                <label className="block text-xs font-semibold text-blue-900">
                   💵 Cash Received (UGX)
                 </label>
                 <input
@@ -1827,11 +1827,11 @@ const CashierPortal = () => {
                   }}
                   onFocus={(e) => e.target.select()}
                   placeholder="Enter amount..."
-                  className="w-full px-3 md:px-4 py-2 md:py-3 text-xl md:text-2xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                  className="w-full px-2 md:px-3 py-1 md:py-2 text-lg md:text-xl font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 />
                 
                 {/* Quick Cash Buttons */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1 md:gap-2">
                   {[
                     Math.ceil(currentTransaction.total / 1000) * 1000, // Round up to nearest 1000
                     Math.ceil(currentTransaction.total / 5000) * 5000, // Round up to nearest 5000
@@ -1842,7 +1842,7 @@ const CashierPortal = () => {
                     <button
                       key={amount}
                       onClick={() => setCashReceived(amount.toString())}
-                      className="px-2 md:px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs md:text-sm font-semibold transform hover:scale-105"
+                      className="px-1 md:px-2 py-1 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs font-semibold transform hover:scale-105"
                     >
                       {formatUGX(amount)}
                     </button>
@@ -1852,7 +1852,7 @@ const CashierPortal = () => {
                 {/* Exact Amount Button */}
                 <button
                   onClick={() => setCashReceived(currentTransaction.total.toString())}
-                  className="w-full px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-xs md:text-sm font-semibold"
+                  className="w-full px-2 py-1 md:py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 text-xs font-semibold"
                 >
                   ✓ Exact Amount
                 </button>
@@ -1860,10 +1860,10 @@ const CashierPortal = () => {
               
               {/* Change Calculator */}
               {cashReceived && parseFloat(cashReceived) >= currentTransaction.total && (
-                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg md:rounded-xl p-3 md:p-4 animate-pulse">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm md:text-lg font-bold text-yellow-900">💰 CHANGE:</span>
-                    <span className="text-2xl md:text-3xl font-bold text-orange-600">
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-300 rounded-lg md:rounded-xl p-2 md:p-3 animate-pulse">
+                  <div className="flex items-center justify-between mb-1 md:mb-2">
+                    <span className="text-xs md:text-base font-bold text-yellow-900">💰 CHANGE:</span>
+                    <span className="text-lg md:text-2xl font-bold text-orange-600">
                       {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}
                     </span>
                   </div>
@@ -1902,9 +1902,9 @@ const CashierPortal = () => {
               
               {/* Warning if insufficient cash */}
               {cashReceived && parseFloat(cashReceived) < currentTransaction.total && (
-                <div className="bg-red-50 border-2 border-red-300 rounded-lg md:rounded-xl p-3 flex items-center space-x-2">
-                  <FiAlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                  <span className="text-xs md:text-sm font-semibold text-red-900">
+                <div className="bg-red-50 border-2 border-red-300 rounded-lg md:rounded-xl p-2 flex items-center space-x-2">
+                  <FiAlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                  <span className="text-xs font-semibold text-red-900">
                     Need {formatUGX(currentTransaction.total - parseFloat(cashReceived))} more
                   </span>
                 </div>
@@ -1914,7 +1914,7 @@ const CashierPortal = () => {
               <button
                 onClick={() => setPaymentModal(true)}
                 disabled={cashReceived && parseFloat(cashReceived) < currentTransaction.total}
-                className={`w-full py-3 md:py-4 rounded-lg md:rounded-xl font-bold text-sm md:text-lg transition-all duration-300 mt-4 transform hover:scale-105 shadow-lg ${
+                className={`w-full py-2 md:py-3 rounded-lg md:rounded-xl font-bold text-xs md:text-sm transition-all duration-300 mt-2 md:mt-3 transform hover:scale-105 shadow-lg ${
                   cashReceived && parseFloat(cashReceived) >= currentTransaction.total
                     ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700'
                     : 'bg-gradient-to-r from-yellow-500 to-red-600 text-white hover:from-yellow-600 hover:to-red-700'
