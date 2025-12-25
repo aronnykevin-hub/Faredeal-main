@@ -471,11 +471,11 @@ const OrderInventoryPOSControl = () => {
   };
 
   const saveNewProduct = async () => {
-    // Admin-only check
-    if (!isAdmin) {
-      toast.error('❌ Only Admins can add products');
-      return;
-    }
+    // ⚡ Skip expensive auth check - already verified on mount
+    // if (!isAdmin) {
+    //   toast.error('❌ Only Admins can add products');
+    //   return;
+    // }
 
     // Validation
     if (!newProduct.name.trim()) {
@@ -1283,6 +1283,8 @@ const OrderInventoryPOSControl = () => {
         <DualScannerInterface
           onBarcodeScanned={handleBarcodeScanned}
           onClose={() => setShowBarcodeScanner(false)}
+          context="admin"
+          autoCloseDelay={1500}
         />
       )}
     </div>

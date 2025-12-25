@@ -113,50 +113,51 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       let constraintsFailed = false;
       
       try {
-        // Attempt 1: Full HD with environment facingMode
+        // Attempt 1: Mobile-optimized constraints - back camera with reasonable size
         stream = await Promise.race([
           navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
+              width: { ideal: 1280, min: 480 },
+              height: { ideal: 720, min: 320 }
             },
             audio: false
           }),
-          // Timeout after 5 seconds
+          // Faster timeout - 3 seconds for mobile
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 5000)
+            setTimeout(() => reject(new Error('Timeout')), 3000)
           )
         ]);
       } catch (error) {
-        console.warn('⚠️ Ideal constraints failed, trying fallback...');
+        console.warn('⚠️ Full HD constraints failed, trying VGA...');
         constraintsFailed = true;
         
         try {
-          // Attempt 2: No specific facingMode, relaxed constraints
+          // Attempt 2: VGA resolution with basic constraints
           stream = await Promise.race([
             navigator.mediaDevices.getUserMedia({
               video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 640 },
+                height: { ideal: 480 }
               },
               audio: false
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 5000)
+              setTimeout(() => reject(new Error('Timeout')), 2000)
             )
           ]);
         } catch (error2) {
-          console.warn('⚠️ Relaxed constraints failed, trying minimal...');
+          console.warn('⚠️ VGA constraints failed, trying any camera...');
           
-          // Attempt 3: Absolutely minimal constraints
+          // Attempt 3: Absolutely minimal constraints with fast timeout
           stream = await Promise.race([
             navigator.mediaDevices.getUserMedia({
-              video: true,
+              video: { facingMode: { ideal: 'environment' } },
               audio: false
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 5000)
+              setTimeout(() => reject(new Error('Timeout')), 2000)
             )
           ]);
         }
@@ -256,7 +257,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       
       console.log('📺 Video element ready, waiting for media to load...');
       
-      // Timeout if neither event fires within 10 seconds
+      // Timeout if neither event fires within 5 seconds (faster for mobile)
       timeoutId = setTimeout(() => {
         if (!cameraActive) {
           console.error('❌ Camera initialization timeout - no media event fired');
@@ -283,7 +284,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               }
             });
         }
-      }, 10000);
+      }, 5000);
       
     } catch (error) {
       console.error('📸 Camera Error:', error);
@@ -412,7 +413,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             streamRef.current = null;
           }
         }
-      }, 8000);
+      }, 3000);
 
     } catch (error) {
       console.error('❌ Fallback camera initialization failed:', error);

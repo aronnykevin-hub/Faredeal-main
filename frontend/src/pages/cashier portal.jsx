@@ -1224,7 +1224,8 @@ const CashierPortal = () => {
     if (product) {
       // Product found - add to transaction
       addItemToTransaction(product);
-      setShowBarcodeScanner(false);
+      // ⚡ DON'T close scanner in cashier mode - keep open for continuous scanning
+      // setShowBarcodeScanner(false);  // REMOVED FOR CASHIER MODE
       toast.success(`✅ ${product.name} (${product.barcode}) scanned and added!`);
       console.log(`✅ Product ${product.name} scanned and added to transaction!`);
     } else {
@@ -3209,6 +3210,7 @@ const CashierPortal = () => {
         <DualScannerInterface
           onBarcodeScanned={handleBarcodeScanned}
           onClose={() => setShowBarcodeScanner(false)}
+          context="cashier"
           inventoryProducts={products}
         />
       )}
