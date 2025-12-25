@@ -660,15 +660,15 @@ const SupplierPortal = () => {
         ['pending_approval', 'approved', 'sent_to_supplier', 'confirmed'].includes(o.status)
       ).length || 0;
 
-      // Calculate total revenue (received and completed orders)
+      // Calculate total revenue (all non-cancelled orders = processing, confirmed, received, completed)
       const totalRevenue = allOrders
-        ?.filter(o => ['received', 'completed'].includes(o.status))
+        ?.filter(o => !['pending_approval', 'cancelled', 'rejected'].includes(o.status))
         .reduce((sum, o) => sum + (parseFloat(o.total_amount_ugx) || 0), 0) || 0;
 
       // Calculate average order value
       const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-      // Calculate on-time delivery
+      // Calculate on-time delivery (only for delivered/completed orders with dates)
       const deliveredOrders = allOrders?.filter(o => 
         ['received', 'completed'].includes(o.status)
       ) || [];
@@ -1138,13 +1138,7 @@ const SupplierPortal = () => {
 
     checkAuthAndLoad();
 
-    // Refresh supplier metrics every 30 seconds for real-time updates
-    const refreshInterval = setInterval(() => {
-      console.log('🔄 Refreshing supplier metrics every 30 seconds...');
-      loadSupplierData();
-    }, 30 * 1000);
-
-    // Subscribe to real-time updates on purchase orders
+    // Subscribe to real-time updates on purchase orders (only refresh on actual changes)
     const subscription = supabase
       .channel('purchase-orders-updates')
       .on('postgres_changes', {
@@ -1154,14 +1148,11 @@ const SupplierPortal = () => {
       }, (payload) => {
         console.log('📊 Real-time order update detected, refreshing supplier metrics...', payload);
         loadSupplierData();
-        // Also refresh just the performance metrics for faster update
-        loadSupplierData(); // This includes loadPerformanceMetrics
       })
       .subscribe();
 
     return () => {
       clearInterval(timer);
-      clearInterval(refreshInterval);
       supabase.removeChannel(subscription);
     };
   }, []);

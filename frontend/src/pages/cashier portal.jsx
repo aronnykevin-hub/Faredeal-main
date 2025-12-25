@@ -161,24 +161,27 @@ const CashierPortal = () => {
 
   // Cashier Profile - Load from Supabase (no mock data)
   const [cashierProfile, setCashierProfile] = useState({
+    id: null,
     name: 'Cashier',
+    phone: '+256 XXX XXX XXX',
+    email: 'your.email@example.com',
     role: 'Cashier',
     department: 'Front End Operations',
-    employeeId: 'Loading...',
+    employeeId: 'CASH-001',
     joinDate: new Date().toISOString().split('T')[0],
     avatar: '🛒',
     avatar_url: null,
-    shift: 'Current Shift',
-    register: 'Till',
+    shift: 'Morning Shift',
+    register: 'Till #1',
     manager: 'Manager',
-    location: 'Branch',
-    languages: ['English'],
+    location: 'Kampala Branch',
+    languages: ['English', 'Luganda'],
     permissions: {
       pos: true,
       returns: true,
       voidTransactions: false,
       mobileMoneyTransactions: true,
-      foreignCurrency: false,
+      foreignCurrency: true,
       loyaltyProgram: true
     }
   });
@@ -338,49 +341,152 @@ const CashierPortal = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        console.error('No authenticated user');
+        console.error('❌ No authenticated user found');
         return;
       }
+
+      console.log('🔍 Loading cashier profile for user:', user.id);
 
       // Get cashier data from users table
       const { data: cashierData, error } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', user.id)
-        .eq('role', 'cashier')
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error loading cashier profile:', error);
+        console.error('❌ Error loading cashier profile:', error);
         return;
       }
 
       if (cashierData) {
-        // Parse metadata if it exists
-        const metadata = cashierData.metadata || {};
+        console.log('📋 Raw data from Supabase:', {
+          full_name: cashierData.full_name,
+          employee_id: cashierData.employee_id,
+          department: cashierData.department,
+          phone: cashierData.phone,
+          avatar_url: cashierData.avatar_url,
+          metadata: cashierData.metadata,
+          created_at: cashierData.created_at
+        });
+        
+        // Parse metadata - handle both JSON string and object
+        let metadata = {};
+        if (cashierData.metadata) {
+          if (typeof cashierData.metadata === 'string') {
+            try {
+              metadata = JSON.parse(cashierData.metadata);
+            } catch (e) {
+              console.warn('⚠️ Could not parse metadata JSON:', cashierData.metadata);
+            }
+          } else {
+            metadata = cashierData.metadata;
+          }
+        }
+        
+        console.log('📊 Parsed metadata:', metadata);
         
         // Get profile picture from database first, fallback to localStorage
         const storageKey = `cashier_profile_pic_${user.id}`;
         const localProfilePic = localStorage.getItem(storageKey);
         const profilePicture = cashierData.avatar_url || localProfilePic || null;
         
-        setCashierProfile({
+        const profileData = {
           id: cashierData.id,
-          name: cashierData.full_name || 'Cashier',
-          phone: cashierData.phone || '+256 XXX XXX XXX',
+          name: cashierData.full_name && cashierData.full_name.trim() ? cashierData.full_name : 'Cashier',
+          phone: cashierData.phone && cashierData.phone.trim() ? cashierData.phone : '+256 XXX XXX XXX',
           email: cashierData.email || user.email || 'your.email@example.com',
           role: 'Cashier',
-          department: cashierData.department || 'Front End Operations',
-          employeeId: cashierData.employee_id || 'CASH-001',
-          joinDate: new Date(cashierData.created_at).toISOString().split('T')[0],
+          department: cashierData.department && cashierData.department.trim() ? cashierData.department : 'Front End Operations',
+          employeeId: cashierData.employee_id && cashierData.employee_id.trim() ? cashierData.employee_id : 'CASH-001',
+          joinDate: cashierData.created_at ? new Date(cashierData.created_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
           avatar: metadata.avatar || '🛒',
           avatar_url: profilePicture,
           shift: metadata.shift || 'Morning Shift',
           register: metadata.register || 'Till #1',
           manager: metadata.manager || 'Manager',
           location: metadata.location || 'Kampala Branch',
-          languages: metadata.languages || ['English', 'Luganda'],
-          permissions: metadata.permissions || {
+          languages: Array.isArray(metadata.languages) ? metadata.languages : ['English', 'Luganda'],
+          permissions: metadata.permissions ? {
+            pos: metadata.permissions.pos !== false,
+            returns: metadata.permissions.returns !== false,
+            voidTransactions: metadata.permissions.voidTransactions === true,
+            mobileMoneyTransactions: metadata.permissions.mobileMoneyTransactions !== false,
+            foreignCurrency: metadata.permissions.foreignCurrency === true,
+            loyaltyProgram: metadata.permissions.loyaltyProgram !== false
+          } : {
+            pos: true,
+            returns: true,
+            voidTransactions: false,
+            mobileMoneyTransactions: true,
+            foreignCurrency: true,
+            loyaltyProgram: true
+          }
+        };
+        
+        setCashierProfile(profileData);
+        console.log('✅ Cashier profile successfully loaded and set:', profileData);
+        
+        // Set profile pic URL state
+        setProfilePicUrl(profilePicture);
+        console.log('🖼️ Profile picture source:', profilePicture ? (cashierData.avatar_url ? 'Database' : 'LocalStorage') : 'None');
+      } else {
+        console.log('⚠️ No cashier record found in database - using fallback defaults');
+        
+        // Use fallback profile if no data exists
+        const fallbackProfile = {
+          id: user.id,
+          name: 'Cashier',
+          phone: '+256 XXX XXX XXX',
+          email: user.email || 'your.email@example.com',
+          role: 'Cashier',
+          department: 'Front End Operations',
+          employeeId: 'CASH-001',
+          joinDate: new Date().toISOString().split('T')[0],
+          avatar: '🛒',
+          avatar_url: null,
+          shift: 'Morning Shift',
+          register: 'Till #1',
+          manager: 'Manager',
+          location: 'Kampala Branch',
+          languages: ['English', 'Luganda'],
+          permissions: {
+            pos: true,
+            returns: true,
+            voidTransactions: false,
+            mobileMoneyTransactions: true,
+            foreignCurrency: true,
+            loyaltyProgram: true
+          }
+        };
+        
+        setCashierProfile(fallbackProfile);
+        setProfilePicUrl(null);
+        console.log('ℹ️ Using fallback defaults:', fallbackProfile);
+      }
+    } catch (error) {
+      console.error('❌ Exception in loadCashierProfile:', error);
+      
+      // Always set a fallback on error
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCashierProfile({
+          id: user.id,
+          name: 'Cashier',
+          phone: '+256 XXX XXX XXX',
+          email: user.email || 'your.email@example.com',
+          role: 'Cashier',
+          department: 'Front End Operations',
+          employeeId: 'CASH-001',
+          joinDate: new Date().toISOString().split('T')[0],
+          avatar: '🛒',
+          avatar_url: null,
+          shift: 'Morning Shift',
+          register: 'Till #1',
+          manager: 'Manager',
+          location: 'Kampala Branch',
+          languages: ['English', 'Luganda'],
+          permissions: {
             pos: true,
             returns: true,
             voidTransactions: false,
@@ -389,15 +495,87 @@ const CashierPortal = () => {
             loyaltyProgram: true
           }
         });
+      }
+    }
+  };
+
+  // Update profile data in Supabase (for empty fields)
+  const ensureProfileDataInDatabase = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log('🔄 Ensuring profile data exists in database...');
+
+      // Check if user has a profile record
+      const { data: existingProfile } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+      if (!existingProfile) {
+        console.log('📝 Creating new profile record...');
         
-        // Set profile pic URL state - always update, even if null
-        setProfilePicUrl(profilePicture);
-        console.log('✅ Profile picture loaded:', profilePicture ? 'Image found' : 'No image', 'from:', cashierData.avatar_url ? 'database' : 'localStorage');
+        // Create new profile record
+        const { error } = await supabase
+          .from('users')
+          .insert({
+            auth_id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || 'Cashier',
+            employee_id: 'CASH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            department: 'Front End Operations',
+            phone: user.user_metadata?.phone || '+256',
+            role: 'cashier',
+            metadata: {
+              shift: 'Morning Shift',
+              register: 'Till #1',
+              manager: 'Manager',
+              location: 'Kampala Branch',
+              languages: ['English', 'Luganda'],
+              permissions: {
+                pos: true,
+                returns: true,
+                voidTransactions: false,
+                mobileMoneyTransactions: true,
+                foreignCurrency: true,
+                loyaltyProgram: true
+              }
+            }
+          });
+
+        if (error) {
+          console.error('❌ Error creating profile:', error);
+        } else {
+          console.log('✅ Profile record created successfully');
+          loadCashierProfile(); // Reload to get the new data
+        }
+      } else if (!existingProfile.full_name || !existingProfile.employee_id) {
+        console.log('📝 Updating empty profile fields...');
+        
+        // Update empty fields
+        const { error } = await supabase
+          .from('users')
+          .update({
+            full_name: existingProfile.full_name || user.user_metadata?.full_name || 'Cashier',
+            employee_id: existingProfile.employee_id || 'CASH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
+            department: existingProfile.department || 'Front End Operations',
+            phone: existingProfile.phone || user.user_metadata?.phone || '+256'
+          })
+          .eq('auth_id', user.id);
+
+        if (error) {
+          console.error('❌ Error updating profile:', error);
+        } else {
+          console.log('✅ Profile fields updated successfully');
+          loadCashierProfile(); // Reload to get the updated data
+        }
       } else {
-        console.log('⚠️ No cashier data found for this user');
+        console.log('✅ Profile data is complete');
       }
     } catch (error) {
-      console.error('Error loading cashier profile:', error);
+      console.error('❌ Error ensuring profile data:', error);
     }
   };
 
@@ -945,7 +1123,42 @@ const CashierPortal = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check if notifications table exists, otherwise create sample notifications
+      // Silently skip notifications - table may not exist
+      console.log('📝 Notifications: Using system-generated notifications (table may not exist)');
+      
+      const systemNotifications = [
+        {
+          id: 1,
+          title: 'Welcome to FAREDEAL',
+          message: 'Your cashier portal is ready to use',
+          time: new Date().toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
+          read: false,
+          type: 'info'
+        },
+        {
+          id: 2,
+          title: 'System Status',
+          message: 'All payment systems operational',
+          time: new Date(Date.now() - 30 * 60000).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
+          read: false,
+          type: 'info'
+        },
+        {
+          id: 3,
+          title: 'Performance Update',
+          message: 'Check your daily performance metrics',
+          time: new Date(Date.now() - 60 * 60000).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
+          read: true,
+          type: 'info'
+        }
+      ];
+      
+      setNotifications(systemNotifications);
+      console.log('✅ Notifications loaded:', systemNotifications.length);
+      return;
+      
+      /* DISABLED: Notifications table doesn't exist in production
+      // Attempt to load from Supabase if table exists
       const { data: notificationsData, error } = await supabase
         .from('notifications')
         .select('*')
@@ -953,43 +1166,9 @@ const CashierPortal = () => {
         .order('created_at', { ascending: false })
         .limit(10);
 
-      if (error && (error.code === '42P01' || error.code === 'PGRST205')) {
-        // Table doesn't exist, use system-generated notifications
-        console.log('Notifications table not found, generating system notifications');
-        
-        const systemNotifications = [
-          {
-            id: 1,
-            title: 'Welcome to FAREDEAL',
-            message: 'Your cashier portal is ready to use',
-            time: new Date().toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-            type: 'info'
-          },
-          {
-            id: 2,
-            title: 'System Status',
-            message: 'All payment systems operational',
-            time: new Date(Date.now() - 30 * 60000).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-            type: 'info'
-          },
-          {
-            id: 3,
-            title: 'Performance Update',
-            message: 'Check your daily performance metrics',
-            time: new Date(Date.now() - 60 * 60000).toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
-            read: true,
-            type: 'info'
-          }
-        ];
-        
-        setNotifications(systemNotifications);
-        return;
-      }
-
       if (error) {
-        console.error('Error loading notifications:', error);
+        // Silently use system notifications
+        setNotifications(systemNotifications);
         return;
       }
 
@@ -1007,28 +1186,19 @@ const CashierPortal = () => {
         }));
         
         setNotifications(formatted);
-        console.log('✅ Loaded notifications:', formatted.length);
+        console.log('✅ Loaded notifications from database:', formatted.length);
       } else {
-        // No notifications found, create welcome message
-        setNotifications([
-          {
-            id: 1,
-            title: 'Welcome!',
-            message: 'You\'re all set up and ready to go',
-            time: new Date().toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
-            read: false,
-            type: 'info'
-          }
-        ]);
+        setNotifications(systemNotifications);
       }
+      */
     } catch (error) {
-      console.error('Error loading notifications:', error);
-      // Fallback notifications
+      console.log('ℹ️ Notifications: Using fallback system notifications');
+      // Fallback to system notifications on any error
       setNotifications([
         {
           id: 1,
-          title: 'System Ready',
-          message: 'Cashier portal loaded successfully',
+          title: 'Welcome!',
+          message: 'You\'re all set up and ready to go',
           time: new Date().toLocaleTimeString('en-UG', { hour: '2-digit', minute: '2-digit' }),
           read: false,
           type: 'info'
@@ -1071,6 +1241,7 @@ const CashierPortal = () => {
   // Load cashier profile on mount
   useEffect(() => {
     loadCashierProfile();
+    ensureProfileDataInDatabase(); // Ensure profile data exists and is complete
     loadDashboardData();
     
     // Refresh dashboard data every 30 seconds for real-time updates
