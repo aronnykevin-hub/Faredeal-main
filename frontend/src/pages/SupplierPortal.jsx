@@ -1154,6 +1154,8 @@ const SupplierPortal = () => {
       }, (payload) => {
         console.log('📊 Real-time order update detected, refreshing supplier metrics...', payload);
         loadSupplierData();
+        // Also refresh just the performance metrics for faster update
+        loadSupplierData(); // This includes loadPerformanceMetrics
       })
       .subscribe();
 
@@ -1732,16 +1734,17 @@ const SupplierPortal = () => {
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { title: 'Total Revenue', value: formatCurrency(performanceMetrics.totalRevenue), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '+18.5%' },
-          { title: 'Total Orders', value: formatNumber(performanceMetrics.totalOrders), icon: FiPackage, color: 'from-blue-500 to-blue-600', change: '+12.3%' },
-          { title: 'On-Time Delivery', value: `${performanceMetrics.onTimeDelivery}%`, icon: FiTruck, color: 'from-purple-500 to-purple-600', change: '+2.1%' },
-          { title: 'Quality Rating', value: performanceMetrics.qualityRating, icon: FiStar, color: 'from-yellow-500 to-yellow-600', change: '+0.3' }
+          { title: 'Total Revenue', value: formatCurrency(performanceMetrics.totalRevenue), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '+18.5%', detail: `${performanceMetrics.totalOrders} orders` },
+          { title: 'Total Orders', value: formatNumber(performanceMetrics.totalOrders), icon: FiPackage, color: 'from-blue-500 to-blue-600', change: '+12.3%', detail: `${performanceMetrics.pendingOrders} pending` },
+          { title: 'On-Time Delivery', value: `${performanceMetrics.onTimeDelivery}%`, icon: FiTruck, color: 'from-purple-500 to-purple-600', change: '+2.1%', detail: 'On schedule' },
+          { title: 'Quality Rating', value: performanceMetrics.qualityRating, icon: FiStar, color: 'from-yellow-500 to-yellow-600', change: '+0.3', detail: 'Customer satisfaction' }
         ].map((metric, index) => (
           <div key={index} className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex-1">
                 <p className="text-gray-600 text-sm font-medium">{metric.title}</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
+                <p className="text-xs text-gray-500 mt-1">{metric.detail}</p>
                 <p className="text-green-600 text-sm font-medium mt-1">{metric.change}</p>
               </div>
               <div className={`p-3 rounded-lg bg-gradient-to-r ${metric.color}`}>
@@ -1750,6 +1753,42 @@ const SupplierPortal = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Payment Summary Bar */}
+      <div className="mt-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 shadow-md border border-purple-100">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">💳 Payment Summary</h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold mb-1">FULLY PAID</p>
+            <p className="text-2xl font-bold text-green-600">{performanceMetrics.paidOrders || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+          </div>
+          
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm border-2 border-yellow-300">
+            <p className="text-xs text-gray-600 font-semibold mb-1">PARTIALLY PAID ⚠️</p>
+            <p className="text-2xl font-bold text-yellow-600">{performanceMetrics.partiallyPaidOrders || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">Needs Completion</p>
+          </div>
+          
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold mb-1">UNPAID</p>
+            <p className="text-2xl font-bold text-red-600">{performanceMetrics.unpaidOrders || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
+          </div>
+          
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold mb-1">TOTAL RECEIVED</p>
+            <p className="text-2xl font-bold text-blue-600">{formatCurrency(performanceMetrics.totalPaid || 0)}</p>
+            <p className="text-xs text-gray-500 mt-1">Cash In</p>
+          </div>
+          
+          <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+            <p className="text-xs text-gray-600 font-semibold mb-1">OUTSTANDING</p>
+            <p className="text-2xl font-bold text-purple-600">{formatCurrency(performanceMetrics.totalOutstanding || 0)}</p>
+            <p className="text-xs text-gray-500 mt-1">Balance Due</p>
+          </div>
+        </div>
       </div>
 
       {/* Payment Statistics - Collapsible */}
