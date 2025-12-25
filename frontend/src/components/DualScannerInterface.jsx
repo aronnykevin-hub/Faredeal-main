@@ -6,7 +6,7 @@ import Quagga from '@ericblade/quagga2';
 import { supabase } from '../services/supabase';
 import geminiAIService from '../services/geminiAIService';
 
-const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [] }) => {
+const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [], context = 'cashier', autoCloseDelay = 0 }) => {
   const [scanMode, setScanMode] = useState('camera'); // 'smart', 'camera', 'gun' - CAMERA ACTIVE BY DEFAULT
   const [cameraActive, setCameraActive] = useState(false);
   const [gunListening, setGunListening] = useState(true); // GUN SCANNER LISTENING BY DEFAULT
@@ -1233,9 +1233,21 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     // Callback to parent with full context
     onBarcodeScanned(barcode);
 
-    // Auto-focus back to gun input
-    if (gunInputRef.current && (scanMode === 'gun' || scanMode === 'smart')) {
-      setTimeout(() => gunInputRef.current?.focus(), 200);
+    // 🤖 AUTO-CLOSE LOGIC
+    // For admin portal: auto-close after successfully adding a new product
+    if (context === 'admin' && added) {
+      console.log('📦 Admin context: Auto-closing scanner after product added...');
+      const delayTime = autoCloseDelay || 1500; // Default 1.5 seconds
+      setTimeout(() => {
+        onClose();
+      }, delayTime);
+    }
+    // For cashier portal: keep scanner open for continuous scanning (no auto-close)
+    else if (context === 'cashier') {
+      // Auto-focus back to gun input for next scan
+      if (gunInputRef.current && (scanMode === 'gun' || scanMode === 'smart')) {
+        setTimeout(() => gunInputRef.current?.focus(), 200);
+      }
     }
   };
 

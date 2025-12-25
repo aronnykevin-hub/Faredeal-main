@@ -645,44 +645,43 @@ const OrderInventoryPOSControl = () => {
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-        <div className="bg-white rounded-lg p-4 shadow-md border-l-4 border-blue-500">
-          <p className="text-sm text-gray-600 font-semibold">Total Products</p>
-          <p className="text-3xl font-bold text-blue-600 mt-2">{stats.total}</p>
-          <p className="text-xs text-gray-500 mt-1">{stats.active} active</p>
+      {/* Statistics Cards - Mobile Optimized - COMPACT */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1 sm:gap-2 lg:gap-4">
+        <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 shadow-md border-l-4 border-blue-500 hover:shadow-lg transition-shadow">
+          <p className="text-xs text-gray-600 font-semibold truncate leading-tight">Total</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600 mt-0.5 sm:mt-1">{stats.total}</p>
+          <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">{stats.active} active</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4 shadow-md border-l-4 border-green-500">
-          <p className="text-sm text-gray-600 font-semibold">Inventory Value</p>
-          <p className="text-2xl font-bold text-green-600 mt-2">{formatCurrency(stats.totalValue)}</p>
-          <p className="text-xs text-gray-500 mt-1">Total cost</p>
+        <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 shadow-md border-l-4 border-green-500 hover:shadow-lg transition-shadow">
+          <p className="text-xs text-gray-600 font-semibold truncate leading-tight">Value</p>
+          <p className="text-sm sm:text-lg lg:text-2xl font-bold text-green-600 mt-0.5 sm:mt-1 truncate">{formatCurrency(stats.totalValue)}</p>
+          <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Cost</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4 shadow-md border-l-4 border-purple-500">
-          <p className="text-sm text-gray-600 font-semibold">Avg Margin</p>
-          <p className="text-3xl font-bold text-purple-600 mt-2">{stats.avgMargin}%</p>
-          <p className="text-xs text-gray-500 mt-1">Profit margin</p>
+        <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 shadow-md border-l-4 border-purple-500 hover:shadow-lg transition-shadow">
+          <p className="text-xs text-gray-600 font-semibold truncate leading-tight">Margin</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600 mt-0.5 sm:mt-1">{stats.avgMargin}%</p>
+          <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Avg</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4 shadow-md border-l-4 border-orange-500">
-          <p className="text-sm text-gray-600 font-semibold">Low Stock Items</p>
-          <p className="text-3xl font-bold text-orange-600 mt-2">{stats.lowStock}</p>
-          <p className="text-xs text-gray-500 mt-1">Need reordering</p>
+        <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-4 shadow-md border-l-4 border-orange-500 hover:shadow-lg transition-shadow col-span-2 sm:col-span-1">
+          <p className="text-xs text-gray-600 font-semibold truncate leading-tight">Low Stock</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600 mt-0.5 sm:mt-1">{stats.lowStock}</p>
+          <p className="text-xs text-gray-500 mt-0.5 hidden sm:block">Need</p>
         </div>
 
-        <div className="bg-white rounded-lg p-4 shadow-md border-l-4 border-red-500">
-          <p className="text-sm text-gray-600 font-semibold">Inactive</p>
-          <p className="text-3xl font-bold text-red-600 mt-2">{stats.inactive}</p>
-          <p className="text-xs text-gray-500 mt-1">Deactivated</p>
+        <div className="hidden lg:flex bg-white rounded-lg p-2 sm:p-3 lg:p-4 shadow-md border-l-4 border-red-500 hover:shadow-lg transition-shadow items-center flex-col justify-center">
+          <p className="text-xs text-gray-600 font-semibold">Inactive</p>
+          <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600 mt-0.5 sm:mt-1">{stats.inactive}</p>
         </div>
       </div>
 
       {/* Controls and Filters */}
-      <div className="bg-white rounded-lg p-6 shadow-md space-y-4">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">🔍 Product Management</h2>
-          <div className="flex gap-2">
+      <div className="bg-white rounded-lg p-2 sm:p-3 lg:p-6 shadow-md space-y-2 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0 mb-2 sm:mb-4">
+          <h2 className="text-base sm:text-lg lg:text-xl font-bold text-gray-800 w-full sm:w-auto">🔍 Products</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 w-full sm:w-auto">
             <button
               onClick={() => {
                 if (!isAdmin) {
@@ -691,15 +690,15 @@ const OrderInventoryPOSControl = () => {
                 }
                 setShowAddProductModal(true);
               }}
-              className={`px-4 py-2 rounded-lg transition-all flex items-center gap-2 font-semibold ${
+              className={`px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 text-xs sm:text-sm lg:text-base rounded-lg transition-all flex items-center justify-center gap-1 font-semibold whitespace-nowrap ${
                 isAdmin 
                   ? 'bg-green-500 text-white hover:bg-green-600 shadow-lg hover:shadow-xl' 
                   : 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300 cursor-default'
               }`}
               title={!isAdmin ? 'Admin access required' : 'Add new product to inventory'}
             >
-              <FiPlus className="h-4 w-4" />
-              Add Product {!isAdmin && '(Admin Only)'}
+              <FiPlus className="h-3 w-3 sm:h-4 sm:w-4 lg:h-4 lg:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Add</span>
             </button>
             <button
               onClick={() => {
@@ -708,17 +707,17 @@ const OrderInventoryPOSControl = () => {
                 });
               }}
               disabled={refreshing}
-              className={`${refreshing ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'} text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2`}
+              className={`${refreshing ? 'bg-gray-400' : 'bg-blue-500 hover:bg-blue-600'} text-white px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 text-xs sm:text-sm lg:text-base rounded-lg transition-colors flex items-center justify-center gap-1 font-semibold whitespace-nowrap`}
             >
               <FiRefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
               {refreshing ? 'Syncing...' : 'Refresh'}
             </button>
             <button
               onClick={exportToCSV}
-              className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              className="bg-green-500 text-white px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 text-xs sm:text-sm lg:text-base rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-1 font-semibold whitespace-nowrap"
             >
-              <FiDownload className="h-4 w-4" />
-              Export CSV
+              <FiDownload className="h-3 w-3 sm:h-4 sm:w-4 lg:h-4 lg:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Export</span>
             </button>
             <button
               onClick={() => {
@@ -729,14 +728,14 @@ const OrderInventoryPOSControl = () => {
                 setShowBulkPricing(!showBulkPricing);
               }}
               disabled={!isAdmin}
-              className={`px-4 py-2 rounded-lg transition-colors flex items-center gap-2 ${
+              className={`px-2 sm:px-3 lg:px-4 py-1.5 sm:py-2 text-xs sm:text-sm lg:text-base rounded-lg transition-colors flex items-center justify-center gap-1 font-semibold whitespace-nowrap ${
                 isAdmin 
                   ? 'bg-purple-500 text-white hover:bg-purple-600' 
                   : 'bg-gray-300 text-gray-600 cursor-not-allowed'
               }`}
             >
-              <FiDollarSign className="h-4 w-4" />
-              Bulk Price {!isAdmin && '(Admin Only)'}
+              <FiDollarSign className="h-3 w-3 sm:h-4 sm:w-4 lg:h-4 lg:w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Bulk</span>
             </button>
           </div>
         </div>
@@ -779,16 +778,16 @@ const OrderInventoryPOSControl = () => {
           </div>
         )}
 
-        {/* Search and Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2 relative">
-            <FiSearch className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+        {/* Search and Filters - Mobile Optimized - COMPACT */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 lg:gap-4">
+          <div className="sm:col-span-2 lg:col-span-2 relative">
+            <FiSearch className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by product name, SKU, or barcode..."
-              className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+              placeholder="Search..."
+              className="w-full pl-8 pr-3 py-1.5 sm:py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             />
           </div>
 
@@ -799,7 +798,7 @@ const OrderInventoryPOSControl = () => {
               setFilterCategory(selectedValue);
               console.log('Category filter changed to:', selectedValue);
             }}
-            className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none bg-white"
           >
             <option value="all">All Categories</option>
             {categories && categories.length > 0 ? (
@@ -814,7 +813,7 @@ const OrderInventoryPOSControl = () => {
           <select
             value={sortField}
             onChange={(e) => setSortField(e.target.value)}
-            className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+            className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
           >
             <option value="name">Sort by Name</option>
             <option value="margin">Sort by Margin</option>
