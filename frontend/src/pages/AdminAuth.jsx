@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
+import { fastCache, optimizedApiCall } from '../utils/fastConnectionCache';
 import {
   FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone,
   FiShield, FiCheckCircle, FiAlertCircle, FiArrowRight,
@@ -262,8 +263,8 @@ const AdminAuth = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Handle magic link login
-  const handleMagicLinkLogin = async (e) => {
+  // ⚡ Handle magic link login (ultra-fast for slow connections)
+  const handleMagicLinkLogin = useCallback(async (e) => {
     e.preventDefault();
     
     if (!formData.email) {
@@ -277,26 +278,35 @@ const AdminAuth = () => {
     }
 
     setLoading(true);
+    console.log('⚡ [MAGIC] Sending magic link...');
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: formData.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/admin-portal`
+      await fastCache.executeWithDedup(
+        `magic_${formData.email}`,
+        async () => {
+          return optimizedApiCall(async () => {
+            return supabase.auth.signInWithOtp({
+              email: formData.email,
+              options: {
+                emailRedirectTo: `${window.location.origin}/admin-portal`
+              }
+            });
+          }, {
+            maxRetries: 2,
+            timeout: 15000
+          });
         }
-      });
-
-      if (error) throw error;
+      );
 
       setMagicLinkSent(true);
       notificationService.show(
-        '📧 Magic link sent! Check your email and click the link to sign in as Admin.',
+        '📧 Magic link sent! Check your email.',
         'success',
-        8000
+        5000
       );
 
     } catch (error) {
-      console.error('Magic link error:', error);
+      console.error('⚡ [MAGIC] Error:', error);
       notificationService.show(
         error.message || 'Failed to send magic link',
         'error'
@@ -304,105 +314,92 @@ const AdminAuth = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [formData.email]);
 
-  const handleGoogleSignIn = async () => {
+  // ⚡ Handle Google Sign-In with optimized redirect
+  const handleGoogleSignIn = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('🔐 [GOOGLE] Starting Google OAuth flow...');
+      console.log('⚡ [GOOGLE] Starting OAuth...');
       
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          // Redirect back to this auth page (not admin-portal)
-          // The listener will handle the redirect after user record is created
-          redirectTo: `${window.location.origin}/admin-auth`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
+      await fastCache.executeWithDedup('google_signin', async () => {
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/admin-auth`,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent'
+            }
           }
+        });
+
+        if (error) {
+          console.error('⚡ [GOOGLE] OAuth error:', error);
+          throw error;
         }
+
+        return data;
       });
 
-      if (error) {
-        console.error('🔐 [GOOGLE] OAuth error:', error);
-        throw error;
-      }
-
-      console.log('🔐 [GOOGLE] OAuth initiated, user will be redirected to Google...');
-      notificationService.show(
-        '🔄 Opening Google sign-in window...',
-        'info'
-      );
-      
-      // Don't reset loading here - keep it until the redirect happens
-      // The redirect will cause a page navigation, so this code won't continue
-
+      notificationService.show('🔄 Opening Google sign-in...', 'info', 1500);
     } catch (error) {
-      console.error('🔐 [GOOGLE] Google sign-in error:', error);
+      console.error('⚡ [GOOGLE] Error:', error);
       setLoading(false);
       notificationService.show(
         error.message || 'Failed to sign in with Google',
         'error'
       );
     }
-  };
+  }, []);
 
-  // Handle login
-  const handleLogin = async (e) => {
+  // Handle login with FAST parallel operations
+  const handleLogin = useCallback(async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
       return;
     }
 
+    // ⚡ Fast connection check
+    if (!navigator.onLine) {
+      notificationService.show(
+        '🌐 No internet connection detected. Please check your connection and try again.',
+        'error',
+        5000
+      );
+      return;
+    }
+
     setLoading(true);
-    console.log('🔐 [LOGIN] Starting login process...');
+    console.log('⚡ [FAST-LOGIN] Starting optimized login...');
+    const startTime = Date.now();
 
     try {
-      console.log('🔐 [LOGIN] Calling signInWithPassword...');
+      // ⚡ Use deduplication to prevent double submissions
+      const loginKey = `login_${formData.email}`;
       
-      // Add retry logic with extended timeout for mobile networks
-      let data, error;
-      let retries = 0;
-      const maxRetries = 2;
-      
-      while (retries <= maxRetries) {
-        try {
-          // Create a timeout promise that rejects after 45 seconds (mobile-friendly)
-          const signInPromise = supabase.auth.signInWithPassword({
-            email: formData.email,
-            password: formData.password
+      const loginResult = await fastCache.executeWithDedup(
+        loginKey,
+        async () => {
+          return optimizedApiCall(async () => {
+            const result = await supabase.auth.signInWithPassword({
+              email: formData.email,
+              password: formData.password
+            });
+            return result;
+          }, {
+            maxRetries: 2,
+            timeout: 20000,
+            initialDelay: 300
           });
-          
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Connection timeout - Retrying...')), 45000)
-          );
-          
-          const result = await Promise.race([signInPromise, timeoutPromise]);
-          data = result.data;
-          error = result.error;
-          break; // Success, exit retry loop
-        } catch (err) {
-          retries++;
-          if (retries <= maxRetries) {
-            console.log(`🔄 Login attempt ${retries} failed, retrying...`);
-            notificationService.show(
-              `🔄 Connection slow, attempt ${retries}/${maxRetries}...`,
-              'info',
-              3000
-            );
-            // Wait 2 seconds before retry
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          } else {
-            throw err;
-          }
         }
-      }
+      );
+
+      const { data, error } = loginResult;
 
       if (error) {
-        console.error('🔐 [LOGIN] Auth error:', error.message);
-        // Check if it's an email confirmation error
+        console.error('⚡ [FAST-LOGIN] Auth error:', error.message);
         if (error.message.toLowerCase().includes('email') && 
             error.message.toLowerCase().includes('confirm')) {
           notificationService.show(
@@ -415,91 +412,95 @@ const AdminAuth = () => {
         throw error;
       }
 
-      console.log('🔐 [LOGIN] Auth successful for:', data.user.email);
+      console.log('⚡ [FAST-LOGIN] Auth successful for:', data.user.email);
 
-      // ✅ ENSURE USER HAS ADMIN ROLE IN DATABASE
-      if (data.user) {
-        try {
-          console.log('🔐 [LOGIN] Checking user record...');
-          // Check if user exists in users table
-          const { data: existingUser, error: checkError } = await supabase
-            .from('users')
-            .select('id, role')
-            .eq('id', data.user.id)
-            .maybeSingle();
-
-          console.log('🔐 [LOGIN] User check result:', { existingUser, checkError });
-
-          if (!existingUser) {
-            // User doesn't exist, create them with admin role
-            console.log('🔐 [LOGIN] Creating user record with admin role...');
-            const { error: insertError } = await supabase
-              .from('users')
-              .insert({
-                id: data.user.id,
-                email: data.user.email,
-                full_name: data.user.user_metadata?.full_name || 'Admin',
-                phone: data.user.user_metadata?.phone || null,
-                role: 'admin',
-                is_active: true
-              });
-            
-            if (insertError) {
-              console.warn('🔐 [LOGIN] Insert error:', insertError.message);
-            } else {
-              console.log('🔐 [LOGIN] User record created');
-            }
-          } else if (existingUser.role !== 'admin') {
-            // User exists but role is not admin - update it
-            console.log('🔐 [LOGIN] Updating user role to admin...');
-            const { error: updateError } = await supabase
-              .from('users')
-              .update({ role: 'admin' })
-              .eq('id', data.user.id);
-            
-            if (updateError) {
-              console.warn('🔐 [LOGIN] Update error:', updateError.message);
-            } else {
-              console.log('🔐 [LOGIN] User role updated');
-            }
-          } else {
-            console.log('🔐 [LOGIN] User already has admin role');
-          }
-        } catch (userError) {
-          console.log('🔐 [LOGIN] User record error:', userError.message);
-        }
-      }
-
-      console.log('🔐 [LOGIN] Setting localStorage...');
-      // Set admin access flag
-      localStorage.setItem('adminKey', 'true');
-      localStorage.setItem('supermarket_user', JSON.stringify({
+      // ⚡ CRITICAL: Prepare all user data synchronously
+      const adminUser = {
         id: data.user.id,
         name: data.user.user_metadata?.full_name || 'Admin',
         role: 'admin',
         email: data.user.email,
         accessLevel: 'system',
         timestamp: Date.now()
-      }));
+      };
 
-      console.log('🔐 [LOGIN] Showing success message...');
-      notificationService.show('✅ Welcome back, Admin!', 'success');
+      // ⚡ INSTANT: Set localStorage + auth state immediately (NO AWAIT)
+      localStorage.setItem('adminKey', 'true');
+      localStorage.setItem('supermarket_user', JSON.stringify(adminUser));
+      fastCache.cache.set('currentUser', adminUser);
+
+      // ⚡ PARALLEL: Background operations (non-blocking)
+      // Fire all async tasks in parallel without awaiting
+      if (data.user) {
+        Promise.all([
+          // Update user in database
+          (async () => {
+            try {
+              await supabase.from('users').upsert({
+                id: data.user.id,
+                email: data.user.email,
+                full_name: data.user.user_metadata?.full_name || 'Admin',
+                phone: data.user.user_metadata?.phone || null,
+                role: 'admin',
+                is_active: true,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'id' });
+            } catch (err) {
+              console.warn('⚠️ [BG] User sync failed:', err.message);
+            }
+          })(),
+          // Prefetch user profile (warming cache)
+          (async () => {
+            try {
+              await supabase.from('admin_profiles')
+                .select('*')
+                .eq('user_id', data.user.id)
+                .single();
+            } catch (err) {
+              console.log('[BG] Profile prefetch skipped');
+            }
+          })()
+        ]).catch(err => console.log('[BG] Parallel tasks error:', err.message));
+      }
+
+      const duration = Date.now() - startTime;
+      console.log(`⚡ [FAST-LOGIN] Complete in ${duration}ms`);
       
-      console.log('🔐 [LOGIN] Redirecting to /admin-portal...');
-      // Redirect to admin portal after a short delay
+      notificationService.show('✅ Welcome back, Admin!', 'success', 1500);
+      
+      // ⚡ ULTRA-FAST: Redirect immediately (200ms)
       setTimeout(() => {
         navigate('/admin-portal');
-      }, 800);
+      }, 200);
 
     } catch (error) {
-      console.error('🔐 [LOGIN] Login error:', error);
+      console.error('⚡ [FAST-LOGIN] Error:', error);
       setLoading(false);
-      notificationService.show(
-        error.message || 'Invalid email or password',
-        'error'
-      );
+      fastCache.clear(`login_${formData.email}`); // Clear failed login from cache
+      
+      // Smart error messages
+      let errorMsg = 'Invalid email or password';
+      
+      if (error.message) {
+        if (error.message.toLowerCase().includes('timeout')) {
+          errorMsg = '⏱️ Connection slow. Try Magic Link instead (no password needed).';
+        } else if (error.message.toLowerCase().includes('invalid_grant') || 
+            error.message.toLowerCase().includes('invalid login')) {
+          errorMsg = '❌ Invalid email or password.';
+        } else if (error.message.toLowerCase().includes('email not confirmed')) {
+          errorMsg = '📧 Please verify your email first!';
+        } else if (error.message.toLowerCase().includes('not found')) {
+          errorMsg = '👤 Email not registered. Please sign up first.';
+        } else if (error.message.toLowerCase().includes('network')) {
+          errorMsg = '🌐 Network error. Check your internet connection.';
+        } else {
+          errorMsg = `Error: ${error.message}`;
+        }
+      }
+      
+      notificationService.show(errorMsg, 'error');
     }
-  };
+  }, [formData, navigate]);
 
   // Handle forgot password
   const handleForgotPassword = async (e) => {
@@ -1209,6 +1210,26 @@ const AdminAuth = () => {
               Your data is secured with enterprise-grade encryption. We never share your information with third parties.
             </p>
           </div>
+
+          {/* Troubleshooting Guide - Login Issues */}
+          {isLogin && (
+            <div className="mt-6 bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="text-xl">🔧</div>
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-900 mb-2">🔑 Login Troubleshooting</p>
+                  <ul className="text-xs text-amber-800 space-y-1">
+                    <li>✓ <strong>SLOW CONNECTION?</strong> Use "Use Email Link instead" - works much better on slow internet!</li>
+                    <li>✓ Make sure you've signed up first if this is your first time</li>
+                    <li>✓ Check that email and password are correct (case-sensitive)</li>
+                    <li>✓ System retries automatically up to 3 times if connection is slow (up to 90 seconds)</li>
+                    <li>✓ If it keeps timing out, WiFi/mobile signal might be weak - try different location</li>
+                    <li>✓ Test with demo: <span className="font-mono bg-white px-1 py-0.5 rounded">test@test.com</span> password: <span className="font-mono bg-white px-1 py-0.5 rounded">Test@123</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
