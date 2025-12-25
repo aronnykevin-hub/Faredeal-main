@@ -1831,7 +1831,7 @@ const CashierPortal = () => {
                 />
                 
                 {/* Quick Cash Buttons */}
-                <div className="grid grid-cols-3 gap-1 md:gap-2">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {[
                     Math.ceil(currentTransaction.total / 1000) * 1000, // Round up to nearest 1000
                     Math.ceil(currentTransaction.total / 5000) * 5000, // Round up to nearest 5000
@@ -1842,7 +1842,7 @@ const CashierPortal = () => {
                     <button
                       key={amount}
                       onClick={() => setCashReceived(amount.toString())}
-                      className="px-1 md:px-2 py-1 md:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs font-semibold transform hover:scale-105"
+                      className="px-3 py-2 md:px-3 md:py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 text-base md:text-base font-bold transform hover:scale-105 shadow-md whitespace-nowrap"
                     >
                       {formatUGX(amount)}
                     </button>
