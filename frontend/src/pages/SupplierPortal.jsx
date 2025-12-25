@@ -33,6 +33,7 @@ const SupplierPortal = () => {
   const [loading, setLoading] = useState(true);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
+  const [expandedPaymentId, setExpandedPaymentId] = useState(null);
   const [supplierProfile, setSupplierProfile] = useState({
     name: '',
     contactPerson: '',
@@ -1998,57 +1999,63 @@ const SupplierPortal = () => {
               <div key={order.id} className="border-2 border-blue-200 rounded-lg overflow-hidden bg-gradient-to-r from-blue-50 to-white hover:shadow-md transition-all duration-300">
                 {/* Collapsed View - Order Header */}
                 <div 
-                  className="p-4 cursor-pointer hover:bg-blue-50 transition-colors"
+                  className="p-4 md:p-5 cursor-pointer hover:bg-blue-50 transition-colors"
                   onClick={() => setExpandedOrderId(expandedOrderId === order.orderId ? null : order.orderId)}
                 >
-                  <div className="flex items-center justify-between">
-                    {/* Left Section */}
-                    <div className="flex items-center space-x-4 flex-1">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <FiPackage className="h-5 w-5 text-white" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="font-bold text-base text-gray-900">{order.id}</h4>
-                          {/* Status Badge */}
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
-                            order.status === 'confirmed' ? 'bg-green-100 text-green-800' :
-                            order.status === 'received' ? 'bg-teal-100 text-teal-800' :
-                            order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {order.status?.toUpperCase()}
-                          </span>
-                          {/* Payment Status Badge */}
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-bold rounded-full ${
-                            order.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                            order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
-                            {order.payment_status === 'paid' && '✅ PAID'}
-                            {order.payment_status === 'partially_paid' && '⚠️ PARTIAL'}
-                            {order.payment_status === 'unpaid' && '❌ UNPAID'}
-                            {!order.payment_status && '❌ UNPAID'}
-                          </span>
+                  {/* Mobile Portrait: Completely Stacked Layout */}
+                  <div className="space-y-3 md:space-y-0">
+                    {/* Row 1: Order Icon, ID, and Expand Button */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start space-x-3 flex-1">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <FiPackage className="h-5 w-5 md:h-6 md:w-6 text-white" />
                         </div>
-                        <p className="text-xs text-gray-600 mt-1">{order.items} items • {order.date}</p>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-sm md:text-base text-gray-900">{order.id}</h4>
+                          <p className="text-xs md:text-sm text-gray-600 mt-0.5">{order.items} items • {order.date}</p>
+                        </div>
+                      </div>
+                      {/* Expand/Collapse Icon */}
+                      <div className={`transform transition-transform flex-shrink-0`}>
+                        <FiChevronDown className="h-5 w-5 text-gray-500 mt-0.5" />
                       </div>
                     </div>
-                    
-                    {/* Right Section */}
-                    <div className="flex items-center gap-4 ml-4">
-                      <div className="text-right">
-                        <p className="font-bold text-lg text-green-600">{formatCurrency(order.amount)}</p>
+
+                    {/* Row 2: Status and Payment Badges */}
+                    <div className="flex items-center gap-2 flex-wrap pl-13 md:pl-0">
+                      {/* Status Badge */}
+                      <span className={`inline-flex px-2.5 py-1 text-xs font-semibold rounded-full ${
+                        order.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                        order.status === 'received' ? 'bg-teal-100 text-teal-800' :
+                        order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {order.status?.toUpperCase()}
+                      </span>
+                      {/* Payment Status Badge */}
+                      <span className={`inline-flex px-2.5 py-1 text-xs font-bold rounded-full ${
+                        order.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                        order.payment_status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {order.payment_status === 'paid' && '✅ PAID'}
+                        {order.payment_status === 'partially_paid' && '⚠️ PARTIAL'}
+                        {order.payment_status === 'unpaid' && '❌ UNPAID'}
+                        {!order.payment_status && '❌ UNPAID'}
+                      </span>
+                    </div>
+
+                    {/* Row 3: Amount (Large and Prominent) */}
+                    <div className="flex items-baseline justify-between pl-13 md:pl-0 pt-1 border-t md:border-t-0 md:pt-0">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-600 mb-1">Total Amount</p>
+                        <p className="font-bold text-3xl md:text-lg text-green-600">{formatCurrency(order.amount)}</p>
                         {order.payment_status === 'partially_paid' && (
-                          <p className="text-xs text-gray-600">
+                          <p className="text-xs text-gray-600 mt-1">
                             Paid: <span className="text-green-600 font-semibold">{formatCurrency(order.amount_paid)}</span>
                           </p>
                         )}
-                      </div>
-                      {/* Expand/Collapse Icon */}
-                      <div className={`transform transition-transform ${expandedOrderId === order.orderId ? 'rotate-180' : ''}`}>
-                        <FiChevronDown className="h-5 w-5 text-gray-500" />
                       </div>
                     </div>
                   </div>
@@ -2470,12 +2477,16 @@ const SupplierPortal = () => {
                 )
                 .map((order) => (
                   <div key={order.id} className="border-2 border-blue-200 rounded-xl overflow-hidden bg-gradient-to-r from-blue-50 to-white shadow-md hover:shadow-lg transition-all">
-                    {/* Order Header with Status */}
-                    <div className="p-6 border-b-2 border-blue-200">
-                      <div className="flex items-start justify-between gap-4">
+                    {/* Order Header with Status - Mobile Optimized & Clickable */}
+                    <div 
+                      className="p-4 md:p-6 border-b-2 border-blue-200 cursor-pointer hover:bg-blue-100 transition-colors"
+                      onClick={() => setExpandedPaymentId(expandedPaymentId === order.id ? null : order.id)}
+                    >
+                      <div className="space-y-3 md:space-y-0 md:flex md:items-start md:justify-between md:gap-4">
+                        {/* Left Section: Order ID and Info */}
                         <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-bold text-xl text-gray-900">{order.id}</h4>
+                          <div className="flex items-start gap-2 mb-2 flex-wrap">
+                            <h4 className="font-bold text-base md:text-xl text-gray-900">{order.id}</h4>
                             <span className={`inline-block px-3 py-1 text-xs font-bold rounded-full border-2 ${
                               order.status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-300' :
                               order.status === 'processing' ? 'bg-blue-100 text-blue-800 border-blue-300' :
@@ -2493,31 +2504,48 @@ const SupplierPortal = () => {
                               {(!order.payment_status || order.payment_status === 'unpaid') && '❌ UNPAID'}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600">Ordered: {order.date}</p>
+                          <p className="text-xs md:text-sm text-gray-600">Ordered: {order.date}</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-xs text-gray-500 font-semibold mb-1">Total Amount</p>
-                          <p className="font-bold text-2xl text-blue-600">{formatCurrency(order.amount)}</p>
+
+                        {/* Right Section: Amount + Expand Icon */}
+                        <div className="flex items-baseline justify-between md:items-start md:flex-col gap-3 pt-2 md:pt-0 border-t md:border-t-0">
+                          <div className="md:text-right">
+                            <p className="text-xs text-gray-500 font-semibold">Total Amount</p>
+                            <p className="font-bold text-3xl md:text-2xl text-blue-600">{formatCurrency(order.amount)}</p>
+                          </div>
+                          {/* Expand/Collapse Icon */}
+                          <div className={`transform transition-transform flex-shrink-0 ${expandedPaymentId === order.id ? 'rotate-180' : ''}`}>
+                            <FiChevronDown className="h-5 w-5 text-gray-500" />
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Payment Tracker Component */}
-                    <div className="p-6">
-                      {(order.status === 'confirmed' || order.payment_status) && (
-                        <OrderPaymentTracker
-                          order={order}
-                          showAddPayment={false}
-                          userRole="supplier"
-                        />
-                      )}
+                    {/* Expanded Payment Details */}
+                    {expandedPaymentId === order.id && (
+                      <div className="p-4 md:p-6 space-y-4 animate-fadeInUp bg-white">
+                        {/* Payment Tracker Component - Larger on Mobile */}
+                        {(order.status === 'confirmed' || order.payment_status) && (
+                          <div className="bg-blue-50 rounded-lg p-4 md:p-6 border-2 border-blue-200">
+                            <OrderPaymentTracker
+                              order={order}
+                              showAddPayment={false}
+                              userRole="supplier"
+                            />
+                          </div>
+                        )}
 
-                      {/* Order Items Summary */}
-                      <div className="mt-4 p-4 bg-white rounded-lg border border-gray-200">
-                        <p className="text-sm font-semibold text-gray-700 mb-2">📦 Products:</p>
-                        <p className="text-sm text-gray-600">{order.products}</p>
+                        {/* Order Items Summary - Larger Bullet Form for Mobile */}
+                        <div className="bg-gray-50 rounded-lg p-4 md:p-6 border-2 border-gray-200">
+                          <p className="text-base md:text-lg font-bold text-gray-800 mb-3">📦 Products</p>
+                          <div className="space-y-2">
+                            <p className="text-sm md:text-base text-gray-700 leading-relaxed">
+                              • {order.products}
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 ))
             )}

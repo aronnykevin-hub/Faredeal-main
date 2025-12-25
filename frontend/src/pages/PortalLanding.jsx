@@ -31,15 +31,15 @@ const PortalLanding = () => {
       color: 'from-green-600 to-green-700',
       route: '/cashier-login',
     },
-    {
-      id: 'employee',
-      title: 'Employee',
-      shortDesc: 'Tasks',
-      description: 'Personal dashboard & tasks',
-      icon: FiUser,
-      color: 'from-indigo-600 to-indigo-700',
-      route: '/employee-login',
-    },
+    // {
+    //   id: 'employee',
+    //   title: 'Employee',
+    //   shortDesc: 'Tasks',
+    //   description: 'Personal dashboard & tasks',
+    //   icon: FiUser,
+    //   color: 'from-indigo-600 to-indigo-700',
+    //   route: '/employee-login',
+    // },
     {
       id: 'supplier',
       title: 'Supplier',
@@ -199,9 +199,9 @@ const PortalLanding = () => {
 
         {/* Footer */}
         <div className="text-center mt-8 sm:mt-12 animate-fadeInUp">
-          <p className="text-xs sm:text-sm text-gray-500 mb-3">
+          {/* <p className="text-xs sm:text-sm text-gray-500 mb-3">
             💡 Tip: Add <span className="text-blue-400 font-mono">#/admin</span> to URL for admin access
-          </p>
+          </p> */}
           <div className="flex justify-center space-x-4 flex-wrap gap-2">
             <button className="text-sm sm:text-base bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-semibold hover:shadow-lg transition-all duration-300">
               Learn More
