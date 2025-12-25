@@ -9,7 +9,11 @@ import { supabase } from './supabase';
 
 class AdminService {
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    if (import.meta.env.PROD) {
+      this.baseURL = import.meta.env.VITE_API_URL || 'https://api.faredeal.vercel.app/api';
+    } else {
+      this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    }
     this.supabase = supabase;
   }
 

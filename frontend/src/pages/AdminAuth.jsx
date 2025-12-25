@@ -692,7 +692,11 @@ const AdminAuth = () => {
 
       // 📧 Send welcome email (non-blocking)
       try {
-        const emailResponse = await fetch('http://localhost:3001/api/email/send-signup', {
+        const apiUrl = import.meta.env.PROD
+          ? 'https://api.faredeal.vercel.app/api'
+          : 'http://localhost:3001/api';
+        
+        const emailResponse = await fetch(`${apiUrl}/email/send-signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

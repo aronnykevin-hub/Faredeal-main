@@ -1,8 +1,15 @@
 // Portal Configuration Service - Real API Integration
 class PortalConfigService {
   constructor() {
-    // Use import.meta.env for Vite environment variables
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    // ⚡ Smart API URL detection for production/development
+    if (import.meta.env.PROD) {
+      // Production: Use your actual backend URL
+      this.baseURL = import.meta.env.VITE_API_URL || 'https://api.faredeal.vercel.app/api';
+    } else {
+      // Development: Use localhost
+      this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+    }
+    
     this.isDevelopment = import.meta.env.DEV || import.meta.env.NODE_ENV === 'development';
     this.endpoints = {
       getConfig: '/portal-config',
