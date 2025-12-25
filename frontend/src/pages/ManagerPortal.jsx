@@ -5570,10 +5570,26 @@ _Automated Business Report System_`)}`;
     loadPendingOrdersFromDatabase();
     loadPosItems();
     
-    // Refresh dashboard data every 5 minutes
-    const interval = setInterval(loadDashboardData, 5 * 60 * 1000);
+    // Refresh dashboard data every 30 seconds for real-time updates
+    const interval = setInterval(loadDashboardData, 30 * 1000);
     
-    return () => clearInterval(interval);
+    // Subscribe to real-time updates on key tables
+    const subscription = supabase
+      .channel('transactions-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions'
+      }, (payload) => {
+        console.log('📊 Real-time transaction update detected, refreshing manager metrics...', payload);
+        loadDashboardData();
+      })
+      .subscribe();
+    
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   // Theme Application Effect

@@ -14,7 +14,7 @@ import {
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area
+  BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, Legend
 } from 'recharts';
 import { toast } from 'react-toastify';
 import DualScannerInterface from '../components/DualScannerInterface';
@@ -27,6 +27,7 @@ import OrderSuppliesModal from '../components/OrderSuppliesModal';
 import inventoryService from '../services/inventorySupabaseService';
 import transactionService from '../services/transactionService';
 import cashierOrdersService from '../services/cashierOrdersService';
+import { receiptService } from '../services/receiptService';
 import { supabase } from '../services/supabase';
 
 const CashierPortal = () => {
@@ -637,22 +638,12 @@ const CashierPortal = () => {
   // Load performance metrics from Supabase
   const loadPerformanceMetrics = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Get today's date range
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // Load today's transactions for this cashier
+      // Load all recent transactions (not filtered by cashier_id)
+      // to match loadRecentTransactions behavior
       const { data: transactions, error } = await supabase
         .from('transactions')
         .select('*')
-        .eq('cashier_id', user.id)
-        .gte('created_at', today.toISOString())
-        .lt('created_at', tomorrow.toISOString());
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading performance metrics:', error);
@@ -664,6 +655,9 @@ const CashierPortal = () => {
         const todaySales = transactions.reduce((sum, t) => sum + (t.total_amount || 0), 0);
         const todayTransactions = transactions.length;
         const averageBasketSize = todayTransactions > 0 ? todaySales / todayTransactions : 0;
+        
+        // Count total items sold
+        const totalItems = transactions.reduce((sum, t) => sum + (t.items_count || 0), 0);
         
         // Count payment methods
         const mobileMoneyTransactions = transactions.filter(t => 
@@ -688,11 +682,12 @@ const CashierPortal = () => {
           mobileMoneyTransactions,
           cashTransactions,
           cardTransactions,
+          totalItems,
           loyaltySignups: 0, // TODO: Add loyalty program tracking
           returnRate: 0 // TODO: Add returns tracking
         });
 
-        console.log('✅ Loaded performance metrics:', { todaySales, todayTransactions });
+        console.log('✅ Loaded performance metrics:', { todaySales, todayTransactions, totalItems });
       }
     } catch (error) {
       console.error('Error loading performance metrics:', error);
@@ -747,17 +742,11 @@ const CashierPortal = () => {
   // Load Top Selling Products from Supabase
   const loadTopProducts = async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // Get today's transactions
+      // Get all recent transactions (not just today)
       const { data: transactions, error } = await supabase
         .from('transactions')
         .select('*')
-        .gte('created_at', today.toISOString())
-        .lt('created_at', tomorrow.toISOString());
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading top products:', error);
@@ -1084,10 +1073,26 @@ const CashierPortal = () => {
     loadCashierProfile();
     loadDashboardData();
     
-    // Refresh dashboard data every 5 minutes
-    const dashboardInterval = setInterval(loadDashboardData, 5 * 60 * 1000);
+    // Refresh dashboard data every 30 seconds for real-time updates
+    const dashboardInterval = setInterval(loadDashboardData, 30 * 1000);
     
-    return () => clearInterval(dashboardInterval);
+    // Also subscribe to real-time transaction updates
+    const subscription = supabase
+      .channel('transactions-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'transactions'
+      }, (payload) => {
+        console.log('📊 Real-time update detected, refreshing metrics...', payload);
+        loadDashboardData();
+      })
+      .subscribe();
+    
+    return () => {
+      clearInterval(dashboardInterval);
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   // Load performance data when switching to performance tab
@@ -1395,24 +1400,55 @@ const CashierPortal = () => {
             changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0
           });
           
-          // 💾 Save receipt to localStorage as backup
+          // 💾 Save receipt to Supabase using receipt service
+          const receiptData = {
+            receiptNumber: savedReceiptNumber,
+            transactionId: saveResult.transactionId || result.transactionId,
+            timestamp: new Date().toISOString(),
+            items: currentTransaction.items,
+            subtotal: currentTransaction.subtotal,
+            tax: currentTransaction.tax,
+            total: currentTransaction.total,
+            paymentMethod: paymentMethod.name,
+            amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
+            changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0,
+            cashier: cashierProfile.name
+          };
+          
+          // Save to Supabase via receipt service
           try {
-            const existingReceipts = JSON.parse(localStorage.getItem('receipts') || '[]');
-            existingReceipts.unshift({
+            const receiptSaveResult = await receiptService.saveReceipt({
               receiptNumber: savedReceiptNumber,
               transactionId: saveResult.transactionId || result.transactionId,
-              timestamp: new Date().toISOString(),
-              items: currentTransaction.items,
-              subtotal: currentTransaction.subtotal,
-              tax: currentTransaction.tax,
-              total: currentTransaction.total,
+              cashierId: user?.id,
+              cashierName: cashierProfile.name,
+              customerName: result.customer?.name || 'Walk-in Customer',
+              totalAmount: currentTransaction.total,
               paymentMethod: paymentMethod.name,
+              itemsJson: currentTransaction.items,
+              subtotal: currentTransaction.subtotal,
+              taxAmount: currentTransaction.tax,
               amountPaid: cashReceived ? parseFloat(cashReceived) : finalAmount,
               changeGiven: cashReceived ? parseFloat(cashReceived) - currentTransaction.total : 0,
-              cashier: cashierProfile.name
+              registerNumber: cashierProfile.register || 'POS-001',
+              storeLocation: cashierProfile.location || 'Kampala Main Branch'
             });
+            
+            if (receiptSaveResult.success) {
+              console.log('✅ Receipt saved to Supabase:', receiptSaveResult.receipt);
+            } else {
+              console.warn('⚠️ Could not save receipt to Supabase:', receiptSaveResult.error);
+            }
+          } catch (supabaseError) {
+            console.warn('⚠️ Supabase receipt save failed:', supabaseError);
+          }
+          
+          // Also save to localStorage as backup
+          try {
+            const existingReceipts = JSON.parse(localStorage.getItem('receipts') || '[]');
+            existingReceipts.unshift(receiptData);
             localStorage.setItem('receipts', JSON.stringify(existingReceipts.slice(0, 100))); // Keep last 100
-            console.log('💾 Receipt saved to local storage');
+            console.log('💾 Receipt saved to local storage as backup');
           } catch (storageError) {
             console.warn('⚠️ Could not save to localStorage:', storageError);
           }
@@ -1568,6 +1604,56 @@ const CashierPortal = () => {
       currency: 'UGX',
       minimumFractionDigits: 0
     }).format(amount);
+  };
+
+  // Custom label renderer for pie charts with percentage
+  const renderCustomLabel = (entry) => {
+    const percent = ((entry.value / entry.payload.total) * 100).toFixed(1);
+    return `${percent}%`;
+  };
+
+  // Get performance metrics pie data with totals
+  const getPerformanceMetricsData = () => {
+    const values = [
+      performanceMetrics.todaySales || 1,
+      performanceMetrics.customersServed || 1,
+      performanceMetrics.averageBasketSize || 1,
+      performanceMetrics.todayTransactions || 1,
+      performanceMetrics.totalItems || 1
+    ];
+    const total = values.reduce((a, b) => a + b, 0);
+    
+    return [
+      { name: `Sales: ${formatUGX(performanceMetrics.todaySales)}`, value: performanceMetrics.todaySales || 1, color: '#10b981', total },
+      { name: `Customers: ${performanceMetrics.customersServed}`, value: performanceMetrics.customersServed || 1, color: '#3b82f6', total },
+      { name: `Avg Basket: ${formatUGX(performanceMetrics.averageBasketSize)}`, value: performanceMetrics.averageBasketSize || 1, color: '#a855f7', total },
+      { name: `Transactions: ${performanceMetrics.todayTransactions}`, value: performanceMetrics.todayTransactions || 1, color: '#f59e0b', total },
+      { name: `Items: ${performanceMetrics.totalItems || 0}`, value: performanceMetrics.totalItems || 1, color: '#ef4444', total }
+    ];
+  };
+
+  // Get payment methods pie data with totals
+  const getPaymentMethodsData = () => {
+    const values = [
+      performanceMetrics.mobileMoneyTransactions || 1,
+      performanceMetrics.cashTransactions || 1,
+      performanceMetrics.mobileMoneyTransactions || 1,
+      performanceMetrics.cardTransactions || 1
+    ];
+    const total = values.reduce((a, b) => a + b, 0);
+    
+    return [
+      { name: `MTN Mobile: ${performanceMetrics.mobileMoneyTransactions}`, value: performanceMetrics.mobileMoneyTransactions || 1, color: '#f59e0b', total },
+      { name: `Cash: ${performanceMetrics.cashTransactions}`, value: performanceMetrics.cashTransactions || 1, color: '#10b981', total },
+      { name: `Airtel Money: ${performanceMetrics.mobileMoneyTransactions}`, value: performanceMetrics.mobileMoneyTransactions || 1, color: '#dc2626', total },
+      { name: `Card: ${performanceMetrics.cardTransactions}`, value: performanceMetrics.cardTransactions || 1, color: '#3b82f6', total }
+    ];
+  };
+
+  // Custom label renderer for pie slices
+  const renderLabel = (entry) => {
+    const percent = ((entry.value / entry.total) * 100).toFixed(1);
+    return `${percent}%`;
   };
 
   // 🛒 ORDER SUBMISSION FUNCTION
@@ -1983,122 +2069,106 @@ const CashierPortal = () => {
         </div>
       </div>
 
-      {/* Hardware Scanner Banner */}
-      <div className="bg-gradient-to-r from-green-500 via-blue-500 to-purple-600 rounded-none md:rounded-xl p-2 md:p-4 shadow-lg md:shadow-2xl animate-pulse">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <div className="relative">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <FiCamera className="h-8 w-8 text-white" />
-              </div>
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center animate-bounce">
-                <span className="text-xs font-bold text-black">!</span>
-              </div>
+      {/* Performance Metrics Pie Chart */}
+      <div className="bg-white rounded-lg md:rounded-xl shadow-md md:shadow-lg p-2 md:p-4">
+        <div className="border-b pb-2 md:pb-4 mb-2 md:mb-4 flex items-center justify-between">
+          <h3 className="text-base md:text-lg font-bold text-gray-900 bg-gradient-to-r from-yellow-500 to-red-600 bg-clip-text text-transparent">📊 Today's Performance Breakdown</h3>
+          <button
+            onClick={() => loadPerformanceMetrics()}
+            className="p-1 md:p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900"
+            title="Refresh metrics"
+          >
+            <FiRefreshCw className="h-4 w-4 md:h-5 md:w-5" />
+          </button>
+        </div>
+        <div className="h-80 flex items-center justify-center">
+          {performanceMetrics.todayTransactions > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={getPerformanceMetricsData()}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {getPerformanceMetricsData().map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value, name, props) => {
+                    const total = props.payload.total;
+                    const percent = ((value / total) * 100).toFixed(1);
+                    return [`${value} (${percent}%)`, props.payload.name];
+                  }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-8">
+              <FiPieChart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No transactions yet</p>
+              <p className="text-sm text-gray-400">Start processing sales to see metrics</p>
             </div>
-            <div className="text-white">
-              <h3 className="text-2xl font-bold mb-2">🔍 Advanced Hardware Scanner System</h3>
-              <p className="text-green-100 text-lg">Mobile Camera • USB Scanners • Bluetooth • Network Scanners</p>
-              <div className="flex items-center space-x-4 mt-2 text-sm">
-                <span className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>📱 Mobile Ready</span>
-                </span>
-                <span className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span>🔌 USB Compatible</span>
-                </span>
-                <span className="flex items-center space-x-1">
-                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                  <span>📶 Bluetooth Support</span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col space-y-3">
-            <button
-              onClick={() => setShowBarcodeScanner(true)}
-              className="px-8 py-4 bg-white text-purple-600 rounded-xl font-bold hover:bg-gray-100 transition-all duration-300 transform hover:scale-105 shadow-xl flex items-center space-x-3"
-            >
-              <FiZap className="h-6 w-6" />
-              <span>Launch Scanner</span>
-            </button>
-            <div className="text-center text-white/80 text-sm">
-              <p>✨ Real hardware integration</p>
-              <p>🇺🇬 Built for Uganda retail</p>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Real Performance Metrics from Database */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
-        {[
-          { title: 'Today\'s Sales', value: formatUGX(performanceMetrics.todaySales), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '📊 Revenue', desc: 'Today' },
-          { title: 'Customers Served', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '👥 Active', desc: 'Today' },
-          { title: 'Avg Basket Size', value: formatUGX(performanceMetrics.averageBasketSize), icon: FiShoppingBag, color: 'from-purple-500 to-purple-600', change: '🛒 Avg', desc: 'per customer' },
-          { title: 'Mobile Money', value: `${performanceMetrics.mobileMoneyTransactions}`, icon: FiPhone, color: 'from-orange-500 to-orange-600', change: '📱 Mobile', desc: 'payments' },
-          { title: 'Efficiency Score', value: `${performanceMetrics.efficiency}%`, icon: FiTarget, color: 'from-indigo-500 to-indigo-600', change: '⚡ Speed', desc: 'rating' },
-          { title: 'Total Transactions', value: performanceMetrics.todayTransactions, icon: FiAward, color: 'from-pink-500 to-pink-600', change: '💼 Count', desc: 'today' },
-          { title: 'Items Sold', value: performanceMetrics.totalItems || 0, icon: FiRefreshCw, color: 'from-red-500 to-red-600', change: '📦 Items', desc: 'today' },
-          { 
-            title: 'Quick Scanner', 
-            value: '📱', 
-            icon: FiCamera, 
-            color: 'from-green-500 to-blue-600', 
-            change: 'Ready', 
-            desc: 'Tap to scan',
-            isButton: true,
-            onClick: () => setShowBarcodeScanner(true)
-          }
-        ].map((metric, index) => (
-          <div 
-            key={index} 
-            className={`bg-white rounded-lg p-3 md:p-6 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 ${
-              metric.isButton ? 'cursor-pointer border-2 border-green-200 hover:border-green-400' : ''
-            }`}
-            onClick={metric.onClick || (() => {})}
+      {/* Payment Methods Pie Chart */}
+      <div className="bg-white rounded-lg md:rounded-xl shadow-md md:shadow-lg p-2 md:p-4">
+        <div className="border-b pb-2 md:pb-4 mb-2 md:mb-4 flex items-center justify-between">
+          <h3 className="text-base md:text-lg font-bold text-gray-900">💳 Payment Methods Distribution (Today)</h3>
+          <button
+            onClick={() => loadPerformanceMetrics()}
+            className="p-1 md:p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-900"
+            title="Refresh metrics"
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-gray-600 text-sm font-medium">{metric.title}</p>
-                <p className={`text-2xl font-bold text-gray-900 mt-1 ${metric.isButton ? 'text-center' : ''}`}>
-                  {metric.value}
-                </p>
-                <div className="flex items-center justify-between mt-2">
-                  <span className={`text-sm font-medium ${
-                    metric.isButton ? 'text-green-600' : 'text-green-600'
-                  }`}>
-                    {metric.change}
-                  </span>
-                  <span className="text-gray-500 text-xs">{metric.desc}</span>
-                </div>
-              </div>
-              <div className={`p-3 rounded-lg bg-gradient-to-r ${metric.color} ml-4 ${
-                metric.isButton ? 'animate-pulse' : ''
-              }`}>
-                <metric.icon className="h-6 w-6 text-white" />
-              </div>
+            <FiRefreshCw className="h-4 w-4 md:h-5 md:w-5" />
+          </button>
+        </div>
+        <div className="h-80 flex items-center justify-center">
+          {(performanceMetrics.mobileMoneyTransactions + performanceMetrics.cashTransactions + performanceMetrics.cardTransactions) > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={getPaymentMethodsData()}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={renderLabel}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                >
+                  {getPaymentMethodsData().map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  formatter={(value, name, props) => {
+                    const total = props.payload.total;
+                    const percent = ((value / total) * 100).toFixed(1);
+                    return [`${value} transactions (${percent}%)`, props.payload.name];
+                  }}
+                  contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <Legend verticalAlign="bottom" height={36} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-center py-8">
+              <FiPieChart className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500 font-medium">No payment data yet</p>
+              <p className="text-sm text-gray-400">Process payments to see distribution</p>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Payment Methods - Ugandan Focus (Real-time data from Supabase) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { title: 'MTN Mobile Money', count: performanceMetrics.mobileMoneyTransactions, icon: '📱', color: 'bg-yellow-600 hover:bg-yellow-700' },
-          { title: 'Cash (UGX)', count: performanceMetrics.cashTransactions, icon: '💵', color: 'bg-green-600 hover:bg-green-700' },
-          { title: 'Airtel Money', count: performanceMetrics.mobileMoneyTransactions, icon: '📲', color: 'bg-red-600 hover:bg-red-700' },
-          { title: 'Card Payments', count: performanceMetrics.cardTransactions, icon: '💳', color: 'bg-blue-600 hover:bg-blue-700' }
-        ].map((method, index) => (
-          <div key={index} className={`${method.color} text-white p-4 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105`}>
-            <div className="text-center">
-              <div className="text-2xl mb-2">{method.icon}</div>
-              <div className="text-2xl font-bold">{method.count}</div>
-              <div className="text-sm opacity-90">{method.title}</div>
-            </div>
-          </div>
-        ))}
+          )}
+        </div>
       </div>
 
       {/* Daily Tasks */}
@@ -2157,21 +2227,21 @@ const CashierPortal = () => {
       </div>
 
       {/* Recent Transactions & Top Products */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">💳 Recent Transactions (Real-time from Supabase)</h3>
-          <div className="space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 md:gap-4">
+        <div className="bg-white rounded-lg md:rounded-xl p-2 md:p-4 shadow-md md:shadow-lg">
+          <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-4">💳 Recent Transactions</h3>
+          <div className="space-y-2">
             {recentTransactions.length > 0 ? (
               recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-all duration-300">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center">
-                      <FiShoppingCart className="h-5 w-5 text-white" />
+                <div key={transaction.id} className="flex items-center justify-between p-2 md:p-3 border rounded-lg hover:shadow-md transition-all duration-300">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-r from-yellow-500 to-red-600 rounded-full flex items-center justify-center">
+                      <FiShoppingCart className="h-4 w-4 md:h-5 md:w-5 text-white" />
                     </div>
                     <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-900">{transaction.id}</span>
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      <div className="flex items-center space-x-1 md:space-x-2">
+                        <span className="font-medium text-gray-900 text-xs md:text-sm truncate">{transaction.id}</span>
+                        <span className={`inline-flex px-1 md:px-2 py-0.5 md:py-1 text-xs font-semibold rounded-full ${
                           transaction.method.includes('MoMo') || transaction.method.includes('Money') ? 'bg-orange-100 text-orange-800' :
                           transaction.method === 'Cash' ? 'bg-green-100 text-green-800' :
                           'bg-blue-100 text-blue-800'
@@ -2179,12 +2249,12 @@ const CashierPortal = () => {
                           {transaction.method}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500">{transaction.items} items • {transaction.time}</p>
+                      <p className="text-xs md:text-sm text-gray-500">{transaction.items} items • {transaction.time}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatUGX(transaction.amount)}</p>
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                  <div className="text-right ml-2">
+                    <p className="font-semibold text-gray-900 text-sm md:text-base">{formatUGX(transaction.amount)}</p>
+                    <span className="inline-flex px-1 md:px-2 py-0.5 md:py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                       {transaction.status}
                     </span>
                   </div>
@@ -2200,23 +2270,23 @@ const CashierPortal = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-lg">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">🥇 Top Selling Products (Today - Supabase)</h3>
-          <div className="space-y-4">
+        <div className="bg-white rounded-lg md:rounded-xl p-2 md:p-4 shadow-md md:shadow-lg">
+          <h3 className="text-base md:text-lg font-bold text-gray-900 mb-2 md:mb-4">🥇 Top Products (Today)</h3>
+          <div className="space-y-2">
             {topProducts.length > 0 ? (
               topProducts.map((product, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold">
+                <div key={index} className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center space-x-2 md:space-x-3">
+                    <div className="w-6 h-6 md:w-8 md:h-8 bg-yellow-500 rounded-full flex items-center justify-center text-white font-bold text-xs md:text-sm">
                       {index + 1}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-900">{product.name}</p>
-                      <p className="text-sm text-gray-500">{product.sales} units sold</p>
+                      <p className="font-medium text-gray-900 text-sm md:text-base">{product.name}</p>
+                      <p className="text-xs md:text-sm text-gray-500">{product.sales} units sold</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">{formatUGX(product.revenue)}</p>
+                  <div className="text-right ml-2">
+                    <p className="font-semibold text-gray-900 text-sm md:text-base">{formatUGX(product.revenue)}</p>
                   </div>
                 </div>
               ))

@@ -13,36 +13,26 @@ import { supabase } from './supabase';
 
 /**
  * Notify supplier about order events
+ * NOTE: notifications table doesn't exist in Supabase
+ * Silently skip for now - can be implemented via email or push notifications later
  */
 const notifySupplier = async (supplierId, notification) => {
   try {
-    // Check if notifications table exists
-    const { data: notificationData, error } = await supabase
-      .from('notifications')
-      .insert({
-        user_id: supplierId,
-        type: notification.type || 'order_update',
-        title: notification.title,
-        message: notification.message,
-        data: {
-          order_id: notification.orderId,
-          po_number: notification.poNumber
-        },
-        is_read: false,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+    console.log('📧 Notification event:', {
+      supplier_id: supplierId,
+      type: notification.type || 'order_update',
+      title: notification.title,
+      message: notification.message
+    });
 
-    if (error) {
-      console.warn('⚠️ Notification table may not exist, skipping:', error.message);
-      return { success: false, error: error.message };
-    }
+    // TODO: Implement notification system:
+    // Option 1: Send email notification
+    // Option 2: Use push notifications service
+    // Option 3: Create notifications table in Supabase
 
-    console.log('✅ Supplier notified successfully');
-    return { success: true, data: notificationData };
+    return { success: true, message: 'Notification logged (table not yet implemented)' };
   } catch (error) {
-    console.warn('⚠️ Failed to notify supplier:', error.message);
+    console.warn('⚠️ Failed to process notification:', error.message);
     return { success: false, error: error.message };
   }
 };

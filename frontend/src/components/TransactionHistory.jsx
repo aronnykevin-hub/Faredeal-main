@@ -601,16 +601,46 @@ www.faredeal.ug
                       <p className="text-xs text-gray-600">Total Amount</p>
                       <p className="font-bold text-green-600 text-lg">{formatCurrency(localReceiptsOnly ? item.total : item.total_amount)}</p>
                     </div>
-                    <div className="flex gap-1">
+                    <div className="flex gap-2">
                       {!localReceiptsOnly && (
                         <button
                           onClick={() => handleViewReceipt(item)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded"
-                          title="View"
+                          className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-600 hover:bg-blue-200 rounded font-semibold"
+                          title="View Receipt"
                         >
-                          <FiEye className="h-4 w-4" />
+                          <FiEye className="h-3 w-3" />
+                          <span>View</span>
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          // Download receipt as JSON
+                          const receiptData = localReceiptsOnly ? {
+                            receiptNumber: item.receiptNumber,
+                            date: new Date(item.timestamp).toLocaleString('en-UG'),
+                            amount: item.total,
+                            paymentMethod: item.paymentMethod,
+                            items: item.items || [],
+                            subtotal: item.subtotal,
+                            tax: item.tax,
+                            total: item.total,
+                            status: item.syncStatus
+                          } : item;
+                          const dataStr = JSON.stringify(receiptData, null, 2);
+                          const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                          const url = URL.createObjectURL(dataBlob);
+                          const link = document.createElement('a');
+                          link.href = url;
+                          link.download = `Receipt-${localReceiptsOnly ? item.receiptNumber : item.receipt_number}.json`;
+                          link.click();
+                          toast.success('Receipt downloaded!');
+                        }}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-100 text-purple-600 hover:bg-purple-200 rounded font-semibold"
+                        title="Download"
+                      >
+                        <FiDownload className="h-3 w-3" />
+                        <span>Download</span>
+                      </button>
                       <button
                         onClick={() => {
                           setSelectedTransaction(localReceiptsOnly ? {
@@ -630,10 +660,11 @@ www.faredeal.ug
                           } : item);
                           setShowReceipt(true);
                         }}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded"
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-600 hover:bg-green-200 rounded font-semibold"
                         title="Print"
                       >
-                        <FiPrinter className="h-4 w-4" />
+                        <FiPrinter className="h-3 w-3" />
+                        <span>Print</span>
                       </button>
                     </div>
                   </div>

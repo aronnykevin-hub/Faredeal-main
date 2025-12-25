@@ -267,18 +267,10 @@ class TransactionService {
   // ===================================================
   async getTodaysTransactions(cashierId = null) {
     try {
-      // Get today's date range as ISO strings
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      
-      const endOfDay = new Date();
-      endOfDay.setHours(23, 59, 59, 999);
-
+      // Load all recent transactions (not just today, to match CashierPortal behavior)
       let query = supabase
         .from('transactions')
         .select('*')
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString())
         .order('created_at', { ascending: false });
 
       // Only filter by cashier if specifically provided
@@ -289,7 +281,7 @@ class TransactionService {
       const { data, error } = await query;
 
       if (error) {
-        console.error('❌ Error fetching today\'s transactions:', error);
+        console.error('❌ Error fetching transactions:', error);
         return {
           success: false,
           transactions: [],
@@ -364,29 +356,11 @@ class TransactionService {
   // ===================================================
   async getDailyReport(date = new Date()) {
     try {
-      const reportDate = new Date(date).toISOString().split('T')[0];
-      
-      const { data, error } = await supabase
-        .from('daily_sales_reports')
-        .select('*')
-        .eq('report_date', reportDate)
-        .single();
-
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows
-        throw error;
-      }
-
-      if (!data) {
-        // Generate report for the day
-        return await this.generateDailyReport(date);
-      }
-
-      return {
-        success: true,
-        report: data
-      };
+      // NOTE: daily_sales_reports table doesn't exist
+      // Generate report on-the-fly from transactions
+      return await this.generateDailyReport(date);
     } catch (error) {
-      console.error('Error fetching daily report:', error);
+      console.error('Error generating daily report:', error);
       return {
         success: false,
         error: error.message

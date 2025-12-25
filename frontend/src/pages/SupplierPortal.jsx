@@ -1138,7 +1138,30 @@ const SupplierPortal = () => {
 
     checkAuthAndLoad();
 
-    return () => clearInterval(timer);
+    // Refresh supplier metrics every 30 seconds for real-time updates
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Refreshing supplier metrics every 30 seconds...');
+      loadSupplierData();
+    }, 30 * 1000);
+
+    // Subscribe to real-time updates on purchase orders
+    const subscription = supabase
+      .channel('purchase-orders-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'purchase_orders'
+      }, (payload) => {
+        console.log('📊 Real-time order update detected, refreshing supplier metrics...', payload);
+        loadSupplierData();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(timer);
+      clearInterval(refreshInterval);
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   // Mobile detection
