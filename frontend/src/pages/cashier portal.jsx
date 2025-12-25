@@ -1934,12 +1934,12 @@ const CashierPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-6 animate-slideInLeft container-3d bg-white rounded-2xl p-8 shadow-2xl">
+    <div className="space-y-4 md:space-y-6 animate-slideInLeft container-3d bg-white rounded-none md:rounded-2xl p-2 md:p-8 shadow-none md:shadow-2xl">
       {/* Ugandan-themed Welcome Section - Real Data */}
-      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-xl p-6 text-white shadow-lg">
+      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-none md:rounded-xl p-3 md:p-6 text-white shadow-none md:shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-xl md:text-3xl font-bold mb-1 md:mb-2">
               {getGreeting()}, {cashierProfile?.name || 'Cashier'}! 🇺🇬
             </h1>
             <p className="text-yellow-100 text-lg">
@@ -3042,7 +3042,7 @@ const CashierPortal = () => {
       )}
 
       {/* Main Content */}
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${isMobile ? 'pt-20 pb-6' : 'py-8'}`}>
+      <div className={`${isMobile ? 'w-full px-0' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'} ${isMobile ? 'pt-20 pb-6' : 'py-8'}`}>
         {activeTab === 'pos' && renderPOS()}
         {activeTab === 'dashboard' && renderDashboard()}
         {activeTab === 'transactions' && (
