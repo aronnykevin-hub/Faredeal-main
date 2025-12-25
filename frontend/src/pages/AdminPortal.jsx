@@ -41,11 +41,19 @@ const AdminPortal = () => {
     phone: ''
   });
 
+  // Date range for revenue metrics
+  const [revenueDateRange, setRevenueDateRange] = useState({
+    type: 'today', // 'today', '7days', '30days', '90days', '1year', 'custom'
+    startDate: new Date(new Date().setHours(0, 0, 0, 0)),
+    endDate: new Date(new Date().setHours(23, 59, 59, 999))
+  });
+
   // Real-time state management - Initialize with zeros, will be loaded from Supabase
   const [realTimeData, setRealTimeData] = useState({
     activeUsers: 0,
     todaysOrders: 0,
     dailyRevenue: 0,
+    revenueLabel: 'Today',
     systemHealth: 100,
     employeeLogins: 0,
     failedAttempts: 0,
@@ -392,6 +400,13 @@ const AdminPortal = () => {
         loading: false
       });
 
+      // SYNC: Also update realTimeData with order stats
+      setRealTimeData(prev => ({
+        ...prev,
+        todaysOrders: todayCount || 0,
+        dailyRevenue: Math.round(todayRevenue || 0)
+      }));
+
       console.log('✅ Loaded order statistics:', {
         total: totalCount,
         today: todayCount,
@@ -399,6 +414,7 @@ const AdminPortal = () => {
         completed: completedCount,
         revenue: todayRevenue
       });
+      console.log('🔄 SYNC: Updated realTimeData with todaysOrders:', todayCount, 'revenue:', Math.round(todayRevenue));
     } catch (error) {
       console.error('Error loading order statistics:', error);
       setOrderStats(prev => ({ ...prev, loading: false }));
@@ -617,6 +633,7 @@ const AdminPortal = () => {
 
   useEffect(() => {
     loadSystemData();
+    loadOrderStats(); // Also load order stats immediately for dashboard metrics
     initializeRealTimeUpdates();
     simulateWebSocketConnection();
     loadPortalConfiguration();
@@ -630,7 +647,7 @@ const AdminPortal = () => {
         realTimeListener();
       }
     };
-  }, []);
+  }, [loadOrderStats]);
 
   // Load portal configuration from server with fallback to localStorage
   const loadPortalConfiguration = async () => {
@@ -809,6 +826,30 @@ const AdminPortal = () => {
         settings: {}
       });
       
+      // Calculate revenue for "today" on initial load
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Query transactions for today
+        const { data: transactions } = await supabase
+          .from('transactions')
+          .select('total_amount')
+          .gte('created_at', today.toISOString());
+        
+        const todayRevenue = transactions?.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0) || 0;
+        
+        console.log(`✅ Calculated today's revenue from loadSystemData: UGX ${Math.round(todayRevenue)}`);
+        
+        setRealTimeData(prev => ({
+          ...prev,
+          dailyRevenue: Math.round(todayRevenue),
+          revenueLabel: 'Today'
+        }));
+      } catch (error) {
+        console.error('Error calculating initial revenue:', error);
+      }
+      
       // Calculate real-time dashboard analytics
       const totalUsers = users.length;
       const activeUsers = users.filter(u => u.is_active).length;
@@ -822,22 +863,32 @@ const AdminPortal = () => {
       // Get pending approvals - use direct query instead of RPC
       const pendingApprovals = users.filter(u => !u.is_active || u.status === 'pending').length;
       
-      // Get today's orders count and revenue (if orders table exists)
-      const today = new Date().toISOString().split('T')[0];
-      let ordersData = [];
-      try {
-        const ordersResponse = await supabase
-          .from('orders')
-          .select('total_amount')
-          .gte('created_at', today);
-        ordersData = ordersResponse.data || [];
-      } catch (error) {
-        console.warn('Failed to get orders:', error);
-        ordersData = [];
-      }
+      // Get today's orders count and revenue from transactions table
+      // Using the same logic as loadOrderStats() for consistency
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      const todayISO = todayDate.toISOString();
       
-      const todaysOrders = ordersData?.length || 0;
-      const dailyRevenue = ordersData?.reduce((sum, order) => sum + (parseFloat(order.total_amount) || 0), 0) || 0;
+      let transactionsData = [];
+      let todaysOrders = 0;
+      let dailyRevenue = 0;
+      
+      try {
+        const transResponse = await supabase
+          .from('transactions')
+          .select('*')
+          .gte('created_at', todayISO);
+        transactionsData = transResponse.data || [];
+        todaysOrders = transResponse.count || transactionsData.length || 0;
+        dailyRevenue = transactionsData?.reduce((sum, trans) => 
+          sum + (parseFloat(trans.total_amount || trans.amount || 0)), 0) || 0;
+        console.log(`✅ Loaded ${todaysOrders} transactions for today from loadSystemData`);
+      } catch (error) {
+        console.warn('Failed to get transactions:', error);
+        transactionsData = [];
+        todaysOrders = 0;
+        dailyRevenue = 0;
+      }
       
       // Get recent activities (last 10 user actions)
       const recentActivities = users
@@ -2902,10 +2953,78 @@ const AdminPortal = () => {
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-pink-400/10 to-yellow-400/10 rounded-full blur-3xl -ml-32 -mb-32 animate-pulse" style={{ animationDelay: '1s' }}></div>
         
         <div className="relative">
-          <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-6 flex items-center gap-3">
-            <span className="text-3xl animate-bounce">📊</span>
-            Live Business Metrics
-          </h3>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-3">
+              <span className="text-3xl animate-bounce">📊</span>
+              Live Business Metrics
+            </h3>
+            
+            {/* Date Range Selector for Revenue */}
+            <div className="flex gap-2 flex-wrap">
+              {['today', '7days', '30days', '90days', '1year'].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => {
+                    setRevenueDateRange({ ...revenueDateRange, type });
+                    // Trigger recalculation
+                    const dateRange = { ...revenueDateRange, type };
+                    let label = '';
+                    let startDate, endDate = new Date();
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    
+                    switch(type) {
+                      case 'today':
+                        label = 'Today';
+                        startDate = today;
+                        break;
+                      case '7days':
+                        label = 'Last 7 Days';
+                        startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - 7);
+                        break;
+                      case '30days':
+                        label = 'Last 30 Days';
+                        startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - 30);
+                        break;
+                      case '90days':
+                        label = 'Last 90 Days';
+                        startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - 90);
+                        break;
+                      case '1year':
+                        label = 'Last Year';
+                        startDate = new Date(today);
+                        startDate.setFullYear(startDate.getFullYear() - 1);
+                        break;
+                    }
+                    
+                    supabase
+                      .from('transactions')
+                      .select('total_amount')
+                      .gte('created_at', startDate.toISOString())
+                      .lte('created_at', endDate.toISOString())
+                      .then(({ data: transactions }) => {
+                        const revenue = transactions?.reduce((sum, t) => sum + (parseFloat(t.total_amount) || 0), 0) || 0;
+                        setRealTimeData(prev => ({
+                          ...prev,
+                          dailyRevenue: Math.round(revenue),
+                          revenueLabel: label
+                        }));
+                      });
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    revenueDateRange.type === type
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {type === 'today' ? '1D' : type === '7days' ? '7D' : type === '30days' ? '30D' : type === '90days' ? '90D' : '1Y'}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
@@ -2924,6 +3043,7 @@ const AdminPortal = () => {
               {
                 title: 'Daily Revenue',
                 value: realTimeData.dailyRevenue 
+
                   ? `UGX ${(realTimeData.dailyRevenue / 1000000).toFixed(1)}M`
                   : 'UGX 0',
                 icon: '💰',
@@ -2932,7 +3052,7 @@ const AdminPortal = () => {
                 shadowColor: 'green',
                 trend: '+12.5%',
                 trendUp: true,
-                subtitle: 'Compared to yesterday',
+                subtitle: realTimeData.revenueLabel || 'Today',
                 pulse: false
               },
               {
