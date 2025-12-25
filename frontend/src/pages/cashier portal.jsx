@@ -1645,10 +1645,10 @@ const CashierPortal = () => {
   };
 
   const renderPOS = () => (
-    <div className="space-y-6 animate-fadeInUp container-glass shadow-xl rounded-2xl p-8 border border-yellow-200">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+    <div className="space-y-3 md:space-y-6 animate-fadeInUp container-glass shadow-xl rounded-lg md:rounded-2xl p-2 md:p-6 border border-yellow-200">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 md:gap-6">
         {/* Product Selection */}
-        <div className="lg:col-span-2 bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+        <div className="lg:col-span-2 bg-white rounded-lg md:rounded-xl p-2 md:p-6 shadow-lg">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 md:mb-6 gap-3">
             <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center">
               🛒 Product Selection
@@ -1747,7 +1747,7 @@ const CashierPortal = () => {
         </div>
 
         {/* Transaction Summary */}
-        <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg">
+        <div className="bg-white rounded-lg md:rounded-xl p-2 md:p-6 shadow-lg">
           <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
             🧾 Current Transaction
           </h3>
