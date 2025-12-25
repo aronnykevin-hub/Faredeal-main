@@ -1936,7 +1936,7 @@ const CashierPortal = () => {
   const renderDashboard = () => (
     <div className="space-y-4 md:space-y-6 animate-slideInLeft container-3d bg-white rounded-none md:rounded-2xl p-2 md:p-8 shadow-none md:shadow-2xl">
       {/* Ugandan-themed Welcome Section - Real Data */}
-      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-none md:rounded-xl p-3 md:p-6 text-white shadow-none md:shadow-lg">
+      <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-none md:rounded-xl p-2 md:p-4 text-white shadow-none md:shadow-lg">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl md:text-3xl font-bold mb-1 md:mb-2">
@@ -1974,7 +1974,7 @@ const CashierPortal = () => {
             {/* Quick Scanner Access */}
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="mt-4 px-6 py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg border border-white/30"
+              className="mt-2 px-4 py-2 md:px-6 md:py-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl font-bold transition-all duration-300 transform hover:scale-105 flex items-center space-x-2 shadow-lg border border-white/30 text-sm md:text-base"
             >
               <FiCamera className="h-6 w-6" />
               <span>📱 Quick Scan</span>
@@ -1984,7 +1984,7 @@ const CashierPortal = () => {
       </div>
 
       {/* Hardware Scanner Banner */}
-      <div className="bg-gradient-to-r from-green-500 via-blue-500 to-purple-600 rounded-xl p-6 shadow-2xl animate-pulse">
+      <div className="bg-gradient-to-r from-green-500 via-blue-500 to-purple-600 rounded-none md:rounded-xl p-2 md:p-4 shadow-lg md:shadow-2xl animate-pulse">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <div className="relative">
@@ -2031,7 +2031,7 @@ const CashierPortal = () => {
       </div>
 
       {/* Real Performance Metrics from Database */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         {[
           { title: 'Today\'s Sales', value: formatUGX(performanceMetrics.todaySales), icon: FiDollarSign, color: 'from-green-500 to-green-600', change: '📊 Revenue', desc: 'Today' },
           { title: 'Customers Served', value: performanceMetrics.customersServed, icon: FiUsers, color: 'from-blue-500 to-blue-600', change: '👥 Active', desc: 'Today' },
@@ -2053,7 +2053,7 @@ const CashierPortal = () => {
         ].map((metric, index) => (
           <div 
             key={index} 
-            className={`bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+            className={`bg-white rounded-lg p-3 md:p-6 shadow-md hover:shadow-lg transition-all duration-300 transform hover:scale-105 ${
               metric.isButton ? 'cursor-pointer border-2 border-green-200 hover:border-green-400' : ''
             }`}
             onClick={metric.onClick || (() => {})}
