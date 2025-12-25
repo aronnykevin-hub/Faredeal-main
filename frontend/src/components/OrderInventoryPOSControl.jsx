@@ -52,30 +52,38 @@ const OrderInventoryPOSControl = () => {
   const handleBarcodeScanned = async (barcode) => {
     setShowBarcodeScanner(false);
     
+    // Validate barcode
+    if (!barcode || barcode.trim().length < 3) {
+      toast.warning('⚠️ Invalid barcode - too short');
+      return;
+    }
+
     try {
+      console.log('🔍 Checking barcode:', barcode);
+      
       // Check if product with this barcode already exists
       const { data: existingProduct, error: searchError } = await supabase
         .from('products')
-        .select('id, name, barcode, sku')
-        .eq('barcode', barcode)
+        .select('id, name, barcode, sku, selling_price')
+        .eq('barcode', barcode.trim())
         .maybeSingle();
 
       if (searchError && searchError.code !== 'PGRST116') {
-        console.error('Error searching for product:', searchError);
-        toast.error('Error checking for existing product');
+        console.error('❌ Error searching for product:', searchError);
+        toast.error('❌ Error checking inventory');
         return;
       }
 
       if (existingProduct) {
-        // Product already exists
-        toast.info(`📦 Product found: ${existingProduct.name} (SKU: ${existingProduct.sku || 'N/A'})`);
+        // Product already exists - show one notification and close scanner
+        toast.success(`✅ Found: ${existingProduct.name} - UGX ${existingProduct.selling_price || '0'}`);
+        console.log('✅ Product exists:', existingProduct);
         return;
       }
 
-      // Product doesn't exist - auto-register it
-      toast.info('🔍 Barcode not found in inventory. Auto-registering...');
+      // Product doesn't exist - AUTO REGISTER IT SILENTLY
+      console.log('📝 Barcode not in inventory. Auto-registering...');
       
-      // Auto-create product with scanned barcode
       const generatedName = `Product - ${barcode}`;
       const generatedSKU = `SKU-${barcode.substring(0, 8)}`;
 
@@ -83,42 +91,53 @@ const OrderInventoryPOSControl = () => {
         .from('products')
         .insert([{
           name: generatedName,
-          barcode: barcode,
+          barcode: barcode.trim(),
           sku: generatedSKU,
           cost_price: 0,
           selling_price: 0,
           tax_rate: 18,
+          quantity: 0,
           is_active: true,
-          created_at: new Date()
+          created_at: new Date().toISOString()
         }])
         .select()
         .single();
 
       if (createError) {
-        console.error('Error creating product:', createError);
-        toast.error('Failed to register barcode: ' + createError.message);
+        console.error('❌ Error creating product:', createError);
+        toast.error('❌ Failed to register: ' + createError.message);
         return;
       }
 
-      // Pre-fill the form with the scanned barcode for user to complete details
-      setNewProduct(prev => ({
-        ...prev,
-        barcode: barcode,
+      console.log('✅ Product auto-registered:', newProduct);
+      
+      // Pre-fill form with the scanned barcode for admin to complete details
+      setNewProduct({
         name: '',
-        sku: generatedSKU
-      }));
+        sku: generatedSKU,
+        barcode: barcode.trim(),
+        cost_price: 0,
+        selling_price: 0,
+        tax_rate: 18,
+        category_id: null
+      });
       
+      // Show ONE confirmation notification only
+      toast.success(`✅ Barcode registered! Complete the product details.`, {
+        autoClose: 3000
+      });
+      
+      // Open form to complete details
       setShowAddProductModal(true);
-      toast.success(`✅ Barcode registered! Please complete the product details.`);
       
-      // Reload products list
+      // Reload products list in background
       setTimeout(() => {
         loadData();
       }, 500);
 
     } catch (error) {
-      console.error('Error handling barcode:', error);
-      toast.error('Error processing barcode');
+      console.error('❌ Error handling barcode:', error);
+      toast.error('❌ Error: ' + (error.message || 'Unknown error'));
     }
   };
 

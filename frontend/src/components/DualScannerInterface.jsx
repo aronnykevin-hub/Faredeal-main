@@ -28,6 +28,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [lastFrameData, setLastFrameData] = useState(null);
+  const [isSavingTransaction, setIsSavingTransaction] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -37,6 +38,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const lastDetectionTimeRef = useRef(0);
   const detectionFrameCountRef = useRef(0);
   const indicatorTimeoutRef = useRef(null);
+  const autoSaveTimeoutRef = useRef(null);
 
   //  Initialize Camera Scanner
   useEffect(() => {
@@ -1062,7 +1064,25 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     const total = currentTransaction.reduce((sum, item) => sum + item.subtotal, 0);
     setTransactionTotal(total);
     console.log('💰 Transaction Total:', total);
-  }, [currentTransaction]);
+    
+    // Auto-save transaction if in cashier mode and has 3+ items
+    if (context === 'cashier' && currentTransaction.length >= 3 && currentTransaction.length > 0) {
+      console.log('🔄 Auto-saving transaction with', currentTransaction.length, 'items...');
+      
+      // Clear existing timeout
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+      
+      // Set new timeout to save after 5 seconds of no changes
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        if (currentTransaction.length > 0) {
+          console.log('⏱️ Auto-saving transaction...');
+          saveTransactionToSupabase();
+        }
+      }, 5000);
+    }
+  }, [currentTransaction, context]);
 
   const removeFromTransaction = (productId) => {
     setCurrentTransaction(prev => prev.filter(item => item.id !== productId));
@@ -1076,13 +1096,21 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
 
   // 💾 Save transaction to Supabase (creates real POS data for reporting)
   const saveTransactionToSupabase = async () => {
+    // Prevent duplicate saves
+    if (isSavingTransaction) {
+      console.warn('⚠️ Transaction is already being saved');
+      return;
+    }
+
     if (currentTransaction.length === 0) {
       toast.warning('⚠️ No items in transaction to save');
       return;
     }
 
+    setIsSavingTransaction(true);
+
     try {
-      console.log('💾 Saving transaction to Supabase...');
+      console.log('💾 Saving transaction to Supabase...', currentTransaction);
       
       // Create transaction record - handle if table doesn't exist
       let transactionId = null;
@@ -1100,13 +1128,16 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
           .select();
 
         if (txnError) {
-          console.warn('⚠️ Transactions table not available:', txnError);
-        } else {
+          console.error('❌ Error creating transaction:', txnError);
+          toast.error('❌ Failed to create transaction: ' + txnError.message);
+        } else if (transactionData && transactionData.length > 0) {
           transactionId = transactionData[0]?.id;
           console.log('✅ Transaction created:', transactionId);
+          toast.success('✅ Transaction created!');
         }
       } catch (e) {
-        console.warn('⚠️ Could not save transaction (table may not exist):', e);
+        console.error('❌ Error in transaction creation:', e);
+        toast.error('❌ Error creating transaction: ' + e.message);
       }
 
       // Save each item as transaction_item (if transaction was created)
@@ -1120,47 +1151,70 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         }));
 
         try {
-          const { error: itemsError } = await supabase
+          const { data: itemsData, error: itemsError } = await supabase
             .from('transaction_items')
-            .insert(transactionItems);
+            .insert(transactionItems)
+            .select();
 
           if (itemsError) {
-            console.warn('⚠️ Could not save transaction items:', itemsError);
+            console.error('❌ Error saving transaction items:', itemsError);
+            toast.error('❌ Failed to save items: ' + itemsError.message);
           } else {
-            console.log(`✅ Saved ${currentTransaction.length} transaction items`);
+            console.log(`✅ Saved ${itemsData.length} transaction items`);
+            toast.success(`✅ Saved ${itemsData.length} items!`);
           }
         } catch (e) {
-          console.warn('⚠️ Could not save transaction items:', e);
+          console.error('❌ Error in item save:', e);
+          toast.error('❌ Error saving items: ' + e.message);
         }
       }
 
       // Update product quantities (stock depletion)
+      let successCount = 0;
       for (const item of currentTransaction) {
-        const { data: product } = await supabase
-          .from('products')
-          .select('quantity')
-          .eq('id', item.id)
-          .single();
-
-        if (product) {
-          const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
-          await supabase
+        try {
+          const { data: product, error: fetchError } = await supabase
             .from('products')
-            .update({ quantity: newQuantity })
-            .eq('id', item.id);
-          
-          console.log(`📦 Updated ${item.name}: ${product.quantity} → ${newQuantity}`);
+            .select('quantity')
+            .eq('id', item.id)
+            .single();
+
+          if (fetchError) {
+            console.warn(`⚠️ Could not fetch product ${item.id}:`, fetchError);
+            continue;
+          }
+
+          if (product) {
+            const newQuantity = Math.max(0, (product.quantity || 0) - item.quantity);
+            const { error: updateError } = await supabase
+              .from('products')
+              .update({ quantity: newQuantity })
+              .eq('id', item.id);
+            
+            if (updateError) {
+              console.warn(`⚠️ Could not update product ${item.id}:`, updateError);
+            } else {
+              console.log(`📦 Updated ${item.name}: ${product.quantity} → ${newQuantity}`);
+              successCount++;
+            }
+          }
+        } catch (e) {
+          console.warn(`⚠️ Error updating product ${item.id}:`, e);
         }
       }
 
-      toast.success('✅ Transaction saved! Dashboard will update in 30 seconds.');
-      console.log('💾 Full transaction saved to Supabase - Reports will reflect this data');
+      if (successCount > 0) {
+        console.log(`📦 Successfully updated ${successCount} product quantities`);
+        toast.success(`✅ Transaction saved! Updated ${successCount} products.`);
+      }
       
       // Clear transaction after successful save
       clearTransaction();
     } catch (error) {
       console.error('❌ Error saving transaction:', error);
-      toast.error('Failed to save transaction: ' + error.message);
+      toast.error('❌ Failed to save transaction: ' + (error.message || 'Unknown error'));
+    } finally {
+      setIsSavingTransaction(false);
     }
   };
 
@@ -1248,6 +1302,13 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       if (gunInputRef.current && (scanMode === 'gun' || scanMode === 'smart')) {
         setTimeout(() => gunInputRef.current?.focus(), 200);
       }
+    }
+    // For admin creating NEW products: close immediately after barcode is handled
+    else if (context === 'admin' && !added) {
+      // Product already exists or is being handled - close after short delay
+      setTimeout(() => {
+        onClose();
+      }, 800);
     }
   };
 
