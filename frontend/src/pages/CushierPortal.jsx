@@ -1496,13 +1496,14 @@ const CashierPortal = () => {
               🛒 <span>Products</span>
             </h3>
             <div className="flex items-center gap-1 md:gap-2">
-              <button
+              {/* COMMENTED OUT - Add Product Button Hidden from Cashier */}
+              {/* <button
                 onClick={() => setShowAddProductModal(true)}
                 className="px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg text-xs md:text-sm font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-1 md:gap-2 shadow-lg"
               >
                 <FiPlus className="h-4 md:h-5 w-4 md:w-5" />
                 <span className="hidden md:inline">Add</span>
-              </button>
+              </button> */}
               <button
                 onClick={() => setShowDualScanner(true)}
                 className="px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg text-xs md:text-sm font-bold hover:from-cyan-700 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 flex items-center gap-1 md:gap-2 shadow-lg animate-pulse"

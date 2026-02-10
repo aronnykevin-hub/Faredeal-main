@@ -41,6 +41,12 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const autoSaveTimeoutRef = useRef(null);
   const lastProcessedBarcodeRef = useRef(null); // 🔒 Cooldown tracker
   const barcodeProcessingTimeRef = useRef(0); // 🔒 Last processing time
+  
+  // 📊 ADDED PRODUCTS & SOLD PRODUCTS TRACKING
+  const [addedProducts, setAddedProducts] = useState([]); // Track newly added products (admin)
+  const [soldProducts, setSoldProducts] = useState([]); // Track completed sales (cashier)
+  const [showAddedProducts, setShowAddedProducts] = useState(false); // Toggle added products panel
+  const [showSoldProducts, setShowSoldProducts] = useState(false); // Toggle sold products panel
 
   //  Initialize Camera Scanner
   useEffect(() => {
@@ -291,21 +297,21 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       
       // Provide specific error messages
       if (error.name === 'NotAllowedError') {
-        toast.error('❌ Camera permission denied. Please allow camera access.');
+        // toast.error('❌ Camera permission denied. Please allow camera access.');
       } else if (error.name === 'NotFoundError') {
-        toast.error('❌ No camera found on this device.');
+        // toast.error('❌ No camera found on this device.');
       } else if (error.name === 'NotSupportedError') {
-        toast.error('❌ Camera access not supported. Use HTTPS connection.');
+        // toast.error('❌ Camera access not supported. Use HTTPS connection.');
       } else if (error.name === 'OverconstrainedError') {
         console.warn('⚠️ Camera constraints not supported, retrying with fallback...');
-        toast.error('❌ Camera constraints not supported. Retrying...');
+        // toast.error('❌ Camera constraints not supported. Retrying...');
         retryWithFallbackConstraints();
         return;
       } else if (error.name === 'AbortError') {
         console.error('❌ Camera timeout or aborted:', error.message);
-        toast.error('❌ Camera timeout - device may be busy. Please try again.');
+        // toast.error('❌ Camera timeout - device may be busy. Please try again.');
       } else {
-        toast.error('❌ Camera error: ' + (error.message || 'Unknown error'));
+        // toast.error('❌ Camera error: ' + (error.message || 'Unknown error'));
       }
       
       setCameraActive(false);
@@ -797,7 +803,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     setUSBDeviceName(deviceName);
     
     toast.info(`📱 Device connected: ${deviceName}`);
-    toast.info('🎥 You can now use Phone Camera scanning!');
+    // toast.info('🎥 You can now use Phone Camera scanning!');
     
     // NOTE: Don't call requestUSBPermission here - it requires a user gesture!
     // User must click the "Connect USB" button instead
@@ -1211,6 +1217,9 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         toast.success(`✅ Transaction saved! Updated ${successCount} products.`);
       }
       
+      // 💰 TRACK SOLD PRODUCTS FOR DASHBOARD
+      trackSoldProducts(currentTransaction, transactionTotal);
+      
       // Clear transaction after successful save
       clearTransaction();
     } catch (error) {
@@ -1308,6 +1317,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     // For admin portal: auto-close after successfully adding a new product
     if (context === 'admin' && added) {
       console.log('📦 Admin context: Auto-closing scanner after product added...');
+      
+      // 📊 TRACK ADDED PRODUCT
+      trackAddedProduct(product);
+      
       const delayTime = autoCloseDelay || 1500; // Default 1.5 seconds
       setTimeout(() => {
         onClose();
@@ -1514,79 +1527,114 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     }
   };
 
+  // 📊 Track added product (admin context)
+  const trackAddedProduct = (product) => {
+    const productEntry = {
+      id: Date.now(),
+      product: product,
+      name: product.name,
+      barcode: product.barcode,
+      timestamp: new Date(),
+      addedCount: 1
+    };
+    
+    setAddedProducts(prev => {
+      const existing = prev.find(p => p.barcode === product.barcode);
+      if (existing) {
+        return prev.map(p => 
+          p.barcode === product.barcode 
+            ? { ...p, addedCount: p.addedCount + 1, timestamp: new Date() }
+            : p
+        );
+      }
+      return [productEntry, ...prev.slice(0, 19)]; // Keep last 20
+    });
+  };
+
+  // 💰 Track sold products (cashier context)
+  const trackSoldProducts = (items, total) => {
+    const saleEntry = {
+      id: Date.now(),
+      items: items,
+      itemCount: items.length,
+      unitsSold: items.reduce((sum, item) => sum + item.quantity, 0),
+      total: total,
+      timestamp: new Date()
+    };
+    
+    setSoldProducts(prev => [saleEntry, ...prev.slice(0, 19)]); // Keep last 20
+  };
+
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
-      <div className="bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-hidden flex flex-col border border-white/20">
-        {/* ✨ Modern Compact Header with Icon Bar */}
-        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 px-3 sm:px-6 py-3 sm:py-4 flex flex-col space-y-2 sm:space-y-3 flex-shrink-0 relative overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 flex items-center justify-center z-50 p-1 sm:p-2 backdrop-blur-sm">
+      <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-2xl w-full h-full sm:max-w-6xl sm:max-h-[95vh] overflow-hidden flex flex-col border border-white/20">
+        {/* ✨ Compact Header with Icon Bar */}
+        <div className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 px-3 sm:px-6 py-2 flex flex-col space-y-2 flex-shrink-0 relative overflow-hidden">
           {/* Animated background elements */}
           <div className="absolute inset-0 opacity-10">
             <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse"></div>
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-white rounded-full filter blur-3xl animate-pulse delay-1000"></div>
           </div>
           
-          {/* Title Row */}
+          {/* Title Row - Collapsed */}
           <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="p-2 bg-white/20 rounded-full backdrop-blur-md">
-                <FiZap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+            <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="p-1.5 bg-white/20 rounded-full backdrop-blur-md">
+                <FiZap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
               </div>
-              <div>
-                <h2 className="text-white text-lg sm:text-2xl font-bold tracking-tight">Scanner</h2>
-                <p className="text-white/80 text-xs sm:text-sm hidden sm:block">Smart Barcode Detection</p>
-              </div>
+              <span className="text-white text-xs sm:text-sm font-bold hidden sm:inline">Scanner</span>
             </div>
             
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90 flex-shrink-0"
+              className="p-1.5 hover:bg-white/20 rounded-full transition-all z-10 active:scale-90 flex-shrink-0"
             >
-              <FiX className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <FiX className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
             </button>
           </div>
 
           {/* Control Badge Bar - Smart Layout */}
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3 relative z-10 justify-between sm:justify-start">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 relative z-10 justify-between sm:justify-start">
             {/* Smart Mode Badge */}
             <button
               onClick={() => setScanMode('smart')}
               title="Smart Mode: Both Camera and Gun Scanner"
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
                 scanMode === 'smart'
                   ? 'bg-white text-purple-600 shadow-lg scale-110'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <FiSmartphone className="h-4 w-4" />
-              <span className="hidden sm:inline">Smart</span>
+              <FiSmartphone className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline text-xs">Smart</span>
             </button>
 
             {/* Camera Scan Badge */}
             <button
               onClick={() => setScanMode('camera')}
               title="Camera Mode: Phone Camera Only"
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
                 scanMode === 'camera'
                   ? 'bg-white text-blue-600 shadow-lg scale-110'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <FiCamera className="h-4 w-4" />
-              <span className="hidden sm:inline">Camera</span>
+              <FiCamera className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline text-xs">Camera</span>
             </button>
 
             {/* Gun Scan Badge */}
             <button
               onClick={() => setScanMode('gun')}
               title="Gun Mode: Barcode Gun Only"
-              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+              className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
                 scanMode === 'gun'
                   ? 'bg-white text-green-600 shadow-lg scale-110'
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
             >
-              <span className="text-lg">🔫</span>
-              <span className="hidden sm:inline">Gun</span>
+              <span className="text-sm">🔫</span>
+              <span className="hidden sm:inline text-xs">Gun</span>
             </button>
 
             {/* AI Analysis Badge - Only when camera active and AI ready */}
@@ -1600,10 +1648,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                   }
                 }}
                 title="AI Vision: Analyze image with AI"
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95 group"
+                className="px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95 group"
               >
-                <FiCpu className="h-4 w-4 animate-pulse" />
-                <span className="hidden sm:inline">AI</span>
+                <FiCpu className="h-3 w-3 sm:h-4 sm:w-4 animate-pulse" />
+                <span className="hidden sm:inline text-xs">AI</span>
               </button>
             )}
 
@@ -1612,14 +1660,14 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               <button
                 onClick={requestUSBPermission}
                 title="Connect USB Device"
-                className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap ${
+                className={`px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap ${
                   usbDeviceConnected
                     ? 'bg-white text-green-600 shadow-lg'
                     : 'bg-white/20 text-white hover:bg-white/30'
                 }`}
               >
-                <span className="text-lg">🔌</span>
-                <span className="hidden sm:inline">USB</span>
+                <span className="text-sm">🔌</span>
+                <span className="hidden sm:inline text-xs">USB</span>
               </button>
             )}
 
@@ -1631,10 +1679,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                   toast.info('📱 Troubleshooting guide printed to console');
                 }}
                 title="USB Setup Help"
-                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95"
+                className="px-2 sm:px-3 py-1 rounded-full text-xs font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-0.5 sm:gap-1 whitespace-nowrap bg-white/20 text-white hover:bg-white/30 active:scale-95"
               >
-                <span className="text-lg">❓</span>
-                <span className="hidden sm:inline">Help</span>
+                <span className="text-sm">❓</span>
+                <span className="hidden sm:inline text-xs">Help</span>
               </button>
             )}
 
@@ -1645,336 +1693,514 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                 <span className="text-white text-xs sm:text-sm font-semibold hidden sm:inline">AI Ready</span>
               </div>
             )}
+
+            {/* Added Products Badge (Admin Context) */}
+            {context === 'admin' && addedProducts.length > 0 && (
+              <button
+                onClick={() => setShowAddedProducts(!showAddedProducts)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-green-400/20 text-green-100 hover:bg-green-400/30 border border-green-300/50"
+              >
+                <span>✅</span>
+                <span className="hidden sm:inline">Added</span>
+                <span className="font-bold bg-green-500 text-white px-1.5 py-0.5 rounded-full text-xs">{addedProducts.length}</span>
+              </button>
+            )}
+
+            {/* Sold Products Badge (Cashier Context) */}
+            {context === 'cashier' && soldProducts.length > 0 && (
+              <button
+                onClick={() => setShowSoldProducts(!showSoldProducts)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 backdrop-blur-md flex items-center gap-1 sm:gap-2 whitespace-nowrap bg-orange-400/20 text-orange-100 hover:bg-orange-400/30 border border-orange-300/50"
+              >
+                <span>💰</span>
+                <span className="hidden sm:inline">Sold</span>
+                <span className="font-bold bg-orange-500 text-white px-1.5 py-0.5 rounded-full text-xs">{soldProducts.length}</span>
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 p-2 sm:p-6 flex-1 overflow-y-auto">
-          {/* Left: Status & Info */}
-          <div className="space-y-2 sm:space-y-4">
-            <h3 className="font-bold text-gray-900 text-sm sm:text-base flex items-center space-x-2">
-              <FiSmartphone className="h-5 w-5 text-blue-600 sm:h-6 sm:w-6" />
-              <span className="font-semibold">Status & Info</span>
-            </h3>
+        {/* Main Content Grid - CREATIVE NEW LAYOUT */}
+        <div className="grid grid-cols-12 gap-2 p-3 flex-1 overflow-hidden">
+          
+          {/* LEFT PANEL: Scanner Viewer (Compact) + Scanned Products */}
+          <div className="col-span-12 md:col-span-5 lg:col-span-4 flex flex-col gap-2 min-h-0">
+            
+            {/* 📹 Scanner Viewer - COMPACT CONTAINER */}
+            <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 rounded-xl overflow-hidden flex flex-col items-center justify-center relative border-2 border-cyan-500/50 shadow-2xl" style={{height: '220px'}}>
+              {scanMode === 'camera' || scanMode === 'smart' ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <canvas
+                    ref={canvasRef}
+                    className="hidden"
+                  />
+                  {cameraActive && (
+                    <>
+                      {/* Compact scanning border */}
+                      <div className="absolute inset-0 border-2 border-cyan-400/60 rounded-lg pointer-events-none">
+                        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"></div>
+                      </div>
+                      
+                      {/* Compact corner markers */}
+                      <div className="absolute top-2 left-2 w-6 h-6 border-t-2 border-l-2 border-cyan-400 rounded-tl-lg shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                      <div className="absolute top-2 right-2 w-6 h-6 border-t-2 border-r-2 border-cyan-400 rounded-tr-lg shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                      <div className="absolute bottom-2 left-2 w-6 h-6 border-b-2 border-l-2 border-cyan-400 rounded-bl-lg shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                      <div className="absolute bottom-2 right-2 w-6 h-6 border-b-2 border-r-2 border-cyan-400 rounded-br-lg shadow-lg shadow-cyan-400/30 animate-pulse"></div>
+                    </>
+                  )}
+                  
+                  {/* Compact Status indicator */}
+                  {showScanningIndicator && (
+                    <div className="absolute top-2 right-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-3 py-1 rounded-full text-xs flex items-center space-x-1 shadow-lg">
+                      <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+                      <span>Scanning...</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center space-y-2 p-3">
+                  <FiCamera className="h-10 w-10 text-gray-500" />
+                  <p className="text-gray-400 text-xs text-center">
+                    {scanMode === 'gun' 
+                      ? '🔫 Gun mode - Scan with hand scanner'
+                      : 'Switch to Camera mode'
+                    }
+                  </p>
+                </div>
+              )}
+              
+              {/* Hidden Gun Input */}
+              <input
+                ref={gunInputRef}
+                type="text"
+                className="absolute opacity-0 -z-10"
+                placeholder="Gun Scanner Input"
+                tabIndex={scanMode === 'gun' || scanMode === 'smart' ? 0 : -1}
+              />
+            </div>
 
-            {/* Current Mode Display */}
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 sm:p-4 border-2 border-blue-200">
-              <p className="text-xs text-gray-600 font-semibold mb-2">ACTIVE MODE</p>
-              <p className="text-lg sm:text-xl font-bold text-blue-600 capitalize">
-                {scanMode === 'smart' && '🧠 Smart Mode'}
-                {scanMode === 'camera' && '📱 Camera Scan'}
-                {scanMode === 'gun' && '🔫 Gun Scan'}
+            {/* 📊 SCANNED PRODUCTS CONTAINER - For Adding/Selling */}
+            <div className="flex-1 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 rounded-xl border-2 border-purple-300 overflow-hidden flex flex-col shadow-lg">
+              <div className="px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📦</span>
+                  <h3 className="font-bold text-sm">Scanned Products</h3>
+                </div>
+                <span className="bg-white/20 px-2 py-1 rounded-full text-xs font-bold">{recentScans.length}</span>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                {recentScans.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-gray-500 text-center text-xs">
+                      💡 Scan products to add them here
+                    </p>
+                  </div>
+                ) : (
+                  recentScans.map(scan => (
+                    <div
+                      key={scan.id}
+                      className="bg-white p-2 rounded-lg border border-purple-200 hover:border-purple-400 hover:shadow-md transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-mono text-xs font-bold text-purple-700 truncate">{scan.barcode}</p>
+                          <p className="text-xs text-gray-600">{scan.timestamp.toLocaleTimeString()}</p>
+                        </div>
+                        <span className="text-lg group-hover:scale-125 transition-transform">{getScanSourceIcon(scan.source)}</span>
+                      </div>
+                      <div className="mt-1 flex gap-1">
+                        {context === 'admin' && (
+                          <button className="flex-1 bg-green-500 hover:bg-green-600 text-white text-xs py-1 rounded font-semibold transition-all">
+                            ➕ Add
+                          </button>
+                        )}
+                        {context === 'cashier' && (
+                          <button className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs py-1 rounded font-semibold transition-all">
+                            🛒 Sell
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* MIDDLE PANEL: Status & Stats & Product Info */}
+          <div className="col-span-12 md:col-span-3 lg:col-span-2 flex flex-col gap-2 min-h-0">
+            
+            {/* Mode Status Card */}
+            <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl p-3 shadow-lg border border-blue-400/50">
+              <p className="text-xs font-bold opacity-80 mb-1">MODE</p>
+              <p className="text-xl font-bold mb-2">
+                {scanMode === 'smart' && '🧠'}
+                {scanMode === 'camera' && '📱'}
+                {scanMode === 'gun' && '🔫'}
               </p>
-              <p className="text-xs text-gray-600 mt-2">
-                {scanMode === 'smart' && 'Both camera and gun scanner active'}
-                {scanMode === 'camera' && 'Phone camera scanning only'}
-                {scanMode === 'gun' && 'Barcode gun scanning only'}
+              <p className="text-xs leading-tight">
+                {scanMode === 'smart' && 'Smart Mode'}
+                {scanMode === 'camera' && 'Camera'}
+                {scanMode === 'gun' && 'Gun Scanner'}
               </p>
+            </div>
+
+            {/* Sensors Status */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-3 border border-gray-300 space-y-2 shadow-md">
+              <p className="text-xs font-bold text-gray-700 uppercase">Sensors</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={`h-2.5 w-2.5 rounded-full ${cameraActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span className="text-xs text-gray-700">📱 Camera</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2.5 w-2.5 rounded-full ${gunListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  <span className="text-xs text-gray-700">🔫 Gun</span>
+                </div>
+                {navigator.usb && (
+                  <div className="flex items-center gap-2">
+                    <div className={`h-2.5 w-2.5 rounded-full ${usbDeviceConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span className="text-xs text-gray-700">🔌 USB</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-3 border border-cyan-300 shadow-md">
+              <p className="text-xs font-bold text-cyan-900 mb-2">📊 Stats</p>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Total Scans:</span>
+                  <span className="font-bold text-blue-600">{scanStats.total}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Camera:</span>
+                  <span className="font-bold text-green-600">{scanStats.cameraScans}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-700">Gun:</span>
+                  <span className="font-bold text-red-600">{scanStats.gunScans}</span>
+                </div>
+              </div>
             </div>
 
             {/* AI Ready Banner */}
             {geminiAIService.isInitialized() && (
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-3 sm:p-4 border-2 border-purple-200">
-                <div className="flex items-center space-x-2 mb-1">
-                  <FiCpu className="h-5 w-5 text-purple-600 animate-pulse" />
-                  <p className="text-sm sm:text-base font-bold text-purple-600">AI Vision Ready</p>
+              <div className="bg-gradient-to-br from-purple-600 to-pink-600 text-white rounded-xl p-3 shadow-lg border border-purple-400/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <FiCpu className="h-4 w-4 animate-pulse" />
+                  <span className="text-xs font-bold">AI Ready</span>
                 </div>
-                <p className="text-xs text-gray-600">Advanced product identification enabled</p>
+                <p className="text-xs leading-tight opacity-90">AI Vision enabled for advanced identification</p>
               </div>
             )}
 
-            {/* Status Indicators */}
-            <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-3 sm:p-4 border-2 border-gray-200 space-y-2 sm:space-y-3">
-              <p className="text-xs font-bold text-gray-700 uppercase">SENSORS</p>
-              <div className="flex items-center space-x-3">
-                <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${cameraActive ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
-                <div>
-                  <p className="text-xs sm:text-sm font-semibold text-gray-700">📱 Camera</p>
-                  <p className="text-xs text-gray-500">{cameraActive ? 'Ready' : 'Disabled'}</p>
-                </div>
+            {/* Added/Sold Counter */}
+            {context === 'admin' && addedProducts.length > 0 && (
+              <div className="bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-xl p-3 shadow-lg border border-green-400/50 text-center">
+                <p className="text-xs opacity-90 mb-1">✅ Products Added</p>
+                <p className="text-2xl font-bold">{addedProducts.length}</p>
               </div>
-              <div className="flex items-center space-x-3">
-                <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${gunListening ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
-                <div>
-                  <p className="text-xs sm:text-sm font-semibold text-gray-700">🔫 Gun</p>
-                  <p className="text-xs text-gray-500">{gunListening ? 'Listening' : 'Disabled'}</p>
-                </div>
-              </div>
-              {navigator.usb && (
-                <div className="flex items-center space-x-3">
-                  <div className={`h-3 w-3 sm:h-4 sm:w-4 rounded-full ${usbDeviceConnected ? 'bg-green-500 animate-pulse shadow-lg shadow-green-400' : 'bg-gray-300'}`}></div>
-                  <div>
-                    <p className="text-xs sm:text-sm font-semibold text-gray-700">🔌 USB</p>
-                    <p className="text-xs text-gray-500">{usbDeviceConnected ? usbDeviceName : 'Disconnected'}</p>
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
 
-            {/* Creative No Activity Notification - Show after 4 seconds */}
-            {showNoActivityWarning && inactivityProduct && (
-              <div className="w-full overflow-hidden">
-                {inactivityProduct.type === 'summary' ? (
-                  // 📊 Transaction Summary Popup
-                  <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-green-400 bg-gradient-to-r from-green-50 to-emerald-50 animate-pulse">
-                    <p className="font-bold text-green-900 text-sm sm:text-base mb-2">📊 Transaction Summary</p>
-                    <div className="space-y-1 max-h-[120px] overflow-y-auto">
-                      {inactivityProduct.items.map(item => (
-                        <div key={item.id} className="flex justify-between text-xs text-green-800 bg-white bg-opacity-50 px-2 py-1 rounded">
-                          <span className="font-semibold">{item.name}</span>
-                          <span>x{item.quantity} = <span className="font-bold text-green-700">${item.subtotal.toFixed(2)}</span></span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-green-300 flex justify-between items-center">
-                      <span className="font-bold text-green-900">💰 Total:</span>
-                      <span className="text-lg font-bold text-green-700">${inactivityProduct.total.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ) : (
-                  // 🏇 Ready to Scan Prompt - Enhanced with animation
-                  <div className="w-full p-4 sm:p-5 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 animate-pulse shadow-lg">
-                    <p className="font-bold text-blue-900 text-center text-3xl sm:text-4xl mb-2">{inactivityProduct.emoji}</p>
-                    <p className="font-bold text-blue-900 text-center text-sm sm:text-base leading-relaxed">{inactivityProduct.message}</p>
-                    <div className="mt-3 flex items-center justify-center space-x-2">
-                      <div className="flex space-x-1">
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-100"></div>
-                        <div className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-bounce delay-200"></div>
+            {context === 'cashier' && soldProducts.length > 0 && (
+              <div className="bg-gradient-to-br from-orange-500 to-amber-600 text-white rounded-xl p-3 shadow-lg border border-orange-400/50 text-center">
+                <p className="text-xs opacity-90 mb-1">💰 Sales Completed</p>
+                <p className="text-2xl font-bold">{soldProducts.length}</p>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT PANEL: DYNAMIC CONTEXT-BASED - POS for Cashier / Inventory for Admin */}
+          <div className="col-span-12 md:col-span-4 lg:col-span-4 flex flex-col gap-2 min-h-0">
+            
+            {/* ======== CASHIER CONTEXT: POS ======== */}
+            {context === 'cashier' && (
+              <>
+                {/* 🛒 POS HEADER */}
+                <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl px-4 py-3 shadow-lg border border-green-400/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">🛒</span>
+                      <div>
+                        <h3 className="font-bold text-base">Point of Sale</h3>
+                        <p className="text-xs opacity-90">{currentTransaction.length} items</p>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Loading status */}
-            {loadingProducts && (
-              <div className="w-full p-2 sm:p-3 rounded-lg border-2 border-blue-400 bg-gradient-to-br from-blue-50 to-blue-100">
-                <p className="font-bold text-blue-900 text-sm sm:text-base">📥 Loading Products...</p>
-                <p className="text-xs text-blue-700">Reading from database</p>
-              </div>
-            )}
-
-              {/* USB Device Status */}
-              {usbDeviceConnected && (
-                <div className="flex items-center space-x-2 pt-1 border-t border-gray-300">
-                  <div className="h-2 w-2 sm:h-3 sm:w-3 rounded-full bg-purple-500 animate-pulse"></div>
-                  <span className="text-xs sm:text-sm text-gray-700">🔌 <span className="font-bold">{usbDeviceName}</span></span>
-                </div>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-2 sm:p-3 space-y-1 border border-blue-200">
-              <p className="text-xs sm:text-sm font-bold text-gray-900">📊 Stats</p>
-              <p className="text-xs text-gray-700">📦 <span className="font-bold text-blue-600">{scanStats.total}</span></p>
-              <p className="text-xs text-gray-700">🔫 <span className="font-bold text-red-600">{scanStats.gunScans}</span></p>
-              <p className="text-xs text-gray-700">📱 <span className="font-bold text-green-600">{scanStats.cameraScans}</span></p>
-              {lastScanTime && (
-                <p className="text-xs text-gray-600 mt-2 flex items-center space-x-1">
-                  <FiClock className="h-3 w-3" />
-                  <span>{lastScanTime.toLocaleTimeString()}</span>
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Center: Camera Feed - Enhanced Modern Design */}
-          <div className="bg-gradient-to-br from-gray-950 via-gray-900 to-gray-800 rounded-2xl overflow-hidden flex flex-col items-center justify-center relative h-full min-h-[300px] sm:min-h-[400px] border border-gray-700 shadow-2xl">
-            {scanMode === 'camera' || scanMode === 'smart' ? (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover rounded-lg"
-                />
-                <canvas
-                  ref={canvasRef}
-                  className="hidden"
-                />
-                {cameraActive && (
-                  <>
-                    {/* Enhanced scanning border with glow */}
-                    <div className="absolute inset-0 border-3 border-blue-500/60 rounded-xl pointer-events-none shadow-xl shadow-blue-500/20">
-                      {/* Top scanning line */}
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"></div>
-                      {/* Bottom scanning line */}
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse"></div>
-                    </div>
-                    
-                    {/* Animated corner markers */}
-                    <div className="absolute top-6 left-6 w-12 h-12 border-t-3 border-l-3 border-cyan-400 rounded-tl-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
-                    <div className="absolute top-6 right-6 w-12 h-12 border-t-3 border-r-3 border-cyan-400 rounded-tr-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
-                    <div className="absolute bottom-6 left-6 w-12 h-12 border-b-3 border-l-3 border-cyan-400 rounded-bl-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
-                    <div className="absolute bottom-6 right-6 w-12 h-12 border-b-3 border-r-3 border-cyan-400 rounded-br-xl shadow-lg shadow-cyan-400/30 animate-pulse"></div>
-                  </>
-                )}
-                
-                {/* Status indicator - Enhanced */}
-                {showScanningIndicator && (
-                  <div className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-gradient-to-r from-cyan-500 to-blue-500 text-white px-4 sm:px-5 py-2 sm:py-3 rounded-full text-xs sm:text-sm flex items-center space-x-2 shadow-2xl shadow-cyan-500/50 font-bold">
-                    <div className="h-2.5 w-2.5 bg-white rounded-full animate-pulse"></div>
-                    <span>✨ Scanning...</span>
-                  </div>
-                )}
-                
-                {/* Instructions - Enhanced modern card */}
-                <div className="absolute bottom-4 left-4 right-4 sm:bottom-6 sm:left-6 sm:right-6 bg-gradient-to-r from-black/80 to-gray-900/80 backdrop-blur-md text-white px-4 sm:px-5 py-3 sm:py-4 rounded-xl text-center space-y-2 border border-gray-700/50 shadow-2xl">
-                  <p className="text-sm sm:text-base font-semibold">📱 Point camera at barcode</p>
-                  <p className="text-cyan-400 font-bold text-xs sm:text-sm flex items-center justify-center space-x-1">
-                    <FiCheck className="h-4 w-4" />
-                    <span>Automatic detection active</span>
-                  </p>
-                </div>
-              </>
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center space-y-2 sm:space-y-4 p-3 sm:p-6">
-                <FiCamera className="h-8 w-8 sm:h-12 sm:w-12 text-gray-600" />
-                <p className="text-gray-400 text-center text-xs sm:text-sm">
-                  {scanMode === 'gun' 
-                    ? '🔫 Gun mode active - scan with hand scanner'
-                    : 'Switch to Camera mode to enable video'
-                  }
-                </p>
-              </div>
-            )}
-
-            {/* Hidden Gun Input */}
-            <input
-              ref={gunInputRef}
-              type="text"
-              className="absolute opacity-0 -z-10"
-              placeholder="Gun Scanner Input"
-              tabIndex={scanMode === 'gun' || scanMode === 'smart' ? 0 : -1}
-            />
-          </div>
-
-          {/* Right: Current Transaction */}
-          <div className="space-y-2 sm:space-y-3 flex flex-col bg-gradient-to-b from-green-50 to-white rounded-lg border-2 border-green-300 p-2 sm:p-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-900 text-sm sm:text-lg">🛒 Transaction</h3>
-              {currentTransaction.length > 0 && (
-                <button
-                  onClick={clearTransaction}
-                  className="text-xs bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition-all active:scale-95"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-            
-            {/* Transaction Items */}
-            <div className="flex-1 bg-white rounded-lg p-2 sm:p-3 overflow-y-auto space-y-1 sm:space-y-2 border border-green-200">
-              {currentTransaction.length === 0 ? (
-                <p className="text-gray-400 text-center text-xs sm:text-sm py-4">No items yet</p>
-              ) : (
-                currentTransaction.map(item => (
-                  <div
-                    key={item.id}
-                    className="bg-green-50 p-1 sm:p-2 rounded border border-green-200 text-xs space-y-0.5 sm:space-y-1 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-green-700 truncate text-xs">{item.name}</span>
+                    {currentTransaction.length > 0 && (
                       <button
-                        onClick={() => removeFromTransaction(item.id)}
-                        className="text-red-500 hover:text-red-700 text-lg leading-none active:scale-125 transition-transform"
+                        onClick={clearTransaction}
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                        title="Clear all items"
                       >
-                        ×
+                        Clear
                       </button>
-                    </div>
-                    <div className="flex items-center justify-between text-gray-700">
-                      <span>Qty: <span className="font-bold">{item.quantity}</span></span>
-                      <span>₱{item.price.toFixed(2)}</span>
-                    </div>
-                    <div className="flex items-center justify-between font-bold text-green-700 border-t border-green-200 pt-1">
-                      <span>Subtotal:</span>
-                      <span>₱{item.subtotal.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Transaction Total */}
-            {currentTransaction.length > 0 && (
-              <>
-                <div className="bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg p-2 sm:p-4 space-y-1 sm:space-y-2">
-                  <div className="flex items-center justify-between text-sm sm:text-lg">
-                    <span className="font-bold">TOTAL</span>
-                    <span className="text-lg sm:text-2xl font-bold">₱{transactionTotal.toFixed(2)}</span>
-                  </div>
-                  <div className="text-xs opacity-90">
-                    <p>Items: {currentTransaction.length} | Units: {currentTransaction.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Save Transaction Button - Creates POS data for dashboard */}
-                <button
-                  onClick={saveTransactionToSupabase}
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 rounded-lg transition-all active:scale-95 flex items-center justify-center space-x-2 shadow-lg"
-                >
-                  <FiZap className="h-5 w-5" />
-                  <span>💾 Save & Submit</span>
-                </button>
+                {/* Transaction Items List */}
+                <div className="flex-1 bg-white rounded-xl border-2 border-green-300 overflow-hidden flex flex-col shadow-lg">
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {currentTransaction.length === 0 ? (
+                      <div className="h-full flex items-center justify-center flex-col gap-2">
+                        <span className="text-4xl">📦</span>
+                        <p className="text-gray-400 text-center text-sm font-semibold">
+                          No items yet
+                        </p>
+                        <p className="text-gray-300 text-center text-xs">
+                          Scan products to start transaction
+                        </p>
+                      </div>
+                    ) : (
+                      currentTransaction.map(item => (
+                        <div
+                          key={item.id}
+                          className="bg-gradient-to-r from-green-50 to-emerald-50 p-2 rounded-lg border border-green-200 hover:border-green-400 hover:shadow-md transition-all"
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-900 text-sm truncate">{item.name}</p>
+                              <p className="text-xs text-gray-600">SKU: {item.sku || 'N/A'}</p>
+                            </div>
+                            <button
+                              onClick={() => removeFromTransaction(item.id)}
+                              className="text-red-500 hover:text-red-700 text-xl leading-none active:scale-125 transition-transform flex-shrink-0"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <div className="bg-white rounded px-2 py-1">
+                              <p className="text-gray-600">Qty</p>
+                              <p className="font-bold text-green-600">{item.quantity}</p>
+                            </div>
+                            <div className="bg-white rounded px-2 py-1">
+                              <p className="text-gray-600">Price</p>
+                              <p className="font-bold text-blue-600">₱{item.price.toFixed(2)}</p>
+                            </div>
+                            <div className="bg-white rounded px-2 py-1">
+                              <p className="text-gray-600">Sub</p>
+                              <p className="font-bold text-green-700">₱{item.subtotal.toFixed(2)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Transaction Total & Action */}
+                  {currentTransaction.length > 0 && (
+                    <>
+                      <div className="border-t-2 border-green-300 bg-gradient-to-r from-green-600 to-emerald-600 text-white p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm">TOTAL</span>
+                          <span className="text-2xl font-bold">₱{transactionTotal.toFixed(2)}</span>
+                        </div>
+                        <div className="text-xs opacity-90 flex justify-between">
+                          <span>Items: {currentTransaction.length}</span>
+                          <span>Units: {currentTransaction.reduce((sum, item) => sum + item.quantity, 0)}</span>
+                        </div>
+                      </div>
+
+                      {/* Save Transaction Button */}
+                      <button
+                        onClick={saveTransactionToSupabase}
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold py-3 px-4 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-lg"
+                      >
+                        <FiZap className="h-5 w-5" />
+                        <span>💾 Save Transaction</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </>
             )}
-          </div>
 
-          {/* Recent Scans Log */}
-          <div className="space-y-2 sm:space-y-3 flex flex-col">
-            <h3 className="font-bold text-gray-900 text-sm sm:text-base">📋 Scans</h3>
-            <div className="flex-1 bg-gray-50 rounded-lg p-2 sm:p-3 overflow-y-auto space-y-1 sm:space-y-2 border border-gray-200">
-              {recentScans.length === 0 ? (
-                <p className="text-gray-400 text-center text-xs sm:text-sm py-4">No scans</p>
-              ) : (
-                recentScans.map(scan => (
-                  <div
-                    key={scan.id}
-                    className="bg-white p-1 sm:p-2 rounded border border-gray-200 text-xs space-y-0.5 hover:shadow-md transition-all"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-blue-600">{scan.barcode}</span>
-                      <span>{getScanSourceIcon(scan.source)}</span>
+            {/* ======== ADMIN CONTEXT: PRODUCTS INVENTORY ======== */}
+            {context === 'admin' && (
+              <>
+                {/* 📦 INVENTORY HEADER */}
+                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-4 py-3 shadow-lg border border-blue-400/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">📦</span>
+                      <div>
+                        <h3 className="font-bold text-base">Products Inventory</h3>
+                        <p className="text-xs opacity-90">{supabaseProducts.length} products</p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-1 text-gray-600">
-                      <FiCheck className="h-3 w-3 text-green-500" />
-                      <span>{scan.timestamp.toLocaleTimeString()}</span>
-                    </div>
+                    {addedProducts.length > 0 && (
+                      <button
+                        onClick={() => setAddedProducts([])}
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg text-xs font-semibold transition-all active:scale-95"
+                        title="Clear all added products"
+                      >
+                        Clear
+                      </button>
+                    )}
                   </div>
-                ))
-              )}
-            </div>
+                </div>
 
-            {/* Manual Input */}
-            <div className="bg-blue-50 rounded-lg p-2 sm:p-3 border border-blue-200 space-y-1 sm:space-y-2">
-              <label className="text-xs font-bold text-gray-700 block">Manual Entry</label>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const barcode = e.target.elements.manualBarcode.value;
-                  manualBarcodeScan(barcode);
-                  e.target.elements.manualBarcode.value = '';
-                }}
-                className="flex gap-1 sm:gap-2"
-              >
-                <input
-                  name="manualBarcode"
-                  type="text"
-                  placeholder="Barcode..."
-                  className="flex-1 px-2 py-2 sm:py-1 rounded border border-gray-300 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-2 sm:py-1 bg-blue-600 text-white rounded font-bold text-xs sm:text-sm hover:bg-blue-700 transition-all active:scale-95 whitespace-nowrap"
-                >
-                  Add
-                </button>
-              </form>
-            </div>
+                {/* Products List */}
+                <div className="flex-1 bg-white rounded-xl border-2 border-blue-300 overflow-hidden flex flex-col shadow-lg">
+                  <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {loadingProducts ? (
+                      <div className="h-full flex items-center justify-center flex-col gap-2">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p className="text-gray-600 text-xs font-semibold">Loading products...</p>
+                      </div>
+                    ) : supabaseProducts.length === 0 ? (
+                      <div className="h-full flex items-center justify-center flex-col gap-2">
+                        <span className="text-4xl">📭</span>
+                        <p className="text-gray-400 text-center text-sm font-semibold">
+                          No products found
+                        </p>
+                        <p className="text-gray-300 text-center text-xs">
+                          Add products to inventory first
+                        </p>
+                      </div>
+                    ) : (
+                      supabaseProducts.map(product => {
+                        const isAdded = addedProducts.find(p => p.id === product.id);
+                        return (
+                          <div
+                            key={product.id}
+                            className={`p-2 rounded-lg border-2 transition-all ${
+                              isAdded
+                                ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-500 shadow-md'
+                                : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 hover:border-blue-400 hover:shadow-md'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-gray-900 text-sm truncate">{product.name}</p>
+                                <p className="text-xs text-gray-600">SKU: {product.sku || 'N/A'}</p>
+                              </div>
+                              {isAdded && (
+                                <span className="text-green-600 text-xl leading-none flex-shrink-0">✓</span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                              <div className="bg-white rounded px-2 py-1">
+                                <p className="text-gray-600">Stock</p>
+                                <p className="font-bold text-blue-600">{product.stock || 0}</p>
+                              </div>
+                              <div className="bg-white rounded px-2 py-1">
+                                <p className="text-gray-600">Price</p>
+                                <p className="font-bold text-green-600">₱{product.price?.toFixed(2) || '0.00'}</p>
+                              </div>
+                              <div className="bg-white rounded px-2 py-1">
+                                <p className="text-gray-600">Category</p>
+                                <p className="font-bold text-purple-600 truncate">{product.category || 'N/A'}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                if (isAdded) {
+                                  setAddedProducts(addedProducts.filter(p => p.id !== product.id));
+                                  toast.info(`❌ ${product.name} removed`);
+                                } else {
+                                  setAddedProducts([...addedProducts, {
+                                    id: product.id,
+                                    name: product.name,
+                                    sku: product.sku,
+                                    price: product.price,
+                                    addedCount: 1,
+                                    timestamp: new Date()
+                                  }]);
+                                  toast.success(`✅ ${product.name} added`);
+                                }
+                              }}
+                              className={`w-full py-1.5 rounded font-semibold text-xs transition-all active:scale-95 ${
+                                isAdded
+                                  ? 'bg-red-500 hover:bg-red-600 text-white'
+                                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+                              }`}
+                            >
+                              {isAdded ? '❌ Remove' : '➕ Add'}
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Added Products Summary */}
+                  {addedProducts.length > 0 && (
+                    <div className="border-t-2 border-blue-300 bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm">ADDED PRODUCTS</span>
+                        <span className="text-2xl font-bold">{addedProducts.length}</span>
+                      </div>
+                      <div className="text-xs opacity-90">
+                        <p>Ready to add to system</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* BOTTOM SECTION - Recent Scans Log & Manual Entry */}
+        <div className="grid grid-cols-12 gap-2 px-3 pb-3 flex-shrink-0">
+          
+          {/* Recent Scans Log */}
+          <div className="col-span-12 md:col-span-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-3">
+            <h4 className="font-bold text-gray-900 text-sm mb-2 flex items-center gap-2">
+              <span>📋</span>
+              Recent Scans
+            </h4>
+            <div className="space-y-1 max-h-20 overflow-y-auto text-xs">
+              {recentScans.slice(0, 5).map(scan => (
+                <div key={scan.id} className="bg-white p-1 rounded flex items-center justify-between border border-blue-100">
+                  <span className="font-mono font-semibold text-blue-600">{scan.barcode}</span>
+                  <span className="text-gray-500">{scan.timestamp.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
+                </div>
+              ))}
+              {recentScans.length === 0 && <p className="text-gray-400 text-center py-2">No scans yet</p>}
+            </div>
+          </div>
+
+          {/* Manual Entry */}
+          <div className="col-span-12 md:col-span-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200 p-3">
+            <h4 className="font-bold text-gray-900 text-sm mb-2">⌨️ Manual Entry</h4>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const barcode = e.target.elements.manualBarcode.value;
+                manualBarcodeScan(barcode);
+                e.target.elements.manualBarcode.value = '';
+              }}
+              className="flex gap-2"
+            >
+              <input
+                name="manualBarcode"
+                type="text"
+                placeholder="Enter barcode..."
+                className="flex-1 px-3 py-2 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+              />
+              <button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all active:scale-95"
+              >
+                Scan
+              </button>
+            </form>
+          </div>
+        </div>
+
+
 
         {/* 🤖 AI Analysis Modal - Product Identification */}
         {showAIAnalysis && (
@@ -2100,7 +2326,56 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             </div>
           </div>
         )}
+
+      {/* 📊 ADDED PRODUCTS PANEL (Always Visible - Admin Context) */}
+      {context === 'admin' && addedProducts.length > 0 && (
+        <div className="absolute bottom-2 left-2 bg-white rounded-lg shadow-lg border border-green-300 p-2 w-56 max-h-40 overflow-hidden flex flex-col z-30">
+          <div className="flex items-center justify-between mb-1 pb-1 border-b border-green-200">
+            <h3 className="font-bold text-green-700 text-xs flex items-center gap-1">
+              <span>✅ Added</span>
+              <span className="bg-green-500 text-white text-xs px-1 rounded font-bold">{addedProducts.length}</span>
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1 text-xs">
+            {addedProducts.slice(0, 5).map(item => (
+              <div key={item.id} className="bg-green-50 p-1 rounded border border-green-200 text-xs">
+                <div className="font-bold text-green-700 truncate">{item.name}</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500">+{item.addedCount}</span>
+                  <span className="text-green-600 text-xs">{item.timestamp.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 💰 SOLD PRODUCTS PANEL (Always Visible - Cashier Context) */}
+      {context === 'cashier' && soldProducts.length > 0 && (
+        <div className="absolute bottom-2 right-2 bg-white rounded-lg shadow-lg border border-orange-300 p-2 w-56 max-h-40 overflow-hidden flex flex-col z-30">
+          <div className="flex items-center justify-between mb-1 pb-1 border-b border-orange-200">
+            <h3 className="font-bold text-orange-700 text-xs flex items-center gap-1">
+              <span>💰 Sold</span>
+              <span className="bg-orange-500 text-white text-xs px-1 rounded font-bold">{soldProducts.length}</span>
+            </h3>
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-1 text-xs">
+            {soldProducts.slice(0, 5).map(sale => (
+              <div key={sale.id} className="bg-orange-50 p-1 rounded border border-orange-200 text-xs">
+                <div className="font-bold text-orange-700">{sale.itemCount}i · {sale.unitsSold}u</div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 font-bold text-xs">₱{sale.total.toFixed(2)}</span>
+                  <span className="text-orange-600 text-xs">{sale.timestamp.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+        {/* End of Main Content Grid */}
       </div>
+    </div>
   );
 };
 

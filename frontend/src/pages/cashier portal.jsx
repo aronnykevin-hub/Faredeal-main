@@ -1920,13 +1920,14 @@ const CashierPortal = () => {
                 <FiRefreshCw className={`h-4 w-4 md:h-5 md:w-5 ${refreshingProducts ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">{refreshingProducts ? 'Loading...' : 'Load POS'}</span>
               </button>
-              <button
+              {/* COMMENTED OUT - Add Product Button Hidden from Cashier */}
+              {/* <button
                 onClick={() => setShowAddProductModal(true)}
                 className="px-3 py-2 md:px-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-bold hover:from-purple-700 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg text-sm md:text-base"
               >
                 <FiPlus className="h-4 w-4 md:h-5 md:w-5" />
                 <span className="hidden xs:inline">Add Product</span>
-              </button>
+              </button> */}
               <button
                 onClick={() => setShowBarcodeScanner(true)}
                 className="px-3 py-2 md:px-4 bg-gradient-to-r from-blue-600 to-green-600 text-white rounded-lg font-bold hover:from-blue-700 hover:to-green-700 transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg text-sm md:text-base"
