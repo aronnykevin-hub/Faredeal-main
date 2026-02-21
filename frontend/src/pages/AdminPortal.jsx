@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { notificationService } from '../services/notificationService';
 import { portalConfigService } from '../services/portalConfigService';
 import { supabase } from '../services/supabase';
@@ -24,6 +24,7 @@ import {
 } from 'recharts';
 
 const AdminPortal = () => {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [systemData, setSystemData] = useState({
@@ -1023,7 +1024,7 @@ const AdminPortal = () => {
       
       // Auto-login hint
       setTimeout(() => {
-        window.location.href = '/admin-auth?email=' + encodeURIComponent(quickAdminData.email);
+        navigate('/admin-auth?email=' + encodeURIComponent(quickAdminData.email));
       }, 2000);
       
       setShowQuickRegister(false);
@@ -6753,7 +6754,7 @@ const AdminPortal = () => {
                 If you believe this is an error, please contact your administrator.
               </p>
               <button
-                onClick={() => window.location.href = '/'}
+                onClick={() => navigate('/')}
                 className="w-full py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-all duration-300"
               >
                 Return to Home
@@ -6949,7 +6950,7 @@ const AdminPortal = () => {
               <button
                 onClick={() => {
                   // Handle logout
-                  window.location.href = '/admin-auth';
+                  navigate('/admin-auth');
                 }}
                 className="w-full p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all flex items-center justify-center gap-2"
               >
@@ -7077,7 +7078,7 @@ const AdminPortal = () => {
                         <button
                           onClick={() => {
                             setShowProfileMenu(false);
-                            window.location.href = '/admin-profile';
+                            navigate('/admin-profile');
                           }}
                           className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 transition-colors"
                         >
@@ -7123,7 +7124,7 @@ const AdminPortal = () => {
                             setShowProfileMenu(false);
                             if (window.confirm('Are you sure you want to logout?')) {
                               localStorage.clear();
-                              window.location.href = '/';
+                              navigate('/');
                             }
                           }}
                           className="w-full flex items-center space-x-3 px-4 py-3 text-red-600 hover:bg-red-50 transition-colors"

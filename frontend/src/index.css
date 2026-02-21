@@ -1,4 +1,69 @@
 @import "tailwindcss";
+@import "./styles/animations.css";
+
+:root {
+  --fd-bg: #f8fafc;
+  --fd-text: #0f172a;
+  --fd-font: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--fd-font);
+  color: var(--fd-text);
+  background: var(--fd-bg);
+  overflow-x: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-container {
+  min-height: 100vh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  background: var(--fd-bg);
+}
+
+.admin-mode,
+.standard-mode {
+  min-height: inherit;
+}
 
 /* Notification animations */
 @keyframes slideIn {
