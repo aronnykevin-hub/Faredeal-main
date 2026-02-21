@@ -4,13 +4,27 @@ import tailwindcss from "@tailwindcss/vite"
 import path from 'path'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   // Load environment variables
   const env = loadEnv(mode, process.cwd(), '');
   const isAdminMode = env.ADMIN_MODE === 'true';
+  const plugins = [react(), tailwindcss()];
+
+  try {
+    const { default: legacy } = await import('@vitejs/plugin-legacy');
+    plugins.push(
+      legacy({
+        // Windows 8 devices often run older browsers that need a legacy bundle.
+        targets: ['ie >= 11', 'chrome >= 49', 'firefox >= 52', 'safari >= 10', 'edge >= 15'],
+        renderLegacyChunks: true,
+      })
+    );
+  } catch {
+    // Optional dependency: dev/build continues without legacy bundle until installed.
+  }
   
   return {
-    plugins: [react(), tailwindcss()],
+    plugins,
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
