@@ -90,7 +90,15 @@ const ManagerAuth = () => {
   const checkAuth = async () => {
     try {
       console.log('🔍 Checking manager authentication...');
-      const { data: { user } } = await supabase.auth.getUser();
+      const [
+        { data: { session } },
+        { data: { user: directUser } }
+      ] = await Promise.all([
+        supabase.auth.getSession(),
+        supabase.auth.getUser()
+      ]);
+
+      const user = directUser || session?.user || null;
       
       if (user) {
         console.log('✅ User authenticated:', user.email);
@@ -101,7 +109,7 @@ const ManagerAuth = () => {
           .from('users')
           .select('id, auth_id, email, full_name, role, is_active, phone, department')
           .eq('auth_id', user.id)
-          .single();
+          .maybeSingle();
 
         console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
 
@@ -109,7 +117,7 @@ const ManagerAuth = () => {
         // 1. First time Google OAuth sign-in
         // 2. Trigger didn't create record
         // 3. Need to create it now or wait for trigger
-        if (fetchError && fetchError.code === 'PGRST116') {
+        if (!userData && !fetchError) {
           console.log('📝 User record not found. Waiting for trigger or creating fallback...');
           
           // Wait a moment for the trigger to create the record
@@ -120,12 +128,12 @@ const ManagerAuth = () => {
             .from('users')
             .select('id, auth_id, email, full_name, role, is_active, phone, department')
             .eq('auth_id', user.id)
-            .single();
+            .maybeSingle();
           
           if (retryData) {
             console.log('✅ User record created by trigger:', retryData);
             userData = retryData;
-          } else if (retryError) {
+          } else if (!retryData || retryError) {
             console.warn('⚠️ Trigger did not create record, using fallback...');
             // Fallback: Create temporary user object
             userData = {
@@ -249,10 +257,15 @@ const ManagerAuth = () => {
     try {
       console.log('📝 Submitting manager profile via RPC function...');
       
-      // Get user ID from localStorage (from login_user RPC)
+      // Use authenticated Supabase user ID (auth_id) first.
+      // Fallback to localStorage for legacy login RPC flow.
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user: liveUser } } = await supabase.auth.getUser();
+      const authUser = liveUser || session?.user || currentUser;
+
       const storedUser = localStorage.getItem('supermarket_user');
-      const userData = storedUser ? JSON.parse(storedUser) : null;
-      const userId = userData?.id;
+      const legacyUserData = storedUser ? JSON.parse(storedUser) : null;
+      const userId = authUser?.id || legacyUserData?.auth_id || legacyUserData?.id;
       
       if (!userId) {
         throw new Error('User session not found. Please log in again.');
