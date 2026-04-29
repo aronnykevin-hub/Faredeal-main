@@ -51,25 +51,45 @@ const AdminAuth = () => {
 
   const checkURLAccess = () => {
     const currentURL = window.location.href.toLowerCase();
+    const hostname = window.location.hostname.toLowerCase();
+    
+    console.log('🔍 Admin URL Check:', {
+      currentURL,
+      hostname,
+      isLocalhost: hostname.includes('localhost') || hostname === '127.0.0.1'
+    });
+    
     const allowedURLs = [
       'http://localhost:5173',
       'http://localhost:3000',
       'http://localhost:5000',
       'http://127.0.0.1:5173',
       'http://127.0.0.1:3000',
+      'http://127.0.0.1:5000',
       'https://faredeal-main.vercel.app',
-      'http://10.0.2.139'  // Android emulator
+      'http://10.0.2.139',  // Android emulator
+      'http://192.168'      // Local network IPs
     ];
     
-    // Check if current URL matches allowed domains (more flexible)
-    const isAllowed = allowedURLs.some(url => 
-      currentURL.toLowerCase().includes(url.toLowerCase().replace('http://', '').replace('https://', ''))
-    );
+    // Allow if:
+    // 1. localhost or 127.0.0.1 (development)
+    // 2. Vercel deployment
+    // 3. Local network (192.168.x.x)
+    // 4. Matches any allowed URL
+    const isAllowed = 
+      hostname.includes('localhost') ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168') ||
+      hostname.startsWith('10.') ||
+      currentURL.includes('vercel.app') ||
+      allowedURLs.some(url => currentURL.includes(url.replace(/https?:\/\//, '')));
     
     setUrlAllowed(isAllowed);
     
     if (!isAllowed) {
-      console.warn('Admin access blocked - Unauthorized URL:', window.location.href);
+      console.warn('❌ Admin access blocked - Unauthorized URL:', window.location.href);
+    } else {
+      console.log('✅ Admin access allowed from:', hostname);
     }
   };
 

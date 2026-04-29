@@ -209,11 +209,12 @@ const AdminPortal = () => {
         
         // If RLS error, show helpful message
         if (error.code === '42P17') {
-          notificationService.show(
-            '⚠️ Database policy issue detected. Please run fix-users-rls-policy.sql in Supabase SQL Editor.',
-            'warning',
-            8000
-          );
+          // DISABLED: Notification popup on page load
+          // notificationService.show(
+          //   '⚠️ Database policy issue detected. Please run fix-users-rls-policy.sql in Supabase SQL Editor.',
+          //   'warning',
+          //   8000
+          // );
         } else {
           throw error;
         }
@@ -233,10 +234,11 @@ const AdminPortal = () => {
       
     } catch (error) {
       console.error('❌ Error loading pending users:', error);
-      notificationService.show(
-        'Failed to load pending applications. Check console for details.',
-        'error'
-      );
+      // DISABLED: Notification popup on page load
+      // notificationService.show(
+      //   'Failed to load pending applications. Check console for details.',
+      //   'error'
+      // );
     } finally {
       setApprovalsLoading(false);
     }
@@ -260,7 +262,8 @@ const AdminPortal = () => {
           }));
           
           setAllUsers(usersWithStatus);
-          notificationService.show(`Loaded ${usersWithStatus.length} registered users`, 'success');
+          // DISABLED: Notification popup on page load
+          // notificationService.show(`Loaded ${usersWithStatus.length} registered users`, 'success');
           console.log(`✅ Loaded ${usersWithStatus.length} users via RPC`);
           return;
         }
@@ -281,16 +284,18 @@ const AdminPortal = () => {
         
         // If RLS error, show helpful message
         if (error.code === '42P17') {
-          notificationService.show(
-            '⚠️ Database policy issue detected. Please run fix-users-rls-policy.sql in Supabase SQL Editor to fix this.',
-            'warning',
-            8000
-          );
+          // DISABLED: Notification popup on page load
+          // notificationService.show(
+          //   '⚠️ Database policy issue detected. Please run fix-users-rls-policy.sql in Supabase SQL Editor to fix this.',
+          //   'warning',
+          //   8000
+          // );
         } else {
-          notificationService.show(
-            'Unable to load users: ' + (error.message || 'Unknown error'),
-            'error'
-          );
+          // DISABLED: Notification popup on page load
+          // notificationService.show(
+          //   'Unable to load users: ' + (error.message || 'Unknown error'),
+          //   'error'
+          // );
         }
         return;
       }
@@ -303,15 +308,17 @@ const AdminPortal = () => {
       }));
       
       setAllUsers(usersWithStatus);
-      notificationService.show(`Loaded ${usersWithStatus.length} registered users`, 'success');
+      // DISABLED: Notification popup on page load
+      // notificationService.show(`Loaded ${usersWithStatus.length} registered users`, 'success');
       console.log(`✅ Loaded ${usersWithStatus.length} users from direct query`);
       
     } catch (error) {
       console.error('Error loading all users:', error);
-      notificationService.show(
-        'Failed to load registered users. Check console for details.',
-        'error'
-      );
+      // DISABLED: Notification popup on page load
+      // notificationService.show(
+      //   'Failed to load registered users. Check console for details.',
+      //   'error'
+      // );
     } finally {
       setAllUsersLoading(false);
     }
@@ -653,22 +660,23 @@ const AdminPortal = () => {
   // Load portal configuration from server with fallback to localStorage
   const loadPortalConfiguration = async () => {
     try {
-      showNotification('Loading portal configuration...', 'info');
+      // DISABLED: Notification popups on page load
+      // showNotification('Loading portal configuration...', 'info');
       
       const response = await portalConfigService.getPortalConfiguration();
       
       if (response.success) {
         setPortalConfig(response.data);
-        showNotification('Portal configuration loaded successfully', 'success');
+        // showNotification('Portal configuration loaded successfully', 'success');
       } else {
         // Fallback to localStorage or default
         const savedConfig = localStorage.getItem('portalConfiguration');
         if (savedConfig) {
           const parsedConfig = JSON.parse(savedConfig);
           setPortalConfig(parsedConfig);
-          showNotification('Portal configuration loaded from local storage', 'warning');
+          // showNotification('Portal configuration loaded from local storage', 'warning');
         } else {
-          showNotification('Using default portal configuration', 'info');
+          // showNotification('Using default portal configuration', 'info');
         }
       }
       
@@ -677,7 +685,7 @@ const AdminPortal = () => {
       
     } catch (error) {
       console.error('Failed to load portal configuration:', error);
-      showNotification('Failed to load portal configuration, using defaults', 'error');
+      // showNotification('Failed to load portal configuration, using defaults', 'error');
     }
   };
 
@@ -709,7 +717,8 @@ const AdminPortal = () => {
       readyState: 1, // OPEN
       send: (data) => {
         console.log('Sending data:', data);
-        showNotification('Command sent successfully', 'success');
+        // DISABLED: Notification popup on page load
+        // showNotification('Command sent successfully', 'success');
       },
       close: () => console.log('WebSocket connection closed'),
       onmessage: null,
@@ -718,7 +727,8 @@ const AdminPortal = () => {
     };
     
     setWsConnection(mockWs);
-    showNotification('Real-time connection established', 'success');
+    // DISABLED: Notification popup on page load
+    // showNotification('Real-time connection established', 'success');
   };
 
   // Update real-time data with simulated changes
@@ -929,7 +939,8 @@ const AdminPortal = () => {
       console.log(`📊 Dashboard Analytics: ${activeUsers} active, ${todaysOrders} orders today, UGX ${Math.round(dailyRevenue)} revenue`);
     } catch (error) {
       console.error('Error loading system data:', error);
-      notificationService.show('Failed to load system data', 'error');
+      // DISABLED: Notification popup on page load
+      // notificationService.show('Failed to load system data', 'error');
     } finally {
       setLoading(false);
     }
