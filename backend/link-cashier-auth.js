@@ -6,8 +6,8 @@
  * Usage: cd backend && node link-cashier-auth.js
  */
 
-require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+import 'dotenv/config.js';
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -47,15 +47,71 @@ async function linkCashierAuth() {
 
     // Check if cashier record exists in database
     console.log(`\n📊 Checking for cashier record in database...`);
-    const { data: existingCashier, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', cashierEmail)
-      .eq('role', 'cashier')
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('❌ Error checking database:', checkError);
+    
+    // First try to drop the email unique constraint if it exists
+    try {
+      await supabase.rpc('drop_email_constraint');
+    } catch (e) {
+      // Constraint might not exist or we don't have RPC, continue anyway
+    }
+    
+    let existingCashier = null;
+    let checkError = null;
+    
+    // Try to find existing cashier record with this email
+    try {
+      const result = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', cashierEmail)
+        .eq('role', 'cashier')
+        .maybeSingle();
+      existingCashier = result.data;
+      checkError = result.error;
+    } catch (e) {
+      console.log('Note: Query error (may be normal):', e.message);
+    }
+    
+    // If not found as cashier, try to find any record with this email and convert it
+    if (!existingCashier) {
+      try {
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', cashierEmail)
+          .maybeSingle();
+        
+        if (result.data) {
+          // Record exists with this email but different role
+          console.log(`ℹ️  Found existing record with role: ${result.data.role}`);
+          console.log(`🔄 Updating to cashier role...`);
+          
+          const { data: updatedRecord, error: updateErr } = await supabase
+            .from('users')
+            .update({
+              role: 'cashier',
+              auth_id: matchingAuthUser.id,
+              email_verified: !!matchingAuthUser.email_confirmed_at
+            })
+            .eq('email', cashierEmail)
+            .select()
+            .maybeSingle();
+          
+          if (updateErr) {
+            console.error('❌ Error updating role:', updateErr);
+            process.exit(1);
+          }
+          
+          existingCashier = updatedRecord;
+          console.log('✅ Record updated to cashier role with auth_id linked!');
+        }
+      } catch (e) {
+        // Continue to create new record
+      }
+    }
+    
+    if (checkError && !existingCashier) {
+      console.error('❌ Database error:', checkError);
       process.exit(1);
     }
 

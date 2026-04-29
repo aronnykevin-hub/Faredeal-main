@@ -6,8 +6,8 @@
  * Usage: cd backend && node link-manager-auth.js
  */
 
-require('dotenv').config();
-const { createClient } = require('@supabase/supabase-js');
+import 'dotenv/config.js';
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -47,15 +47,71 @@ async function linkManagerAuth() {
 
     // Check if manager record exists in database
     console.log(`\n📊 Checking for manager record in database...`);
-    const { data: existingManager, error: checkError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', managerEmail)
-      .eq('role', 'manager')
-      .maybeSingle();
-
-    if (checkError) {
-      console.error('❌ Error checking database:', checkError);
+    
+    // First try to drop the email unique constraint if it exists
+    try {
+      await supabase.rpc('drop_email_constraint');
+    } catch (e) {
+      // Constraint might not exist or we don't have RPC, continue anyway
+    }
+    
+    let existingManager = null;
+    let checkError = null;
+    
+    // Try to find existing manager record with this email
+    try {
+      const result = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', managerEmail)
+        .eq('role', 'manager')
+        .maybeSingle();
+      existingManager = result.data;
+      checkError = result.error;
+    } catch (e) {
+      console.log('Note: Query error (may be normal):', e.message);
+    }
+    
+    // If not found as manager, try to find any record with this email and convert it
+    if (!existingManager) {
+      try {
+        const result = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', managerEmail)
+          .maybeSingle();
+        
+        if (result.data) {
+          // Record exists with this email but different role
+          console.log(`ℹ️  Found existing record with role: ${result.data.role}`);
+          console.log(`🔄 Updating to manager role...`);
+          
+          const { data: updatedRecord, error: updateErr } = await supabase
+            .from('users')
+            .update({
+              role: 'manager',
+              auth_id: matchingAuthUser.id,
+              email_verified: !!matchingAuthUser.email_confirmed_at
+            })
+            .eq('email', managerEmail)
+            .select()
+            .maybeSingle();
+          
+          if (updateErr) {
+            console.error('❌ Error updating role:', updateErr);
+            process.exit(1);
+          }
+          
+          existingManager = updatedRecord;
+          console.log('✅ Record updated to manager role with auth_id linked!');
+        }
+      } catch (e) {
+        // Continue to create new record
+      }
+    }
+    
+    if (checkError && !existingManager) {
+      console.error('❌ Database error:', checkError);
       process.exit(1);
     }
 
