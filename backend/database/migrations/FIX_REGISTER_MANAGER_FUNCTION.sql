@@ -11,8 +11,7 @@ DROP FUNCTION IF EXISTS public.register_manager(
   p_username TEXT,
   p_password TEXT,
   p_full_name TEXT,
-  p_phone TEXT,
-  p_department TEXT
+  p_phone TEXT
 );
 
 DROP FUNCTION IF EXISTS public.register_manager(
@@ -20,7 +19,6 @@ DROP FUNCTION IF EXISTS public.register_manager(
   p_password TEXT,
   p_full_name TEXT,
   p_phone TEXT,
-  p_department TEXT,
   p_assigned_supplier_id UUID
 );
 
@@ -30,7 +28,6 @@ CREATE OR REPLACE FUNCTION public.register_manager(
   p_password TEXT,
   p_full_name TEXT,
   p_phone TEXT,
-  p_department TEXT,
   p_assigned_supplier_id UUID DEFAULT NULL
 )
 RETURNS JSONB AS $$
@@ -68,13 +65,6 @@ BEGIN
     );
   END IF;
 
-  IF p_department IS NULL OR p_department = '' THEN
-    RETURN jsonb_build_object(
-      'success', FALSE,
-      'error', 'Department is required'
-    );
-  END IF;
-
   -- Check if username already exists
   SELECT EXISTS(
     SELECT 1 FROM public.users
@@ -97,7 +87,6 @@ BEGIN
     password,
     full_name,
     phone,
-    department,
     role,
     is_active,
     profile_completed,
@@ -107,7 +96,6 @@ BEGIN
     v_hashed_password,
     p_full_name,
     p_phone,
-    p_department,
     'manager',
     FALSE,
     FALSE,
@@ -133,5 +121,5 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Grant execute permission to anonymous users (for signup)
 GRANT EXECUTE ON FUNCTION public.register_manager(
-  TEXT, TEXT, TEXT, TEXT, TEXT, UUID
+  TEXT, TEXT, TEXT, TEXT, UUID
 ) TO anon, authenticated;

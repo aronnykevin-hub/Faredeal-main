@@ -14,9 +14,8 @@ const CashierAuth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
+  const [showWaitingScreen, setShowWaitingScreen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [profileStep, setProfileStep] = useState(1);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -24,16 +23,7 @@ const CashierAuth = () => {
     confirmPassword: '',
     fullName: '',
     phone: '',
-    shift: 'morning',
-    // Profile completion fields
-    dateOfBirth: '',
-    gender: '',
-    address: '',
-    city: '',
-    idNumber: '',
-    tillExperience: '',
-    emergencyContact: '',
-    emergencyPhone: ''
+    shift: 'morning'
   });
 
   const [errors, setErrors] = useState({});
@@ -99,24 +89,22 @@ const CashierAuth = () => {
           .eq('auth_id', user.id)
           .maybeSingle();
 
-        // Check if user is a cashier (filter in JS to avoid enum issues)
-        if (userData && userData.role !== 'cashier') {
-          console.warn('⚠️ User exists but is not a cashier, role:', userData.role);
-          userData = null;
-        }
-
         console.log('👤 User data from database:', userData);
 
-        // If user doesn't exist (OAuth first-time sign-in), create them
-        if (fetchError || !userData) {
-          console.log('📝 Creating new cashier user in database...');
+        if (fetchError) {
+          console.error('❌ Database error:', fetchError);
+          throw fetchError;
+        }
+
+        if (!userData) {
+          console.log('📝 Creating placeholder cashier record...');
           const { data: newUser, error: createError } = await supabase
             .from('users')
             .insert([{
               auth_id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-              role: 'cashier',
+              role: 'user',
               is_active: false,
               profile_completed: false,
               created_at: new Date().toISOString()
@@ -125,41 +113,20 @@ const CashierAuth = () => {
             .single();
 
           if (createError) {
-            console.error('❌ Error creating user:', createError);
+            console.error('❌ Error creating placeholder user:', createError);
             throw createError;
           }
 
-          console.log('✅ User created:', newUser);
           userData = newUser;
-          notificationService.show('Welcome! Please complete your cashier profile.', 'info');
         }
 
-        // Priority flow: approved → profile incomplete → pending
-        console.log('🔀 Checking user status - Active:', userData.is_active, 'Profile Complete:', userData.profile_completed);
-        
-        if (userData.is_active && userData.profile_completed) {
-          // Approved and profile complete → Go to Employee Portal (Cashier Portal with all features)
-          console.log('✅ User approved and profile complete - Redirecting to Cashier Portal');
+        if (userData.role === 'cashier' && userData.is_active) {
+          console.log('✅ Cashier role assigned - Redirecting to cashier portal');
           notificationService.show('✅ Welcome back!', 'success');
           navigate('/employee-portal');
-        } else if (!userData.profile_completed) {
-          // Profile not completed → Show profile form
-          console.log('📋 Profile not complete - Showing profile form');
-          setShowProfileCompletion(true);
-          setFormData(prev => ({
-            ...prev,
-            fullName: userData.full_name || '',
-            phone: userData.phone || '',
-            shift: userData.shift || 'morning'
-          }));
         } else {
-          // Profile complete but not active → Pending approval
-          console.log('⏳ Profile complete but not approved - Pending approval');
-          notificationService.show(
-            '⏳ Your cashier application is pending admin approval.',
-            'warning',
-            5000
-          );
+          console.log('⏳ Cashier role not assigned yet - Showing waiting screen');
+          setShowWaitingScreen(true);
           await supabase.auth.signOut();
         }
       } else {
@@ -167,98 +134,6 @@ const CashierAuth = () => {
       }
     } catch (error) {
       console.error('❌ Auth check error:', error);
-    }
-  };
-
-  const validateProfileStep = (step) => {
-    const newErrors = {};
-    
-    if (step === 1) {
-      if (!formData.fullName) newErrors.fullName = 'Full name is required';
-      if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-      if (!formData.gender) newErrors.gender = 'Gender is required';
-      if (!formData.phone) newErrors.phone = 'Phone is required';
-      if (!formData.address) newErrors.address = 'Address is required';
-      if (!formData.city) newErrors.city = 'City is required';
-      if (!formData.idNumber) newErrors.idNumber = 'ID number is required';
-    }
-    
-    if (step === 2) {
-      if (!formData.shift) newErrors.shift = 'Shift preference is required';
-      if (!formData.tillExperience) newErrors.tillExperience = 'Till experience is required';
-    }
-    
-    if (step === 3) {
-      if (!formData.emergencyContact) newErrors.emergencyContact = 'Emergency contact is required';
-      if (!formData.emergencyPhone) newErrors.emergencyPhone = 'Emergency phone is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleProfileNext = () => {
-    if (validateProfileStep(profileStep)) {
-      setProfileStep(profileStep + 1);
-      setErrors({});
-    }
-  };
-
-  const handleProfileBack = () => {
-    setProfileStep(profileStep - 1);
-    setErrors({});
-  };
-
-  const handleCompleteProfile = async (e) => {
-    e.preventDefault();
-    
-    if (!validateProfileStep(3)) return;
-
-    setLoading(true);
-
-    try {
-      const { error } = await supabase
-        .from('users')
-        .update({
-          full_name: formData.fullName,
-          date_of_birth: formData.dateOfBirth,
-          gender: formData.gender,
-          phone: formData.phone,
-          address: formData.address,
-          city: formData.city,
-          id_number: formData.idNumber,
-          shift: formData.shift,
-          till_experience: parseInt(formData.tillExperience) || 0,
-          emergency_contact: formData.emergencyContact,
-          emergency_phone: formData.emergencyPhone,
-          profile_completed: true,
-          submitted_at: new Date().toISOString()
-        })
-        .eq('auth_id', currentUser.id);
-
-      if (error) throw error;
-
-      notificationService.show(
-        '🎉 Cashier profile completed! Your application is pending admin approval.',
-        'success',
-        5000
-      );
-
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-        setShowProfileCompletion(false);
-        setProfileStep(1);
-        window.location.reload();
-      }, 2000);
-
-    } catch (error) {
-      console.error('Profile completion error:', error);
-      notificationService.show(
-        error.message || 'Failed to complete profile',
-        'error'
-      );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -486,204 +361,23 @@ const CashierAuth = () => {
   };
 
   // =============================================
-  // RENDER: Profile Completion Form
+  // Waiting Screen
   // =============================================
-  if (showProfileCompletion) {
+  if (showWaitingScreen) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-cyan-600 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <FiUser className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Complete Your Cashier Profile</h1>
-            <p className="text-gray-600">Fill in your details to continue</p>
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <FiClock className="w-8 h-8 text-white" />
           </div>
-
-          <form onSubmit={handleCompleteProfile} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Full Name */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number *
-                </label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* Date of Birth */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Date of Birth *
-                </label>
-                <input
-                  type="date"
-                  name="dateOfBirth"
-                  value={formData.dateOfBirth}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* Gender */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Gender *
-                </label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                >
-                  <option value="">Select Gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Address *
-                </label>
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* City */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  City *
-                </label>
-                <input
-                  type="text"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* ID Number */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  ID Number *
-                </label>
-                <input
-                  type="text"
-                  name="idNumber"
-                  value={formData.idNumber}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* Shift */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preferred Shift *
-                </label>
-                <select
-                  name="shift"
-                  value={formData.shift}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                >
-                  <option value="morning">Morning</option>
-                  <option value="afternoon">Afternoon</option>
-                  <option value="evening">Evening</option>
-                  <option value="night">Night</option>
-                </select>
-              </div>
-
-              {/* Till Experience */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Till Experience (months)
-                </label>
-                <input
-                  type="number"
-                  name="tillExperience"
-                  value={formData.tillExperience}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  min="0"
-                />
-              </div>
-
-              {/* Emergency Contact */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Emergency Contact Name *
-                </label>
-                <input
-                  type="text"
-                  name="emergencyContact"
-                  value={formData.emergencyContact}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-
-              {/* Emergency Phone */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Emergency Contact Phone *
-                </label>
-                <input
-                  type="tel"
-                  name="emergencyPhone"
-                  value={formData.emergencyPhone}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500"
-                  required
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-green-600 to-cyan-600 text-white rounded-xl font-semibold hover:from-green-700 hover:to-cyan-700 transition-all disabled:opacity-50"
-            >
-              {loading ? 'Submitting...' : 'Complete Profile'}
-            </button>
-          </form>
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">Wait for Your Role</h1>
+          <p className="text-gray-600 text-lg">
+            Sign in with Google and wait while admin assigns your cashier role. You will automatically get access to your dashboard once the role is set.
+          </p>
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-semibold text-green-700">
+            <FiClock className="w-4 h-4" />
+            Awaiting role assignment
+          </div>
         </div>
       </div>
     );

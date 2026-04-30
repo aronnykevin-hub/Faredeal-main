@@ -15,9 +15,8 @@ const ManagerAuth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [showProfileCompletion, setShowProfileCompletion] = useState(false);
+  const [showWaitingScreen, setShowWaitingScreen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
-  const [profileStep, setProfileStep] = useState(1);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -25,19 +24,7 @@ const ManagerAuth = () => {
     confirmPassword: '',
     fullName: '',
     phone: '',
-    department: '',
-    // Profile completion fields
-    dateOfBirth: '',
-    gender: '',
-    address: '',
-    city: '',
-    experienceYears: '',
-    education: '',
-    certifications: '',
-    previousEmployer: '',
-    employeeCount: '',
-    emergencyContact: '',
-    emergencyPhone: ''
+    department: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -107,97 +94,53 @@ const ManagerAuth = () => {
         // Check if user exists in database
         let { data: userData, error: fetchError } = await supabase
           .from('users')
-          .select('id, auth_id, email, full_name, role, is_active, phone, department')
+          .select('id, auth_id, email, full_name, role, is_active, phone')
           .eq('auth_id', user.id)
           .maybeSingle();
 
         console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
 
-        // If user doesn't exist, it means:
-        // 1. First time Google OAuth sign-in
-        // 2. Trigger didn't create record
-        // 3. Need to create it now or wait for trigger
+        // If user doesn't exist yet, create a minimal placeholder row for email-based role assignment
         if (!userData && !fetchError) {
-          console.log('📝 User record not found. Waiting for trigger or creating fallback...');
-          
-          // Wait a moment for the trigger to create the record
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          // Try again
-          const { data: retryData, error: retryError } = await supabase
+          console.log('📝 User record not found. Creating minimal placeholder...');
+
+          const { data: insertData, error: insertError } = await supabase
             .from('users')
-            .select('id, auth_id, email, full_name, role, is_active, phone, department')
-            .eq('auth_id', user.id)
-            .maybeSingle();
-          
-          if (retryData) {
-            console.log('✅ User record created by trigger:', retryData);
-            userData = retryData;
-          } else if (!retryData || retryError) {
-            console.warn('⚠️ Trigger did not create record, using fallback...');
-            // Fallback: Create temporary user object
-            userData = {
-              id: null,
+            .insert({
               auth_id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-              role: 'customer',
+              role: 'user',
               is_active: false,
               phone: null,
-              department: null
-            };
-            console.log('⚠️ Using fallback user object - record will be created on profile submission');
-            notificationService.show('Welcome! Please complete your manager profile.', 'info', 4000);
+              created_at: new Date().toISOString()
+            })
+            .select('id, auth_id, email, full_name, role, is_active, phone')
+            .single();
+
+          if (insertError) {
+            console.error('❌ Failed to create placeholder user record:', insertError);
+            throw insertError;
           }
+
+          userData = insertData;
+          console.log('✅ Placeholder user record created:', userData);
         } else if (fetchError) {
           console.error('❌ Database error:', fetchError);
           throw fetchError;
         }
-        
-        // Check if account is approved
-        if (userData && !userData.is_active) {
-          console.warn('⚠️ Account pending approval from administrator');
-        }
 
-
-        // Check if user has manager role
         const hasManagerRole = userData?.role === 'manager';
-        const profileComplete = userData?.full_name && userData?.phone && userData?.department;
-        console.log('🔀 User status - Manager Role:', hasManagerRole, 'Profile Complete:', profileComplete, 'Active:', userData?.is_active);
-        
-        if (hasManagerRole && userData?.is_active && profileComplete) {
-          // Approved manager with complete profile → Go to Manager Portal
-          console.log('✅ Manager approved and profile complete - Redirecting to Manager Portal');
+        const isActiveManager = userData?.is_active === true;
+        console.log('🔀 User status - Manager Role:', hasManagerRole, 'Active:', isActiveManager, 'Email:', userData?.email);
+
+        if (hasManagerRole && isActiveManager) {
+          console.log('✅ Manager role assigned - Redirecting to Manager Portal');
           notificationService.show('✅ Welcome back!', 'success');
           navigate('/manager');
-        } else if (!hasManagerRole && !profileComplete) {
-          // New Google sign-in, no manager role yet → Show profile form for application
-          console.log('📋 New manager application - Showing profile form');
-          setShowProfileCompletion(true);
-          setFormData(prev => ({
-            ...prev,
-            fullName: userData?.full_name || '',
-            phone: userData?.phone || '',
-            department: userData?.department || ''
-          }));
-        } else if (!hasManagerRole && profileComplete) {
-          // Profile submitted but waiting for admin approval → Show pending message
-          console.log('⏳ Application submitted - Waiting for admin approval');
-          notificationService.show(
-            '📝 Your manager application has been submitted! An admin will review your request and grant you manager access.',
-            'info',
-            6000
-          );
-          await supabase.auth.signOut();
-          setShowProfileCompletion(false);
-        } else if (hasManagerRole && !userData?.is_active) {
-          // Approved but not activated yet
-          console.log('⏳ Manager role approved but not activated');
-          notificationService.show(
-            '⏳ Your manager account is being activated. Please try again in a moment.',
-            'warning',
-            5000
-          );
+        } else {
+          console.log('⏳ Manager role not assigned yet - Showing waiting screen');
+          setShowWaitingScreen(true);
           await supabase.auth.signOut();
         }
       } else {
@@ -205,156 +148,6 @@ const ManagerAuth = () => {
       }
     } catch (error) {
       console.error('❌ Auth check error:', error);
-    }
-  };
-
-  const validateProfileStep = (step) => {
-    const newErrors = {};
-    
-    if (step === 1) {
-      if (!formData.fullName) newErrors.fullName = 'Full name is required';
-      if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-      if (!formData.gender) newErrors.gender = 'Gender is required';
-      if (!formData.phone) newErrors.phone = 'Phone is required';
-      if (!formData.address) newErrors.address = 'Address is required';
-      if (!formData.city) newErrors.city = 'City is required';
-    }
-    
-    if (step === 2) {
-      if (!formData.department) newErrors.department = 'Department is required';
-      if (!formData.experienceYears) newErrors.experienceYears = 'Experience is required';
-      if (!formData.education) newErrors.education = 'Education level is required';
-    }
-    
-    if (step === 3) {
-      if (!formData.emergencyContact) newErrors.emergencyContact = 'Emergency contact is required';
-      if (!formData.emergencyPhone) newErrors.emergencyPhone = 'Emergency phone is required';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleProfileNext = () => {
-    if (validateProfileStep(profileStep)) {
-      setProfileStep(profileStep + 1);
-      setErrors({});
-    }
-  };
-
-  const handleProfileBack = () => {
-    setProfileStep(profileStep - 1);
-    setErrors({});
-  };
-
-  const handleCompleteProfile = async (e) => {
-    e.preventDefault();
-    
-    if (!validateProfileStep(3)) return;
-
-    setLoading(true);
-
-    try {
-      console.log('📝 Submitting manager profile via RPC function...');
-      
-      // Use authenticated Supabase user ID (auth_id) first.
-      // Fallback to localStorage for legacy login RPC flow.
-      const { data: { session } } = await supabase.auth.getSession();
-      const { data: { user: liveUser } } = await supabase.auth.getUser();
-      const authUser = liveUser || session?.user || currentUser;
-
-      const storedUser = localStorage.getItem('supermarket_user');
-      const legacyUserData = storedUser ? JSON.parse(storedUser) : null;
-      const userId = authUser?.id || legacyUserData?.auth_id || legacyUserData?.id;
-      
-      if (!userId) {
-        throw new Error('User session not found. Please log in again.');
-      }
-      
-      // Use RPC function to update profile and verify admin assignment
-      const { data: rpcResult, error: rpcError } = await supabase.rpc(
-        'update_manager_profile_on_submission',
-        {
-          p_auth_id: userId,
-          p_full_name: formData.fullName,
-          p_phone: formData.phone,
-          p_department: formData.department
-        }
-      );
-
-      if (rpcError) {
-        console.error('❌ RPC error:', rpcError);
-        throw new Error(rpcError.message || 'Failed to submit profile');
-      }
-
-      if (!rpcResult?.success) {
-        throw new Error(rpcResult?.error || 'Profile submission failed');
-      }
-
-      console.log('✅ Profile submitted:', rpcResult);
-      console.log('👤 Assigned Admin:', {
-        admin_id: rpcResult.assigned_admin_id,
-        admin_email: rpcResult.assigned_admin_email,
-        admin_available: rpcResult.admin_available
-      });
-
-      // Show success notification with admin info
-      if (rpcResult.admin_available) {
-        notificationService.show(
-          `✅ Profile submitted! Your application is assigned to admin: ${rpcResult.assigned_admin_email || 'Unknown'}`,
-          'success',
-          6000
-        );
-      } else {
-        notificationService.show(
-          '⚠️ Profile submitted but no admin available. Your application will be reviewed when an admin is available.',
-          'warning',
-          6000
-        );
-      }
-
-      // Store additional profile data in metadata JSON (for other fields)
-      try {
-        const { error: metadataError } = await supabase
-          .from('users')
-          .update({
-            metadata: {
-              date_of_birth: formData.dateOfBirth,
-              gender: formData.gender,
-              address: formData.address,
-              city: formData.city,
-              experience_years: formData.experienceYears,
-              education_level: formData.education,
-              certifications: formData.certifications,
-              previous_employer: formData.previousEmployer,
-              employee_count: formData.employeeCount,
-              emergency_contact: formData.emergencyContact,
-              emergency_phone: formData.emergencyPhone,
-              submitted_at: new Date().toISOString()
-            }
-          })
-          .eq('auth_id', currentUser.id);
-
-        if (metadataError) console.warn('Metadata update warning:', metadataError);
-      } catch (metaError) {
-        console.warn('Metadata storage failed (non-critical):', metaError);
-      }
-
-      setTimeout(async () => {
-        await supabase.auth.signOut();
-        setShowProfileCompletion(false);
-        setProfileStep(1);
-        window.location.reload();
-      }, 2000);
-
-    } catch (error) {
-      console.error('❌ Profile completion error:', error);
-      notificationService.show(
-        error.message || 'Failed to complete profile',
-        'error'
-      );
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -473,8 +266,7 @@ const ManagerAuth = () => {
         p_username: formData.username,
         p_password: formData.password,
         p_full_name: formData.fullName,
-        p_phone: formData.phone,
-        p_department: formData.department
+        p_phone: formData.phone
       });
 
       if (error) {
@@ -502,8 +294,7 @@ const ManagerAuth = () => {
           password: '',
           confirmPassword: '',
           fullName: '',
-          phone: '',
-          department: ''
+          phone: ''
         });
       }, 2000);
 
@@ -531,365 +322,27 @@ const ManagerAuth = () => {
     }
   };
 
-  // Profile Completion Modal
-  if (showProfileCompletion) {
+  // Waiting Screen
+  if (showWaitingScreen) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 flex items-center justify-center p-4">
-        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl p-8 md:p-12 animate-scale-in">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-bounce-slow">
-              <FiBriefcase className="w-12 h-12 text-white" />
-            </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-              Complete Your Manager Profile
-            </h1>
-            <p className="text-gray-600">
-              Step {profileStep} of 3 - Fill in your details for admin approval
-            </p>
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 md:p-12 text-center">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <FiClock className="w-12 h-12 text-white" />
           </div>
-
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex justify-between mb-2">
-              <span className={`text-sm font-medium ${profileStep >= 1 ? 'text-purple-600' : 'text-gray-400'}`}>
-                Personal Info
-              </span>
-              <span className={`text-sm font-medium ${profileStep >= 2 ? 'text-purple-600' : 'text-gray-400'}`}>
-                Professional
-              </span>
-              <span className={`text-sm font-medium ${profileStep >= 3 ? 'text-purple-600' : 'text-gray-400'}`}>
-                Emergency
-              </span>
-            </div>
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500 ease-out"
-                style={{ width: `${(profileStep / 3) * 100}%` }}
-              ></div>
-            </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
+            Wait for Your Role
+          </h1>
+          <p className="text-gray-600 text-lg leading-relaxed">
+            Your Google account has been received. An admin will assign your role as manager, cashier, or supplier, then you can sign in to the correct dashboard.
+          </p>
+          <div className="mt-8 inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700">
+            <FiClock className="w-4 h-4" />
+            Awaiting role assignment
           </div>
-
-          <form onSubmit={profileStep === 3 ? handleCompleteProfile : (e) => { e.preventDefault(); handleProfileNext(); }}>
-            {/* Step 1: Personal Information */}
-            {profileStep === 1 && (
-              <div className="space-y-5 animate-slide-in-right">
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiUser className="inline w-4 h-4 mr-2" />
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="fullName"
-                      value={formData.fullName}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.fullName ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                      placeholder="John Doe"
-                    />
-                    {errors.fullName && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.fullName}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiCalendar className="inline w-4 h-4 mr-2" />
-                      Date of Birth *
-                    </label>
-                    <input
-                      type="date"
-                      name="dateOfBirth"
-                      value={formData.dateOfBirth}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.dateOfBirth ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                    />
-                    {errors.dateOfBirth && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.dateOfBirth}</p>}
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiUser className="inline w-4 h-4 mr-2" />
-                      Gender *
-                    </label>
-                    <select
-                      name="gender"
-                      value={formData.gender}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.gender ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                    >
-                      <option value="">Select gender...</option>
-                      <option value="male">Male</option>
-                      <option value="female">Female</option>
-                      <option value="other">Other</option>
-                    </select>
-                    {errors.gender && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.gender}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiPhone className="inline w-4 h-4 mr-2" />
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.phone ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                      placeholder="+255 123 456 789"
-                    />
-                    {errors.phone && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.phone}</p>}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiHome className="inline w-4 h-4 mr-2" />
-                    Address *
-                    </label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                      errors.address ? 'border-red-500 animate-shake' : 'border-gray-200'
-                    }`}
-                    placeholder="Street, building, floor..."
-                  />
-                  {errors.address && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.address}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiMapPin className="inline w-4 h-4 mr-2" />
-                    City *
-                  </label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                      errors.city ? 'border-red-500 animate-shake' : 'border-gray-200'
-                    }`}
-                    placeholder="Dar es Salaam"
-                  />
-                  {errors.city && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.city}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Professional Details */}
-            {profileStep === 2 && (
-              <div className="space-y-5 animate-slide-in-right">
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiBriefcase className="inline w-4 h-4 mr-2" />
-                      Department *
-                    </label>
-                    <input
-                      type="text"
-                      name="department"
-                      value={formData.department}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.department ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                      placeholder="Sales, Operations, etc."
-                    />
-                    {errors.department && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.department}</p>}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiClock className="inline w-4 h-4 mr-2" />
-                      Years of Experience *
-                    </label>
-                    <input
-                      type="number"
-                      name="experienceYears"
-                      value={formData.experienceYears}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                        errors.experienceYears ? 'border-red-500 animate-shake' : 'border-gray-200'
-                      }`}
-                      placeholder="5"
-                    />
-                    {errors.experienceYears && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.experienceYears}</p>}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiBook className="inline w-4 h-4 mr-2" />
-                    Education Level *
-                  </label>
-                  <select
-                    name="education"
-                    value={formData.education}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                      errors.education ? 'border-red-500 animate-shake' : 'border-gray-200'
-                    }`}
-                  >
-                    <option value="">Select education level...</option>
-                    <option value="high_school">High School</option>
-                    <option value="diploma">Diploma</option>
-                    <option value="bachelors">Bachelor's Degree</option>
-                    <option value="masters">Master's Degree</option>
-                    <option value="phd">PhD</option>
-                  </select>
-                  {errors.education && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.education}</p>}
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiAward className="inline w-4 h-4 mr-2" />
-                      Certifications
-                    </label>
-                    <input
-                      type="text"
-                      name="certifications"
-                      value={formData.certifications}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                      placeholder="PMP, MBA, etc."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      <FiUsers className="inline w-4 h-4 mr-2" />
-                      Team Size
-                    </label>
-                    <input
-                      type="number"
-                      name="employeeCount"
-                      value={formData.employeeCount}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                      placeholder="10"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiBriefcase className="inline w-4 h-4 mr-2" />
-                    Previous Employer
-                  </label>
-                  <input
-                    type="text"
-                    name="previousEmployer"
-                    value={formData.previousEmployer}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                    placeholder="ABC Company Ltd"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Emergency Contact */}
-            {profileStep === 3 && (
-              <div className="space-y-5 animate-slide-in-right">
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                  <p className="text-blue-800 text-sm flex items-center">
-                    <FiAlertCircle className="w-5 h-5 mr-2" />
-                    Please provide emergency contact information for safety purposes.
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiUser className="inline w-4 h-4 mr-2" />
-                    Emergency Contact Name *
-                  </label>
-                  <input
-                    type="text"
-                    name="emergencyContact"
-                    value={formData.emergencyContact}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                      errors.emergencyContact ? 'border-red-500 animate-shake' : 'border-gray-200'
-                    }`}
-                    placeholder="Jane Doe"
-                  />
-                  {errors.emergencyContact && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.emergencyContact}</p>}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    <FiPhone className="inline w-4 h-4 mr-2" />
-                    Emergency Contact Phone *
-                  </label>
-                  <input
-                    type="tel"
-                    name="emergencyPhone"
-                    value={formData.emergencyPhone}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 bg-gray-50 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all ${
-                      errors.emergencyPhone ? 'border-red-500 animate-shake' : 'border-gray-200'
-                    }`}
-                    placeholder="+255 987 654 321"
-                  />
-                  {errors.emergencyPhone && <p className="text-red-600 text-sm mt-1 flex items-center"><FiAlertCircle className="w-4 h-4 mr-1" />{errors.emergencyPhone}</p>}
-                </div>
-              </div>
-            )}
-
-            {/* Navigation Buttons */}
-            <div className="flex justify-between items-center mt-8 pt-6 border-t border-gray-200">
-              {profileStep > 1 ? (
-                <button
-                  type="button"
-                  onClick={handleProfileBack}
-                  className="px-6 py-3 text-gray-600 hover:text-gray-900 font-semibold rounded-xl hover:bg-gray-100 transition-all flex items-center space-x-2"
-                >
-                  <FiArrowLeft className="w-5 h-5" />
-                  <span>Back</span>
-                </button>
-              ) : (
-                <div></div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold rounded-xl hover:shadow-lg transform hover:scale-105 transition-all flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Processing...</span>
-                  </>
-                ) : profileStep === 3 ? (
-                  <>
-                    <span>Submit Application</span>
-                    <FiCheck className="w-5 h-5" />
-                  </>
-                ) : (
-                  <>
-                    <span>Next Step</span>
-                    <FiArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
+          <p className="mt-6 text-sm text-gray-500">
+            If you already requested access, please check back after the admin assigns your role.
+          </p>
         </div>
       </div>
     );

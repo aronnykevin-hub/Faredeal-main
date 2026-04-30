@@ -33,7 +33,7 @@ export default defineConfig(async ({ mode }) => {
     },
     server: {
       host: '0.0.0.0', // Listen on all network interfaces
-      port: isAdminMode ? 5174 : 5173, // Admin portal runs on 5174, regular on 5173
+      port: 5174, // Always run on port 5174
       https: isAdminMode ? true : false, // Force HTTPS for admin portal
       strictPort: false, // Allow fallback to other ports if busy
       headers: isAdminMode ? {

@@ -11,35 +11,35 @@ DROP FUNCTION IF EXISTS public.get_pending_users() CASCADE;
 CREATE OR REPLACE FUNCTION public.get_pending_users()
 RETURNS TABLE (
   id UUID,
+  auth_id UUID,
   email VARCHAR,
-  username VARCHAR,
-  full_name TEXT,
+  full_name VARCHAR,
   phone VARCHAR,
-  role TEXT,
-  status TEXT,
+  username VARCHAR,
+  role VARCHAR,
+  is_active BOOLEAN,
+  email_verified BOOLEAN,
+  profile_completed BOOLEAN,
   created_at TIMESTAMP WITH TIME ZONE,
-  metadata JSONB
+  updated_at TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
   RETURN QUERY
   SELECT
     u.id,
-    u.email,
-    u.username,
-    COALESCE(u.first_name || ' ' || u.last_name, u.email) AS full_name,
-    u.phone,
-    u.role::TEXT,
-    u.status::TEXT,
+    u.auth_id,
+    u.email::VARCHAR,
+    u.full_name::VARCHAR,
+    u.phone::VARCHAR,
+    u.username::VARCHAR,
+    u.role::VARCHAR,
+    u.is_active,
+    u.email_verified,
+    u.profile_completed,
     u.created_at,
-    jsonb_build_object(
-      'phone', u.phone,
-      'role', u.role,
-      'status', u.status,
-      'permissions', u.permissions,
-      'settings', u.settings
-    ) AS metadata
+    u.updated_at
   FROM public.users u
-  WHERE u.status = 'pending'
+  WHERE u.is_active = FALSE
   ORDER BY u.created_at ASC;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -47,91 +47,13 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 GRANT EXECUTE ON FUNCTION public.get_pending_users() TO authenticated;
 
 -- =========================================
--- 2. APPROVE USER FUNCTION (Two versions)
+-- 2. APPROVE USER FUNCTION (Single resolved RPC)
 -- =========================================
-DROP FUNCTION IF EXISTS public.approve_user(UUID, VARCHAR) CASCADE;
-DROP FUNCTION IF EXISTS public.approve_user(UUID) CASCADE;
+DROP FUNCTION IF EXISTS public.approve_user_admin(UUID, VARCHAR) CASCADE;
 
--- Version 1: Approve user WITHOUT changing role
-CREATE OR REPLACE FUNCTION public.approve_user(
-  p_user_id UUID
-)
-RETURNS JSONB AS $$
-DECLARE
-  v_result JSONB;
-  v_user_email TEXT;
-  v_user_role VARCHAR;
-BEGIN
-  -- Validate input
-  IF p_user_id IS NULL THEN
-    RETURN jsonb_build_object(
-      'success', FALSE,
-      'error', 'User ID is required'
-    );
-  END IF;
-
-  -- Get user details
-  SELECT email, role INTO v_user_email, v_user_role
-  FROM public.users
-  WHERE id = p_user_id;
-
-  IF v_user_email IS NULL THEN
-    RETURN jsonb_build_object(
-      'success', FALSE,
-      'error', 'User not found'
-    );
-  END IF;
-
-  -- Update user status (keep existing role)
-  UPDATE public.users
-  SET
-    status = 'active',
-    updated_at = NOW()
-  WHERE id = p_user_id;
-
-  -- Log the approval
-  INSERT INTO public.audit_log (
-    action,
-    table_name,
-    record_id,
-    old_values,
-    new_values,
-    performed_by,
-    created_at
-  ) VALUES (
-    'USER_APPROVED',
-    'users',
-    p_user_id,
-    jsonb_build_object('status', 'pending', 'role', v_user_role),
-    jsonb_build_object('status', 'active', 'role', v_user_role),
-    auth.uid(),
-    NOW()
-  );
-
-  v_result := jsonb_build_object(
-    'success', TRUE,
-    'message', 'User approved successfully',
-    'user_id', p_user_id,
-    'email', v_user_email,
-    'role', v_user_role,
-    'status', 'active'
-  );
-
-  RETURN v_result;
-
-EXCEPTION WHEN OTHERS THEN
-  RETURN jsonb_build_object(
-    'success', FALSE,
-    'error', 'Failed to approve user: ' || SQLERRM,
-    'error_code', SQLSTATE
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Version 2: Approve user WITH role change
-CREATE OR REPLACE FUNCTION public.approve_user(
+CREATE OR REPLACE FUNCTION public.approve_user_admin(
   p_user_id UUID,
-  p_role VARCHAR
+  p_role VARCHAR DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -148,13 +70,6 @@ BEGIN
     );
   END IF;
 
-  IF p_role IS NULL THEN
-    RETURN jsonb_build_object(
-      'success', FALSE,
-      'error', 'Role is required'
-    );
-  END IF;
-
   -- Get user details
   SELECT email, role INTO v_user_email, v_user_role
   FROM public.users
@@ -167,16 +82,23 @@ BEGIN
     );
   END IF;
 
-  -- Cast role to user_role type
-  v_new_role := p_role::user_role;
+  -- Update user to active and optionally set role
+  IF p_role IS NOT NULL AND p_role <> '' THEN
+    v_new_role := p_role::user_role;
 
-  -- Update user status and role
-  UPDATE public.users
-  SET
-    status = 'active',
-    updated_at = NOW(),
-    role = v_new_role
-  WHERE id = p_user_id;
+    UPDATE public.users
+    SET
+      is_active = TRUE,
+      updated_at = NOW(),
+      role = v_new_role
+    WHERE id = p_user_id;
+  ELSE
+    UPDATE public.users
+    SET
+      is_active = TRUE,
+      updated_at = NOW()
+    WHERE id = p_user_id;
+  END IF;
 
   -- Log the approval
   INSERT INTO public.audit_log (
@@ -192,7 +114,10 @@ BEGIN
     'users',
     p_user_id,
     jsonb_build_object('status', 'pending', 'role', v_user_role),
-    jsonb_build_object('status', 'active', 'role', v_new_role::TEXT),
+    jsonb_build_object(
+      'status', 'active',
+      'role', COALESCE(v_new_role::TEXT, v_user_role)
+    ),
     auth.uid(),
     NOW()
   );
@@ -202,8 +127,8 @@ BEGIN
     'message', 'User approved successfully',
     'user_id', p_user_id,
     'email', v_user_email,
-    'role', v_new_role::TEXT,
-    'status', 'active'
+    'role', COALESCE(v_new_role::TEXT, v_user_role),
+    'is_active', TRUE
   );
 
   RETURN v_result;
@@ -217,13 +142,89 @@ EXCEPTION WHEN OTHERS THEN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Grant execute permissions for both versions
-GRANT EXECUTE ON FUNCTION public.approve_user(UUID) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.approve_user(UUID, VARCHAR) TO authenticated;
+-- Grant execute permission for the single resolved function
+GRANT EXECUTE ON FUNCTION public.approve_user_admin(UUID, VARCHAR) TO authenticated;
 
 -- =========================================
 -- 3. REJECT USER FUNCTION
 -- =========================================
+DROP FUNCTION IF EXISTS public.assign_user_role_by_email(TEXT, TEXT) CASCADE;
+
+CREATE OR REPLACE FUNCTION public.assign_user_role_by_email(
+  p_email TEXT,
+  p_role TEXT DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_result JSONB;
+  v_user_id UUID;
+  v_user_role VARCHAR;
+BEGIN
+  IF p_email IS NULL OR p_email = '' THEN
+    RETURN jsonb_build_object(
+      'success', FALSE,
+      'error', 'Email is required'
+    );
+  END IF;
+
+  SELECT id, role INTO v_user_id, v_user_role
+  FROM public.users
+  WHERE LOWER(email) = LOWER(p_email)
+  LIMIT 1;
+
+  IF v_user_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', FALSE,
+      'error', 'User not found for email: ' || p_email
+    );
+  END IF;
+
+  IF p_role IS NOT NULL AND p_role <> '' THEN
+    IF LOWER(p_role) NOT IN ('manager', 'cashier', 'supplier') THEN
+      RETURN jsonb_build_object(
+        'success', FALSE,
+        'error', 'Role must be manager, cashier, or supplier'
+      );
+    END IF;
+
+    v_user_role := p_role;
+
+    UPDATE public.users
+    SET
+      role = p_role::user_role,
+      is_active = TRUE,
+      updated_at = NOW()
+    WHERE id = v_user_id;
+  ELSE
+    UPDATE public.users
+    SET
+      is_active = TRUE,
+      updated_at = NOW()
+    WHERE id = v_user_id;
+  END IF;
+
+  v_result := jsonb_build_object(
+    'success', TRUE,
+    'message', 'User assigned successfully',
+    'user_id', v_user_id,
+    'email', p_email,
+    'role', v_user_role,
+    'is_active', TRUE
+  );
+
+  RETURN v_result;
+
+EXCEPTION WHEN OTHERS THEN
+  RETURN jsonb_build_object(
+    'success', FALSE,
+    'error', 'Failed to assign user by email: ' || SQLERRM,
+    'error_code', SQLSTATE
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+GRANT EXECUTE ON FUNCTION public.assign_user_role_by_email(TEXT, TEXT) TO authenticated;
+
 DROP FUNCTION IF EXISTS public.reject_user(UUID, TEXT) CASCADE;
 DROP FUNCTION IF EXISTS public.reject_user(UUID) CASCADE;
 

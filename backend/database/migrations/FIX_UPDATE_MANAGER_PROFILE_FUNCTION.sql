@@ -6,12 +6,17 @@
 -- Ensure pgcrypto extension is enabled
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Drop existing function if it exists
+-- Drop existing overloads so PostgREST resolves a single candidate
 DROP FUNCTION IF EXISTS public.update_manager_profile_on_submission(
-  p_auth_id UUID,
-  p_full_name TEXT,
-  p_phone TEXT,
-  p_department TEXT
+  UUID,
+  TEXT,
+  TEXT
+) CASCADE;
+DROP FUNCTION IF EXISTS public.update_manager_profile_on_submission(
+  UUID,
+  TEXT,
+  TEXT,
+  TEXT
 ) CASCADE;
 
 -- Create the function to update manager profile on submission
@@ -19,7 +24,7 @@ CREATE OR REPLACE FUNCTION public.update_manager_profile_on_submission(
   p_auth_id UUID,
   p_full_name TEXT,
   p_phone TEXT,
-  p_department TEXT
+  p_department TEXT DEFAULT NULL
 )
 RETURNS JSONB AS $$
 DECLARE
@@ -50,14 +55,7 @@ BEGIN
     );
   END IF;
 
-  IF p_department IS NULL OR p_department = '' THEN
-    RETURN jsonb_build_object(
-      'success', FALSE,
-      'error', 'Department is required'
-    );
-  END IF;
-
-  -- Find the user by user id (auth_id parameter is actually the user.id from custom users table)
+  -- Find the user by ID (Supabase auth user ID is stored in users.id)
   SELECT id INTO v_user_id
   FROM public.users
   WHERE id = p_auth_id
@@ -85,11 +83,9 @@ BEGIN
   SET
     full_name = p_full_name,
     phone = p_phone,
-    department = p_department,
     role = 'manager',
     profile_completed = TRUE,
-    is_active = FALSE,  -- Pending admin approval
-    submitted_at = NOW()
+    is_active = FALSE  -- Pending admin approval
   WHERE id = v_user_id;
 
   -- Return success with admin assignment info

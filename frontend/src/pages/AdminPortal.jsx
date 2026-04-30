@@ -89,11 +89,19 @@ const AdminPortal = () => {
   // Pending Users State
   const [pendingUsers, setPendingUsers] = useState([]);
   const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [pendingRoleSelections, setPendingRoleSelections] = useState({});
 
   // All Registered Users State
   const [allUsers, setAllUsers] = useState([]);
   const [allUsersLoading, setAllUsersLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('pending'); // 'pending' or 'all'
+  
+  // Active/Inactive Users State
+  const [activeUsers, setActiveUsers] = useState([]);
+  const [inactiveUsers, setInactiveUsers] = useState([]);
+  const [activeUsersLoading, setActiveUsersLoading] = useState(false);
+  const [inactiveUsersLoading, setInactiveUsersLoading] = useState(false);
+  
+  const [viewMode, setViewMode] = useState('pending'); // 'pending', 'active', 'inactive', or 'all'
 
   // Mobile detection
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -244,27 +252,45 @@ const AdminPortal = () => {
     }
   }, []);
 
-  // Load ALL registered users from auth.users
+  // Load ALL registered users from auth.users AND public.users
   const loadAllUsers = useCallback(async () => {
     try {
       setAllUsersLoading(true);
       
-      // Try using RPC helper function that bypasses RLS
+      // ✅ Try using get_all_auth_users first - includes both public users and auth users
+      try {
+        const { data: authUsersData, error: authUsersError } = await supabase.rpc('get_all_auth_users');
+        
+        if (!authUsersError && authUsersData) {
+          // Transform to include verification status from actual email_verified field
+          const usersWithStatus = authUsersData.map(user => ({
+            ...user,
+            verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
+          }));
+          
+          setAllUsers(usersWithStatus);
+          console.log(`✅ Loaded ${usersWithStatus.length} users (from auth.users + public.users) via get_all_auth_users`);
+          return;
+        }
+        
+        console.log('⚠️ get_all_auth_users returned error, trying get_all_users_admin fallback');
+      } catch (authErr) {
+        console.warn('get_all_auth_users not available:', authErr.message);
+      }
+      
+      // Fallback: Try using RPC helper function for admin
       try {
         const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
         
         if (!rpcError && rpcData) {
-          // Transform to include verification status - approved = verified
+          // Transform to include verification status from actual email_verified field
           const usersWithStatus = rpcData.map(user => ({
             ...user,
-            email_verified: !!user.is_active,
-            verification_status: user.is_active ? '✅ Verified' : '⏳ Pending'
+            verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
           }));
           
           setAllUsers(usersWithStatus);
-          // DISABLED: Notification popup on page load
-          // notificationService.show(`Loaded ${usersWithStatus.length} registered users`, 'success');
-          console.log(`✅ Loaded ${usersWithStatus.length} users via RPC`);
+          console.log(`✅ Loaded ${usersWithStatus.length} users via get_all_users_admin (admin RPC)`);
           return;
         }
         
@@ -300,11 +326,10 @@ const AdminPortal = () => {
         return;
       }
       
-      // Transform to include verification status - approved = verified
+      // Transform to include verification status from actual email_verified field
       const usersWithStatus = (data || []).map(user => ({
         ...user,
-        email_verified: !!user.is_active,
-        verification_status: user.is_active ? '✅ Verified' : '⏳ Pending'
+        verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
       }));
       
       setAllUsers(usersWithStatus);
@@ -324,7 +349,115 @@ const AdminPortal = () => {
     }
   }, []);
 
-  // Load order statistics from Supabase
+  // Load ACTIVE users
+  const loadActiveUsers = useCallback(async () => {
+    try {
+      setActiveUsersLoading(true);
+      
+      console.log('🔍 Loading active users...');
+      
+      // Try using RPC function first
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
+        
+        if (!rpcError && rpcData) {
+          const active = rpcData.filter(u => u.is_active === true);
+          const usersWithStatus = active.map(user => ({
+            ...user,
+            verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
+          }));
+          
+          setActiveUsers(usersWithStatus);
+          console.log(`✅ Loaded ${usersWithStatus.length} active users via RPC`);
+          return;
+        }
+        
+        console.log('RPC function returned error or no data, trying direct query');
+      } catch (rpcErr) {
+        console.warn('RPC function not available:', rpcErr.message);
+      }
+      
+      // Fallback: Direct query
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Direct query error:', error);
+        return;
+      }
+      
+      const usersWithStatus = (data || []).map(user => ({
+        ...user,
+        verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
+      }));
+      
+      setActiveUsers(usersWithStatus);
+      console.log(`✅ Loaded ${usersWithStatus.length} active users from direct query`);
+      
+    } catch (error) {
+      console.error('Error loading active users:', error);
+    } finally {
+      setActiveUsersLoading(false);
+    }
+  }, []);
+
+  // Load INACTIVE users
+  const loadInactiveUsers = useCallback(async () => {
+    try {
+      setInactiveUsersLoading(true);
+      
+      console.log('🔍 Loading inactive users...');
+      
+      // Try using RPC function first
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('get_all_users_admin');
+        
+        if (!rpcError && rpcData) {
+          const inactive = rpcData.filter(u => u.is_active === false);
+          const usersWithStatus = inactive.map(user => ({
+            ...user,
+            verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
+          }));
+          
+          setInactiveUsers(usersWithStatus);
+          console.log(`✅ Loaded ${usersWithStatus.length} inactive users via RPC`);
+          return;
+        }
+        
+        console.log('RPC function returned error or no data, trying direct query');
+      } catch (rpcErr) {
+        console.warn('RPC function not available:', rpcErr.message);
+      }
+      
+      // Fallback: Direct query
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('is_active', false)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Direct query error:', error);
+        return;
+      }
+      
+      const usersWithStatus = (data || []).map(user => ({
+        ...user,
+        verification_status: user.email_verified ? '✅ Verified' : '⏳ Pending'
+      }));
+      
+      setInactiveUsers(usersWithStatus);
+      console.log(`✅ Loaded ${usersWithStatus.length} inactive users from direct query`);
+      
+    } catch (error) {
+      console.error('Error loading inactive users:', error);
+    } finally {
+      setInactiveUsersLoading(false);
+    }
+  }, []);
   const loadOrderStats = useCallback(async () => {
     try {
       console.log('📊 Loading order statistics...');
@@ -504,6 +637,10 @@ const AdminPortal = () => {
     if (activeSection === 'users') {
       if (viewMode === 'pending') {
         loadPendingUsers();
+      } else if (viewMode === 'active') {
+        loadActiveUsers();
+      } else if (viewMode === 'inactive') {
+        loadInactiveUsers();
       } else {
         loadAllUsers();
       }
@@ -535,7 +672,7 @@ const AdminPortal = () => {
       
       return () => clearInterval(refreshInterval);
     }
-  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers, loadOrderStats, loadDetailedOrders]);
+  }, [activeSection, viewMode, loadPendingUsers, loadAllUsers, loadActiveUsers, loadInactiveUsers, loadOrderStats, loadDetailedOrders]);
 
   // Real-time subscription for new user registrations
   useEffect(() => {
@@ -946,37 +1083,68 @@ const AdminPortal = () => {
     }
   };
 
-  // Approve a user
-  const approveUser = async (userId, userName, userEmail, userRole = null) => {
+  // Assign a role to a user
+  const assignUserRole = async (userEmail, userName, userRole = null) => {
     try {
-      // Call the approve_user() database function with optional role parameter
-      // This sets is_active=true AND role='manager' for managers
-      let rpcCall;
-      
-      // If we have a user role from the pending list, pass it to the RPC function
-      if (userRole) {
-        rpcCall = supabase.rpc('approve_user', { 
-          p_user_id: userId,
-          p_role: userRole 
-        });
-      } else {
-        // Fallback to basic approval (for backward compatibility)
-        rpcCall = supabase.rpc('approve_user', { 
-          p_user_id: userId 
-        });
-      }
-      
-      const { data, error } = await rpcCall;
+      // Call the email-based approval RPC so admins can assign users by email
+      const { data, error } = await supabase.rpc('assign_user_role_by_email', {
+        p_email: userEmail,
+        p_role: userRole
+      });
 
       if (error) throw error;
 
-      console.log('✅ User approved:', { userId, userName, userRole, data });
-      notificationService.show(`✅ ${userName} has been approved!`, 'success');
-      loadPendingUsers(); // Reload the list
+      console.log('✅ User role assigned:', { userEmail, userName, userRole, data });
+      
+      // IMMEDIATELY update UI - Remove from pending list
+      setPendingUsers(prev => prev.filter(u => u.email !== userEmail));
+      
+      // Add to active users list
+      const approvedUser = {
+        email: userEmail,
+        full_name: userName,
+        role: userRole,
+        is_active: true,
+        email_verified: true,
+        verification_status: '✅ Verified',
+        created_at: new Date().toISOString()
+      };
+      setActiveUsers(prev => [approvedUser, ...prev]);
+      
+      notificationService.show(`✅ ${userName} now has ${userRole || 'assigned'} access!`, 'success');
+      
+      // Also refresh both lists in background
+      setTimeout(() => {
+        loadPendingUsers();
+        loadActiveUsers();
+      }, 500);
+      
     } catch (error) {
       console.error('Error approving user:', error);
-      notificationService.show('Failed to approve user', 'error');
+      notificationService.show('Failed to assign user role', 'error');
     }
+  };
+
+  const updatePendingRoleSelection = (userEmail, role) => {
+    setPendingRoleSelections((current) => ({
+      ...current,
+      [userEmail]: role
+    }));
+  };
+
+  const getPendingRoleSelection = (user) => {
+    const selectableRoles = ['manager', 'cashier', 'supplier'];
+    const currentSelection = pendingRoleSelections[user.email];
+
+    if (selectableRoles.includes(currentSelection)) {
+      return currentSelection;
+    }
+
+    if (selectableRoles.includes(user.role)) {
+      return user.role;
+    }
+
+    return 'manager';
   };
 
   // Reject a user
@@ -990,8 +1158,15 @@ const AdminPortal = () => {
         console.log('Auth user still exists in auth.users, but access is revoked');
       }
 
+      // IMMEDIATELY update UI - Remove from pending list
+      setPendingUsers(prev => prev.filter(u => u.id !== userId));
+      
       notificationService.show(`❌ ${userName}'s application was rejected`, 'info');
-      loadPendingUsers(); // Reload the list
+      
+      // Refresh pending list in background
+      setTimeout(() => {
+        loadPendingUsers();
+      }, 500);
     } catch (error) {
       console.error('Error rejecting user:', error);
       notificationService.show('Failed to reject user', 'error');
@@ -1059,22 +1234,61 @@ const AdminPortal = () => {
             .from('users')
             .update({ is_active: true, status: 'active' })
             .eq('id', userId);
+          
+          // IMMEDIATELY update UI
+          setInactiveUsers(prev => prev.filter(u => u.id !== userId));
+          
           notificationService.show('User activated successfully', 'success');
+          
+          // Refresh lists in background
+          setTimeout(() => {
+            loadActiveUsers();
+            loadInactiveUsers();
+            loadAllUsers();
+          }, 300);
           break;
+          
         case 'deactivate':
           await supabase
             .from('users')
             .update({ is_active: false, status: 'inactive' })
             .eq('id', userId);
+          
+          // IMMEDIATELY update UI
+          setActiveUsers(prev => prev.filter(u => u.id !== userId));
+          
           notificationService.show('User deactivated successfully', 'success');
+          
+          // Refresh lists in background
+          setTimeout(() => {
+            loadActiveUsers();
+            loadInactiveUsers();
+            loadAllUsers();
+          }, 300);
           break;
+          
         case 'delete':
           if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
             await supabase
               .from('users')
               .delete()
               .eq('id', userId);
+            
+            // IMMEDIATELY update UI - remove from all lists
+            setPendingUsers(prev => prev.filter(u => u.id !== userId));
+            setActiveUsers(prev => prev.filter(u => u.id !== userId));
+            setInactiveUsers(prev => prev.filter(u => u.id !== userId));
+            setAllUsers(prev => prev.filter(u => u.id !== userId));
+            
             notificationService.show('User deleted successfully', 'success');
+            
+            // Refresh all lists in background
+            setTimeout(() => {
+              loadPendingUsers();
+              loadActiveUsers();
+              loadInactiveUsers();
+              loadAllUsers();
+            }, 300);
           }
           break;
         default:
@@ -3412,12 +3626,24 @@ const AdminPortal = () => {
 
                     {/* Action Buttons */}
                     <div className="flex items-center space-x-2 ml-4">
+                      <div className="min-w-[160px]">
+                        <label className="block text-xs font-semibold text-gray-500 mb-1">Assign role</label>
+                        <select
+                          value={getPendingRoleSelection(user)}
+                          onChange={(event) => updatePendingRoleSelection(user.email, event.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        >
+                          <option value="manager">Manager</option>
+                          <option value="cashier">Cashier</option>
+                          <option value="supplier">Supplier</option>
+                        </select>
+                      </div>
                       <button
-                        onClick={() => approveUser(user.id, user.full_name, user.email, user.role)}
+                        onClick={() => assignUserRole(user.email, user.full_name, getPendingRoleSelection(user))}
                         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2 font-medium"
                       >
                         <FiCheckCircle className="h-4 w-4" />
-                        <span>Approve</span>
+                          <span>Assign Role</span>
                       </button>
                       <button
                         onClick={() => {
@@ -3477,8 +3703,21 @@ const AdminPortal = () => {
     };
 
     // Get the current user list based on view mode
-    const currentUserList = viewMode === 'pending' ? pendingUsers : allUsers;
-    const currentLoading = viewMode === 'pending' ? approvalsLoading : allUsersLoading;
+    let currentUserList, currentLoading;
+    
+    if (viewMode === 'pending') {
+      currentUserList = pendingUsers;
+      currentLoading = approvalsLoading;
+    } else if (viewMode === 'active') {
+      currentUserList = activeUsers;
+      currentLoading = activeUsersLoading;
+    } else if (viewMode === 'inactive') {
+      currentUserList = inactiveUsers;
+      currentLoading = inactiveUsersLoading;
+    } else {
+      currentUserList = allUsers;
+      currentLoading = allUsersLoading;
+    }
 
     // Filter users
     const filteredUsers = currentUserList.filter(user => {
@@ -3525,15 +3764,19 @@ const AdminPortal = () => {
                 <p className="text-purple-100 text-xs md:text-sm lg:text-base truncate md:truncate">
                   {viewMode === 'pending' 
                     ? 'Review & approve pending • Auto-updates'
+                    : viewMode === 'active'
+                    ? 'View active users'
+                    : viewMode === 'inactive'
+                    ? 'View inactive users'
                     : 'View all registered users'}
                 </p>
               </div>
               <div className="flex items-center gap-1 md:gap-3 flex-shrink-0">
                 {/* View Mode Toggle */}
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg md:rounded-xl p-1 flex gap-0.5 md:gap-1">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg md:rounded-xl p-1 flex gap-0.5 md:gap-1 overflow-x-auto">
                   <button
                     onClick={() => setViewMode('pending')}
-                    className={`px-2 md:px-4 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 ${
+                    className={`px-2 md:px-3 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${
                       viewMode === 'pending'
                         ? 'bg-white text-purple-600 shadow-lg'
                         : 'text-white hover:bg-white/10'
@@ -3548,8 +3791,36 @@ const AdminPortal = () => {
                     )}
                   </button>
                   <button
+                    onClick={() => setViewMode('active')}
+                    className={`px-2 md:px-3 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${
+                      viewMode === 'active'
+                        ? 'bg-white text-purple-600 shadow-lg'
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <FiCheckCircle className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Active</span>
+                    <span className="bg-green-400 text-green-900 px-1.5 md:px-2 py-0.5 rounded-full text-xs font-bold">
+                      {activeUsers.length}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setViewMode('inactive')}
+                    className={`px-2 md:px-3 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${
+                      viewMode === 'inactive'
+                        ? 'bg-white text-purple-600 shadow-lg'
+                        : 'text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <FiAlertTriangle className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                    <span className="hidden sm:inline">Inactive</span>
+                    <span className="bg-orange-400 text-orange-900 px-1.5 md:px-2 py-0.5 rounded-full text-xs font-bold">
+                      {inactiveUsers.length}
+                    </span>
+                  </button>
+                  <button
                     onClick={() => setViewMode('all')}
-                    className={`px-2 md:px-4 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 ${
+                    className={`px-2 md:px-3 py-1 md:py-2 rounded-lg text-xs md:text-sm font-semibold transition-all duration-300 flex items-center gap-1 whitespace-nowrap ${
                       viewMode === 'all'
                         ? 'bg-white text-purple-600 shadow-lg'
                         : 'text-white hover:bg-white/10'
@@ -3564,7 +3835,12 @@ const AdminPortal = () => {
                 </div>
 
                 <button
-                  onClick={viewMode === 'pending' ? loadPendingUsers : loadAllUsers}
+                  onClick={() => {
+                    if (viewMode === 'pending') loadPendingUsers();
+                    else if (viewMode === 'active') loadActiveUsers();
+                    else if (viewMode === 'inactive') loadInactiveUsers();
+                    else loadAllUsers();
+                  }}
                   disabled={currentLoading}
                   className="px-2 md:px-6 py-1.5 md:py-3 bg-white text-purple-600 rounded-lg md:rounded-xl hover:bg-gray-50 transition-all duration-300 font-semibold flex items-center gap-1 md:gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 text-xs md:text-sm flex-shrink-0"
                 >
@@ -3625,21 +3901,23 @@ const AdminPortal = () => {
           </div>
 
           {/* Additional Filters for All Users View - Mobile Optimized */}
-          {viewMode === 'all' && (
+          {(viewMode === 'all' || viewMode === 'pending') && (
             <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-4">
-              {/* Status Filter */}
-              <div className="flex-1 w-full">
-                <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1 md:mb-2">Status</label>
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
-                >
-                  <option value="all">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
+              {/* Status Filter - Only for 'all' view */}
+              {viewMode === 'all' && (
+                <div className="flex-1 w-full">
+                  <label className="block text-xs md:text-sm font-medium text-gray-700 mb-1 md:mb-2">Status</label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full px-3 md:px-4 py-2 text-sm md:text-base border-2 border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-200"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              )}
 
               {/* Email Verification Filter */}
               <div className="flex-1 w-full">
@@ -3882,12 +4160,24 @@ const AdminPortal = () => {
                     <div className="flex items-center space-x-3 pt-4 border-t-2 border-gray-100">
                       {viewMode === 'pending' ? (
                         <>
+                          <div className="min-w-[180px] flex-1">
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Assign role</label>
+                            <select
+                              value={getPendingRoleSelection(user)}
+                              onChange={(event) => updatePendingRoleSelection(user.email, event.target.value)}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            >
+                              <option value="manager">Manager</option>
+                              <option value="cashier">Cashier</option>
+                              <option value="supplier">Supplier</option>
+                            </select>
+                          </div>
                           <button
-                            onClick={() => approveUser(user.id, user.full_name, user.email, user.role)}
+                            onClick={() => assignUserRole(user.email, user.full_name, getPendingRoleSelection(user))}
                             className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all duration-300 font-bold flex items-center justify-center space-x-2 shadow-lg hover:shadow-xl transform hover:scale-105"
                           >
                             <FiCheckCircle className="h-5 w-5" />
-                            <span>Approve</span>
+                            <span>Assign Role</span>
                           </button>
                           <button
                             onClick={() => {
@@ -3921,7 +4211,39 @@ const AdminPortal = () => {
                               onClick={() => {
                                 const action = user.is_active ? 'deactivate' : 'activate';
                                 if (window.confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${user.full_name}?`)) {
-                                  notificationService.show(`User ${action}d successfully`, 'success');
+                                  // ACTUALLY update the database
+                                  supabase
+                                    .from('users')
+                                    .update({ 
+                                      is_active: !user.is_active, 
+                                      status: user.is_active ? 'inactive' : 'active' 
+                                    })
+                                    .eq('id', user.id)
+                                    .then(() => {
+                                      // IMMEDIATELY update UI
+                                      if (user.is_active) {
+                                        // Moving to inactive
+                                        setActiveUsers(prev => prev.filter(u => u.id !== user.id));
+                                        setAllUsers(prev => prev.map(u => u.id === user.id ? {...u, is_active: false} : u));
+                                      } else {
+                                        // Moving to active
+                                        setInactiveUsers(prev => prev.filter(u => u.id !== user.id));
+                                        setAllUsers(prev => prev.map(u => u.id === user.id ? {...u, is_active: true} : u));
+                                      }
+                                      
+                                      notificationService.show(`User ${action}d successfully`, 'success');
+                                      
+                                      // Refresh all lists in background
+                                      setTimeout(() => {
+                                        loadActiveUsers();
+                                        loadInactiveUsers();
+                                        loadAllUsers();
+                                      }, 300);
+                                    })
+                                    .catch(error => {
+                                      console.error(`Error ${action} user:`, error);
+                                      notificationService.show(`Failed to ${action} user`, 'error');
+                                    });
                                 }
                               }}
                               className={`flex-1 px-4 py-3 bg-gradient-to-r ${
@@ -5743,8 +6065,26 @@ const AdminPortal = () => {
                         .update({ is_active: !selectedUser.is_active, status: selectedUser.is_active ? 'inactive' : 'active' })
                         .eq('id', selectedUser.id)
                         .then(() => {
+                          // IMMEDIATELY update UI
+                          if (selectedUser.is_active) {
+                            // Moving to inactive
+                            setActiveUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+                            setAllUsers(prev => prev.map(u => u.id === selectedUser.id ? {...u, is_active: false} : u));
+                          } else {
+                            // Moving to active
+                            setInactiveUsers(prev => prev.filter(u => u.id !== selectedUser.id));
+                            setAllUsers(prev => prev.map(u => u.id === selectedUser.id ? {...u, is_active: true} : u));
+                          }
+                          
                           notificationService.show(`User ${action}d successfully`, 'success');
-                          loadAllUsers();
+                          
+                          // Refresh all lists in background
+                          setTimeout(() => {
+                            loadAllUsers();
+                            loadActiveUsers();
+                            loadInactiveUsers();
+                          }, 300);
+                          
                           setShowUserDetailsModal(false);
                           setSelectedUser(null);
                         });
