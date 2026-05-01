@@ -17,6 +17,7 @@ const ManagerAuth = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showWaitingScreen, setShowWaitingScreen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -74,6 +75,86 @@ const ManagerAuth = () => {
     initAuth();
   }, []);
 
+  // Poll for role updates while on waiting screen
+  useEffect(() => {
+    if (!showWaitingScreen || !currentUser || isRedirecting) {
+      return;
+    }
+
+    console.log('🔄 Starting role update polling for:', currentUser.email);
+    let pollInterval = null;
+    let isCleanedUp = false;
+    
+    const startPolling = () => {
+      pollInterval = setInterval(async () => {
+        try {
+          // Check ALL records with this email (not just by auth_id)
+          // because admin might have set role to 'manager' in a different record
+          const { data: allUserRecords, error: fetchError } = await supabase
+            .from('users')
+            .select('id, auth_id, email, full_name, role, is_active, phone')
+            .eq('email', currentUser.email);
+
+          if (fetchError) {
+            console.error('⚠️  Error polling for updates:', fetchError);
+            return;
+          }
+
+          if (allUserRecords && allUserRecords.length > 0) {
+            console.log('📊 Found', allUserRecords.length, 'record(s) with email:', currentUser.email);
+            
+            // Check if ANY record has manager role and is active
+            const managerRecord = allUserRecords.find(u => u.role === 'manager' && u.is_active === true);
+            
+            if (managerRecord) {
+              console.log('✅ Manager role found in record:', managerRecord.id);
+              
+              // Stop polling immediately
+              if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+              }
+              isCleanedUp = true;
+              
+              // Prevent multiple redirects
+              if (isRedirecting) {
+                console.log('🛑 Already redirecting, skipping duplicate');
+                return;
+              }
+              
+              setIsRedirecting(true);
+              setShowWaitingScreen(false);
+              
+              notificationService.show('✅ Your manager account has been approved!', 'success');
+              
+              // Use setTimeout to ensure state updates are processed
+              // Then navigate (don't reload - let the component handle it)
+              setTimeout(() => {
+                console.log('🚀 Navigating to manager portal...');
+                navigate('/manager');
+              }, 1500);
+            } else {
+              // Log the current status for debugging
+              const userRecord = allUserRecords[0];
+              console.log('📊 Polled user data - Role:', userRecord.role, 'Active:', userRecord.is_active);
+            }
+          }
+        } catch (error) {
+          console.error('❌ Polling error:', error);
+        }
+      }, 3000); // Poll every 3 seconds
+    };
+    
+    startPolling();
+
+    return () => {
+      if (pollInterval && !isCleanedUp) {
+        clearInterval(pollInterval);
+        console.log('🛑 Stopped polling for role updates');
+      }
+    };
+  }, [showWaitingScreen, currentUser, isRedirecting, navigate]);
+
   const checkAuth = async () => {
     try {
       console.log('🔍 Checking manager authentication...');
@@ -119,12 +200,51 @@ const ManagerAuth = () => {
             .single();
 
           if (insertError) {
-            console.error('❌ Failed to create placeholder user record:', insertError);
-            throw insertError;
+            // If duplicate email+role constraint violation, try to fetch the existing record
+            if (insertError.code === '23505' || insertError.details?.includes('users_email_role_unique')) {
+              console.log('⚠️  User record already exists with this email+role. Fetching existing record...');
+              
+              const { data: existingData, error: fetchExistingError } = await supabase
+                .from('users')
+                .select('id, auth_id, email, full_name, role, is_active, phone')
+                .eq('email', user.email)
+                .eq('role', 'user')
+                .maybeSingle();
+              
+              if (fetchExistingError) {
+                console.error('❌ Failed to fetch existing user record:', fetchExistingError);
+                throw fetchExistingError;
+              }
+              
+              if (existingData) {
+                console.log('✅ Using existing user record:', existingData);
+                userData = existingData;
+                
+                // Update auth_id if it's null
+                if (!existingData.auth_id) {
+                  const { data: updatedData, error: updateError } = await supabase
+                    .from('users')
+                    .update({ auth_id: user.id, updated_at: new Date().toISOString() })
+                    .eq('id', existingData.id)
+                    .select('id, auth_id, email, full_name, role, is_active, phone')
+                    .single();
+                  
+                  if (updateError) {
+                    console.error('⚠️  Could not update auth_id:', updateError);
+                    // Non-fatal - continue with existing data
+                  } else {
+                    userData = updatedData;
+                  }
+                }
+              }
+            } else {
+              console.error('❌ Failed to create placeholder user record:', insertError);
+              throw insertError;
+            }
+          } else {
+            userData = insertData;
+            console.log('✅ Placeholder user record created:', userData);
           }
-
-          userData = insertData;
-          console.log('✅ Placeholder user record created:', userData);
         } else if (fetchError) {
           console.error('❌ Database error:', fetchError);
           throw fetchError;
@@ -141,7 +261,7 @@ const ManagerAuth = () => {
         } else {
           console.log('⏳ Manager role not assigned yet - Showing waiting screen');
           setShowWaitingScreen(true);
-          await supabase.auth.signOut();
+          // Don't sign out — keep user logged in so polling can detect role updates
         }
       } else {
         console.log('❌ No authenticated user found');
@@ -327,22 +447,44 @@ const ManagerAuth = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-600 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 md:p-12 text-center">
-          <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 animate-pulse">
             <FiClock className="w-12 h-12 text-white" />
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Wait for Your Role
+            Waiting for Manager Approval
           </h1>
-          <p className="text-gray-600 text-lg leading-relaxed">
-            Your Google account has been received. An admin will assign your role as manager, cashier, or supplier, then you can sign in to the correct dashboard.
+          <p className="text-gray-600 text-lg leading-relaxed mb-6">
+            Your account has been created. An admin will assign your role as manager, then you'll be able to access the manager portal.
           </p>
-          <div className="mt-8 inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700">
-            <FiClock className="w-4 h-4" />
-            Awaiting role assignment
+          
+          <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded mb-6 text-left">
+            <p className="text-sm text-blue-700">
+              <span className="font-semibold">📧 Email:</span> {currentUser?.email}
+            </p>
+            <p className="text-xs text-blue-600 mt-2">
+              ✓ The system is automatically checking for role updates every 3 seconds
+            </p>
           </div>
-          <p className="mt-6 text-sm text-gray-500">
-            If you already requested access, please check back after the admin assigns your role.
+
+          <div className="inline-flex items-center gap-2 rounded-full bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 mb-6">
+            <FiClock className="w-4 h-4 animate-spin" />
+            Auto-checking for updates...
+          </div>
+          
+          <p className="text-sm text-gray-500 mb-6">
+            Once the admin approves you, this page will automatically redirect you to the manager dashboard.
           </p>
+
+          <button
+            onClick={() => {
+              console.log('🔄 Manual refresh triggered');
+              checkAuth();
+            }}
+            className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-6 rounded-lg transition"
+          >
+            <FiArrowRight className="w-4 h-4" />
+            Check Now
+          </button>
         </div>
       </div>
     );

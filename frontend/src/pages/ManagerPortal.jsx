@@ -289,83 +289,7 @@ const ManagerPortal = () => {
   });
   
   // Enhanced Notifications System
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'urgent',
-      title: 'Critical Stock Alert',
-      message: 'iPhone 15 Pro Max inventory critically low - Only 2 units remaining',
-      time: '2 minutes ago',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000),
-      icon: '⚠️',
-      color: 'bg-red-100 text-red-800 border-red-200',
-      unread: true,
-      category: 'inventory',
-      action: 'reorder',
-      priority: 'high',
-      ugandaContext: 'Kampala store'
-    },
-    {
-      id: 2,
-      type: 'success',
-      title: 'Mobile Money Payment Received',
-      message: 'MTN Mobile Money payment of UGX 450,000 processed successfully from customer Nakato Grace',
-      time: '8 minutes ago',
-      timestamp: new Date(Date.now() - 8 * 60 * 1000),
-      icon: '💰',
-      color: 'bg-green-100 text-green-800 border-green-200',
-      unread: true,
-      category: 'payment',
-      action: 'view_receipt',
-      priority: 'medium',
-      ugandaContext: 'MTN MoMo'
-    },
-    {
-      id: 3,
-      type: 'info',
-      title: 'New Supplier Order',
-      message: 'Order #PO-2024-087 received from Tech Solutions Ltd - Requires manager approval',
-      time: '15 minutes ago',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000),
-      icon: '📦',
-      color: 'bg-blue-100 text-blue-800 border-blue-200',
-      unread: true,
-      category: 'orders',
-      action: 'approve_order',
-      priority: 'medium',
-      ugandaContext: 'Kampala supplier'
-    },
-    {
-      id: 4,
-      type: 'achievement',
-      title: 'Team Performance Milestone',
-      message: 'Sarah Nakiyonga completed "Customer Excellence Training" with 98% score',
-      time: '1 hour ago',
-      timestamp: new Date(Date.now() - 60 * 60 * 1000),
-      icon: '🏆',
-      color: 'bg-purple-100 text-purple-800 border-purple-200',
-      unread: false,
-      category: 'team',
-      action: 'view_certificate',
-      priority: 'low',
-      ugandaContext: 'Uganda team'
-    },
-    {
-      id: 5,
-      type: 'warning',
-      title: 'Delivery Delay Notice',
-      message: 'Fresh vegetables delivery from Wakiso farmers delayed by 45 minutes due to Kampala traffic',
-      time: '2 hours ago',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      icon: '🚛',
-      color: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      unread: false,
-      category: 'logistics',
-      action: 'update_schedule',
-      priority: 'medium',
-      ugandaContext: 'Wakiso-Kampala route'
-    }
-  ]);
+  const [notifications, setNotifications] = useState([]);
   
   const [notificationCount, setNotificationCount] = useState(
     notifications.filter(n => n.unread).length
@@ -911,7 +835,8 @@ const ManagerPortal = () => {
           timestamp: new Date().toISOString()
         }));
         
-        toast.success('✅ Portal Control System Connected');
+        // Notification removed - no auto-notifications on load
+        // toast.success('✅ Portal Control System Connected');
       };
       
       ws.onmessage = (event) => {

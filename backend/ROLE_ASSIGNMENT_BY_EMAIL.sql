@@ -4,7 +4,7 @@
 -- ================================================================
 -- Use this after Google sign-in:
 -- - Admin assigns a user by email
--- - Allowed roles: manager, cashier, supplier
+-- - Allowed roles: admin, manager, cashier, supplier
 -- - User is activated immediately after role assignment
 -- ================================================================
 
@@ -41,10 +41,10 @@ BEGIN
   END IF;
 
   IF p_role IS NOT NULL AND p_role <> '' THEN
-    IF LOWER(p_role) NOT IN ('manager', 'cashier', 'supplier') THEN
+    IF LOWER(p_role) NOT IN ('admin', 'manager', 'cashier', 'supplier') THEN
       RETURN jsonb_build_object(
         'success', FALSE,
-        'error', 'Role must be manager, cashier, or supplier'
+        'error', 'Role must be admin, manager, cashier, or supplier'
       );
     END IF;
 
@@ -88,6 +88,7 @@ GRANT EXECUTE ON FUNCTION public.assign_user_role_by_email(TEXT, TEXT) TO authen
 -- ================================================================
 -- TEST
 -- ================================================================
+-- SELECT public.assign_user_role_by_email('user@example.com', 'admin');
 -- SELECT public.assign_user_role_by_email('user@example.com', 'manager');
 -- SELECT public.assign_user_role_by_email('user@example.com', 'cashier');
 -- SELECT public.assign_user_role_by_email('user@example.com', 'supplier');
