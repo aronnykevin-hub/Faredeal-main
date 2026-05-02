@@ -525,10 +525,10 @@ const CashierPortal = () => {
             email: user.email,
             full_name: user.user_metadata?.full_name || 'Cashier',
             employee_id: 'CASH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-            department: 'Front End Operations',
             phone: user.user_metadata?.phone || '+256',
             role: 'cashier',
             metadata: {
+              department: 'Front End Operations',
               shift: 'Morning Shift',
               register: 'Till #1',
               manager: 'Manager',
@@ -560,7 +560,6 @@ const CashierPortal = () => {
           .update({
             full_name: existingProfile.full_name || user.user_metadata?.full_name || 'Cashier',
             employee_id: existingProfile.employee_id || 'CASH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
-            department: existingProfile.department || 'Front End Operations',
             phone: existingProfile.phone || user.user_metadata?.phone || '+256'
           })
           .eq('auth_id', user.id);

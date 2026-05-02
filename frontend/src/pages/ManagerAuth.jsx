@@ -42,10 +42,7 @@ const ManagerAuth = () => {
 
       if (error) throw error;
 
-      notificationService.show(
-        '🔄 Redirecting to Google...',
-        'info'
-      );
+      // OAuth redirect initiated
 
     } catch (error) {
       console.error('Google sign-in error:', error);
@@ -125,7 +122,7 @@ const ManagerAuth = () => {
               setIsRedirecting(true);
               setShowWaitingScreen(false);
               
-              notificationService.show('✅ Your manager account has been approved!', 'success');
+              console.log('✅ Your manager account has been approved!');
               
               // Use setTimeout to ensure state updates are processed
               // Then navigate (don't reload - let the component handle it)
@@ -256,7 +253,6 @@ const ManagerAuth = () => {
 
         if (hasManagerRole && isActiveManager) {
           console.log('✅ Manager role assigned - Redirecting to Manager Portal');
-          notificationService.show('✅ Welcome back!', 'success');
           navigate('/manager');
         } else {
           console.log('⏳ Manager role not assigned yet - Showing waiting screen');
@@ -359,7 +355,6 @@ const ManagerAuth = () => {
         timestamp: Date.now()
       }));
 
-      notificationService.show('✅ Welcome back, Manager!', 'success');
       navigate('/manager-portal');
 
     } catch (error) {
@@ -400,13 +395,7 @@ const ManagerAuth = () => {
 
       console.log('✅ Manager registered:', data);
 
-      notificationService.show(
-        '✅ Application submitted! Your manager account is pending admin approval.',
-        'success',
-        5000
-      );
-
-      // Switch to login view
+      // Switch to login view after successful registration
       setTimeout(() => {
         setIsLogin(true);
         setFormData({

@@ -129,13 +129,13 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             },
             audio: false
           }),
-          // Faster timeout - 3 seconds for mobile
+          // Timeout - 8 seconds for mobile
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 3000)
+            setTimeout(() => reject(new Error('Timeout')), 8000)
           )
         ]);
       } catch (error) {
-        console.warn('⚠️ Full HD constraints failed, trying VGA...');
+        console.debug('Full HD constraints failed, trying VGA...');
         constraintsFailed = true;
         
         try {
@@ -150,11 +150,11 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               audio: false
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 2000)
+              setTimeout(() => reject(new Error('Timeout')), 6000)
             )
           ]);
         } catch (error2) {
-          console.warn('⚠️ VGA constraints failed, trying any camera...');
+          console.debug('VGA constraints failed, trying any camera...');
           
           // Attempt 3: Absolutely minimal constraints with fast timeout
           stream = await Promise.race([
@@ -163,7 +163,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               audio: false
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 2000)
+              setTimeout(() => reject(new Error('Timeout')), 5000)
             )
           ]);
         }
