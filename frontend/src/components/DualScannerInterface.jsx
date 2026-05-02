@@ -126,6 +126,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       
       try {
         // Attempt 1: Optimized for mobile - back camera, VGA or better
+        // IMPORTANT: Permission dialog can take 10-15+ seconds on first load
         stream = await Promise.race([
           navigator.mediaDevices.getUserMedia({
             video: {
@@ -136,7 +137,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             audio: false
           }),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
+            setTimeout(() => reject(new Error('Timeout')), 15000) // 15s timeout (allows for permission prompt)
           )
         ]);
       } catch (error) {
@@ -149,7 +150,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
             audio: false
           }),
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 4000) // 4s timeout
+            setTimeout(() => reject(new Error('Timeout')), 10000) // 10s timeout
           )
         ]);
       }
