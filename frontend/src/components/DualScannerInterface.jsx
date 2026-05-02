@@ -48,16 +48,13 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const [showAddedProducts, setShowAddedProducts] = useState(false); // Toggle added products panel
   const [showSoldProducts, setShowSoldProducts] = useState(false); // Toggle sold products panel
 
-  //  Initialize Camera Scanner
+  //  Initialize Camera Scanner - NO DELAY FOR FAST LOAD
   useEffect(() => {
     if (scanMode === 'camera' || scanMode === 'smart') {
-      // Small delay to ensure video element is mounted
-      const initDelay = setTimeout(() => {
-        initializeCamera();
-      }, 100);
+      // Initialize camera IMMEDIATELY - no 100ms delay
+      initializeCamera();
       
       return () => {
-        clearTimeout(initDelay);
         // Stop detection if running
         if (videoRef.current?._stopDetection) {
           videoRef.current._stopDetection();
@@ -76,17 +73,26 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     };
   }, [scanMode]);
 
-  // � Load products from Supabase on mount
+  // 📦 Load products from Supabase AFTER camera is active (non-blocking)
   useEffect(() => {
-    loadProductsFromSupabase();
-    startNoActivityTimer();
+    // Start loading products asynchronously after a brief delay
+    // This doesn't block camera initialization
+    const loadTimer = setTimeout(() => {
+      loadProductsFromSupabase();
+    }, 300); // Stagger after camera init completes
+    
+    // Start no-activity timer only after camera is ready
+    const activityDelay = setTimeout(() => {
+      startNoActivityTimer();
+    }, 500); // Start after camera is fully initialized
     
     return () => {
-      if (noActivityTimer) clearTimeout(noActivityTimer);
+      clearTimeout(loadTimer);
+      clearTimeout(activityDelay);
     };
   }, []);
 
-  // �🔫 Initialize Gun Scanner Listener
+  // 🔫 Initialize Gun Scanner Listener - parallel with camera
   useEffect(() => {
     if (scanMode === 'gun' || scanMode === 'smart') {
       initializeGunScanner();
@@ -99,11 +105,13 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   }, [scanMode]);
 
   const initializeCamera = async () => {
+    let streamToCleanup = null;
+    let isPlaybackStarted = false; // Track playback locally instead of using stale state
+    
     try {
       // Check if video element exists
       if (!videoRef.current) {
         console.error('❌ Video element not ready');
-        toast.error('❌ Video element not initialized');
         return;
       }
 
@@ -114,66 +122,44 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
 
       console.log('📸 Requesting camera permissions...');
       
-      // Try with ideal constraints first, but fail gracefully
       let stream = null;
-      let constraintsFailed = false;
       
       try {
-        // Attempt 1: Mobile-optimized constraints - back camera with reasonable size
+        // Attempt 1: Optimized for mobile - back camera, VGA or better
         stream = await Promise.race([
           navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: { ideal: 'environment' },
-              width: { ideal: 1280, min: 480 },
-              height: { ideal: 720, min: 320 }
+              width: { ideal: 640, max: 1280 },
+              height: { ideal: 480, max: 720 }
             },
             audio: false
           }),
-          // Timeout - 8 seconds for mobile
           new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Timeout')), 8000)
+            setTimeout(() => reject(new Error('Timeout')), 5000) // 5s timeout
           )
         ]);
       } catch (error) {
-        console.debug('Full HD constraints failed, trying VGA...');
-        constraintsFailed = true;
+        console.debug('Optimized constraints failed, trying minimal...');
         
-        try {
-          // Attempt 2: VGA resolution with basic constraints
-          stream = await Promise.race([
-            navigator.mediaDevices.getUserMedia({
-              video: {
-                facingMode: { ideal: 'environment' },
-                width: { ideal: 640 },
-                height: { ideal: 480 }
-              },
-              audio: false
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 6000)
-            )
-          ]);
-        } catch (error2) {
-          console.debug('VGA constraints failed, trying any camera...');
-          
-          // Attempt 3: Absolutely minimal constraints with fast timeout
-          stream = await Promise.race([
-            navigator.mediaDevices.getUserMedia({
-              video: { facingMode: { ideal: 'environment' } },
-              audio: false
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), 5000)
-            )
-          ]);
-        }
+        // Attempt 2: Minimal constraints - just get any camera
+        stream = await Promise.race([
+          navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 4000) // 4s timeout
+          )
+        ]);
       }
       
       if (!stream || !stream.active) {
         throw new Error('Failed to get active camera stream');
       }
 
-      console.log('✅ Camera stream obtained' + (constraintsFailed ? ' (with fallback constraints)' : ''));
+      streamToCleanup = stream;
+      console.log('✅ Camera stream obtained');
       
       // Double-check video ref still exists
       if (!videoRef.current) {
@@ -182,12 +168,10 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         return;
       }
       
-      // Prepare video element BEFORE attaching stream
+      // Prepare and attach stream immediately
       const video = videoRef.current;
       video.playsInline = true;
       video.muted = true;
-      
-      // Attach stream to video element
       video.srcObject = stream;
       streamRef.current = stream;
       
@@ -208,223 +192,58 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
         }
       };
       
-      // Wait for video metadata to load
-      metadataHandler = () => {
-        console.log('📹 Video metadata loaded, attempting playback...');
-        if (!videoRef.current) {
-          console.error('❌ Video reference lost during metadata load');
-          cleanupHandlers();
-          return;
-        }
-
-        videoRef.current.play()
+      // Handle video playback ready
+      const startPlayback = () => {
+        if (isPlaybackStarted) return; // Prevent multiple attempts
+        isPlaybackStarted = true;
+        
+        videoRef.current?.play()
           .then(() => {
             console.log('✅ Video playback started');
             setCameraActive(true);
-            console.log('✅ Camera initialized and ready for barcode detection');
-            toast.success('📸 Camera activated - point at barcode');
+            console.log('✅ Camera ready for barcode detection');
             startBarcodeDetection();
             cleanupHandlers();
           })
           .catch(err => {
             console.error('❌ Video play error:', err);
-            toast.error('Failed to play video: ' + (err.message || 'Unknown error'));
             setCameraActive(false);
             cleanupHandlers();
           });
       };
       
-      // Fallback: use canplay event if metadata doesn't fire
+      // Wait for video metadata
+      metadataHandler = () => {
+        console.log('📹 Metadata loaded');
+        startPlayback();
+      };
+      
+      // Fallback: use canplay event
       canplayHandler = () => {
-        console.log('📹 Video canplay event triggered');
-        if (!videoRef.current) {
-          cleanupHandlers();
-          return;
-        }
-
-        videoRef.current.play()
-          .then(() => {
-            console.log('✅ Video playback started (canplay fallback)');
-            setCameraActive(true);
-            console.log('✅ Camera initialized and ready for barcode detection');
-            toast.success('📸 Camera activated - point at barcode');
-            startBarcodeDetection();
-            cleanupHandlers();
-          })
-          .catch(err => {
-            console.error('❌ Video play error (canplay):', err);
-            setCameraActive(false);
-            cleanupHandlers();
-          });
+        console.log('📹 Canplay event');
+        startPlayback();
       };
       
       video.addEventListener('loadedmetadata', metadataHandler);
       video.addEventListener('canplay', canplayHandler);
       
-      console.log('📺 Video element ready, waiting for media to load...');
-      
-      // Timeout if neither event fires within 5 seconds (faster for mobile)
+      // Timeout to force playback if events don't fire: 4 seconds
       timeoutId = setTimeout(() => {
-        if (!cameraActive) {
-          console.error('❌ Camera initialization timeout - no media event fired');
-          console.warn('⚠️ Force-starting video playback...');
+        if (!isPlaybackStarted) {
+          console.warn('⚠️ Media event timeout, force-starting playback...');
           cleanupHandlers();
-          
-          // Try to play anyway - sometimes video plays without events
-          video.play()
-            .then(() => {
-              console.log('✅ Video playback started (forced)');
-              setCameraActive(true);
-              toast.success('📸 Camera activated - point at barcode');
-              startBarcodeDetection();
-            })
-            .catch(err => {
-              console.error('❌ Force-play failed:', err);
-              toast.error('Camera timeout - please try again');
-              setCameraActive(false);
-              
-              // Clean up current stream
-              if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop());
-                streamRef.current = null;
-              }
-            });
+          startPlayback();
         }
-      }, 5000);
+      }, 4000); // 4s timeout for media events
       
     } catch (error) {
       console.error('📸 Camera Error:', error);
-      
-      // Provide specific error messages
-      if (error.name === 'NotAllowedError') {
-        // toast.error('❌ Camera permission denied. Please allow camera access.');
-      } else if (error.name === 'NotFoundError') {
-        // toast.error('❌ No camera found on this device.');
-      } else if (error.name === 'NotSupportedError') {
-        // toast.error('❌ Camera access not supported. Use HTTPS connection.');
-      } else if (error.name === 'OverconstrainedError') {
-        console.warn('⚠️ Camera constraints not supported, retrying with fallback...');
-        // toast.error('❌ Camera constraints not supported. Retrying...');
-        retryWithFallbackConstraints();
-        return;
-      } else if (error.name === 'AbortError') {
-        console.error('❌ Camera timeout or aborted:', error.message);
-        // toast.error('❌ Camera timeout - device may be busy. Please try again.');
-      } else {
-        // toast.error('❌ Camera error: ' + (error.message || 'Unknown error'));
-      }
-      
       setCameraActive(false);
-    }
-  };
-
-  const retryWithFallbackConstraints = async () => {
-    try {
-      console.log('🔄 Retrying with fallback camera constraints (basic video only)...');
       
-      if (!videoRef.current) {
-        console.error('❌ Video element not available for fallback');
-        return;
+      // Clean up stream if still available
+      if (streamToCleanup) {
+        streamToCleanup.getTracks().forEach(track => track.stop());
       }
-
-      // Request with NO constraints - let browser choose
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: false
-      });
-      
-      if (!stream || !stream.active) {
-        throw new Error('Fallback stream failed');
-      }
-
-      console.log('✅ Fallback stream obtained');
-
-      const video = videoRef.current;
-      video.srcObject = stream;
-      streamRef.current = stream;
-      video.playsInline = true;
-      video.muted = true;
-
-      let metadataHandler;
-      let canplayHandler;
-      let timeoutId;
-      let handlerCleanup = false;
-
-      const cleanupHandlers = () => {
-        if (handlerCleanup) return;
-        handlerCleanup = true;
-        if (video) {
-          video.removeEventListener('loadedmetadata', metadataHandler);
-          video.removeEventListener('canplay', canplayHandler);
-          if (timeoutId) clearTimeout(timeoutId);
-        }
-      };
-
-      metadataHandler = () => {
-        console.log('📹 Fallback: Video metadata loaded');
-        if (!videoRef.current) {
-          cleanupHandlers();
-          return;
-        }
-        
-        videoRef.current.play()
-          .then(() => {
-            setCameraActive(true);
-            console.log('✅ Camera fallback initialized');
-            toast.success('📸 Camera activated (fallback mode)');
-            startBarcodeDetection();
-            cleanupHandlers();
-          })
-          .catch(err => {
-            console.error('❌ Fallback playback error:', err);
-            setCameraActive(false);
-            cleanupHandlers();
-          });
-      };
-
-      canplayHandler = () => {
-        console.log('📹 Fallback: Video canplay event triggered');
-        if (!videoRef.current) {
-          cleanupHandlers();
-          return;
-        }
-        
-        videoRef.current.play()
-          .then(() => {
-            setCameraActive(true);
-            console.log('✅ Camera fallback initialized (canplay)');
-            toast.success('📸 Camera activated (fallback mode)');
-            startBarcodeDetection();
-            cleanupHandlers();
-          })
-          .catch(err => {
-            console.error('❌ Fallback playback error (canplay):', err);
-            setCameraActive(false);
-            cleanupHandlers();
-          });
-      };
-
-      video.addEventListener('loadedmetadata', metadataHandler);
-      video.addEventListener('canplay', canplayHandler);
-
-      timeoutId = setTimeout(() => {
-        if (!cameraActive) {
-          console.error('❌ Fallback camera initialization timeout');
-          toast.error('❌ Unable to initialize camera');
-          cleanupHandlers();
-          setCameraActive(false);
-          
-          if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-          }
-        }
-      }, 3000);
-
-    } catch (error) {
-      console.error('❌ Fallback camera initialization failed:', error);
-      toast.error('❌ Unable to access camera: ' + (error.message || 'Unknown error'));
-      setCameraActive(false);
     }
   };
 
@@ -1735,10 +1554,11 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                     autoPlay
                     playsInline
                     className="w-full h-full object-cover"
+                    style={{ display: 'block' }}
                   />
                   <canvas
                     ref={canvasRef}
-                    className="hidden"
+                    style={{ display: 'none', width: 0, height: 0 }}
                   />
                   {cameraActive && (
                     <>
