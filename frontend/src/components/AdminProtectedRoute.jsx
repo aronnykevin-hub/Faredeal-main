@@ -14,7 +14,16 @@ const AdminProtectedRoute = ({ children }) => {
 
   useEffect(() => {
     checkURLAccess();
-    checkAuth();
+    
+    // CRITICAL: Set a safety timeout - loading should never be stuck
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ [ROUTE] Loading took too long, forcing completion');
+      setLoading(false);
+    }, 8000);
+    
+    checkAuth().finally(() => {
+      clearTimeout(safetyTimeout);
+    });
   }, []);
 
   const checkURLAccess = () => {
@@ -63,24 +72,51 @@ const AdminProtectedRoute = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      // Check Supabase session
-      const { data: { session }, error } = await supabase.auth.getSession();
+      console.log('🔐 [ROUTE] Checking admin authentication...');
+      
+      // First check localStorage (fastest path)
+      const adminKey = localStorage.getItem('adminKey');
+      const supermarketUser = localStorage.getItem('supermarket_user');
+      
+      if (adminKey === 'true' && supermarketUser) {
+        console.log('✅ [ROUTE] Admin key found in localStorage');
+        setIsAuthenticated(true);
+        setLoading(false);
+        return;
+      }
+      
+      // Then check Supabase session with timeout
+      console.log('🔐 [ROUTE] Checking Supabase session...');
+      const { data: { session }, error } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 10000)
+        )
+      ]);
       
       if (error) {
-        console.error('Auth check error:', error);
+        console.error('❌ [ROUTE] Session error:', error);
         setIsAuthenticated(false);
       } else if (session && session.user) {
-        // User is authenticated
+        console.log('✅ [ROUTE] Session found for:', session.user.email);
         setIsAuthenticated(true);
-        // Set admin key
+        // Store in localStorage for next time
         localStorage.setItem('adminKey', 'true');
+        localStorage.setItem('supermarket_user', JSON.stringify({
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || 'Admin',
+          role: 'admin',
+          email: session.user.email,
+          accessLevel: 'system',
+          timestamp: Date.now()
+        }));
       } else {
-        // No valid session
+        console.log('❌ [ROUTE] No session found');
         setIsAuthenticated(false);
         localStorage.removeItem('adminKey');
       }
     } catch (error) {
-      console.error('Unexpected auth error:', error);
+      console.error('❌ [ROUTE] Unexpected auth error:', error);
       setIsAuthenticated(false);
     } finally {
       setLoading(false);

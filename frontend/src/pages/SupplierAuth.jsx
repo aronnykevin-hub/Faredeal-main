@@ -61,8 +61,8 @@ const SupplierAuth = () => {
 
       let { data: userData, error: fetchError } = await supabase
         .from('users')
-        .select('auth_id, email, full_name, role, is_active')
-        .eq('auth_id', user.id)
+        .select('*')
+        .eq('id', user.id)
         .maybeSingle();
 
       if (fetchError) {
@@ -70,39 +70,41 @@ const SupplierAuth = () => {
       }
 
       if (!userData) {
-        console.log('📝 Creating placeholder supplier user in database...');
+        console.log('📝 Creating/linking supplier user record...');
+        
+        // Use upsert to handle duplicates gracefully
         const { data: newUser, error: createError } = await supabase
           .from('users')
-          .insert([{
+          .upsert({
+            id: user.id,
             auth_id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
             role: 'user',
             is_active: false,
             profile_completed: false,
-            created_at: new Date().toISOString()
-          }])
-          .select('auth_id, email, full_name, role, is_active')
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'id'
+          })
+          .select('*')
           .single();
 
         if (createError) {
-          console.error('❌ Error creating user:', createError);
-          if (createError.code === '23505') {
-            console.log('🔄 User already exists, fetching existing record...');
-            const { data: existingUser, error: existingError } = await supabase
-              .from('users')
-              .select('auth_id, email, full_name, role, is_active')
-              .eq('auth_id', user.id)
-              .maybeSingle();
+          console.error('❌ Error creating/linking user:', createError);
+          // Try to fetch the record again
+          const { data: existingUser, error: existingError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
 
-            if (existingError) {
-              throw existingError;
-            }
-
-            userData = existingUser;
-          } else {
-            throw createError;
+          if (existingError) {
+            throw existingError;
           }
+
+          userData = existingUser;
         } else {
           userData = newUser;
         }

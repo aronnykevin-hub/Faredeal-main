@@ -150,7 +150,7 @@ export const optimizedApiCall = async (fn, options = {}) => {
     maxRetries = 3,
     initialDelay = 500,
     maxDelay = 5000,
-    timeout = 30000
+    timeout = 45000  // Increased from 30s to 45s for slower connections
   } = options;
 
   let lastError;
@@ -158,14 +158,19 @@ export const optimizedApiCall = async (fn, options = {}) => {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await executeWithTimeout(fn, timeout);
+      // Use adaptive timeout - longer for retries
+      const adaptiveTimeout = timeout + (attempt * 10000);
+      console.log(`⏱️ [RETRY ${attempt + 1}/${maxRetries + 1}] Timeout: ${adaptiveTimeout}ms`);
+      return await executeWithTimeout(fn, adaptiveTimeout);
     } catch (error) {
       lastError = error;
+      console.warn(`⚠️ [RETRY ${attempt + 1}] Error:`, error.message);
 
       if (attempt < maxRetries) {
         // Exponential backoff with jitter
         const jitter = Math.random() * 1000;
         const waitTime = Math.min(delay + jitter, maxDelay);
+        console.log(`⏳ Waiting ${waitTime.toFixed(0)}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         delay *= 2;
       }

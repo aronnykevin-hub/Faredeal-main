@@ -28,11 +28,34 @@ export default function AdminUserManagement() {
   const loadAllUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_all_auth_users');
-      if (error) throw error;
-      setUsers(data || []);
+      // Try RPC first
+      try {
+        const { data, error } = await supabase.rpc('get_all_auth_users');
+        if (!error && data) {
+          setUsers(data || []);
+          console.log(`✅ Loaded ${data.length} users via get_all_auth_users RPC`);
+          return;
+        }
+      } catch (rpcErr) {
+        console.warn('⚠️ RPC not available, using direct query');
+      }
+
+      // Fallback: Direct query from users table
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        setMessage('Error loading users: ' + error.message);
+        console.error('Query error:', error);
+      } else {
+        setUsers(data || []);
+        console.log(`✅ Loaded ${(data || []).length} users via direct query`);
+      }
     } catch (error) {
       setMessage('Error: ' + error.message);
+      console.error('Unexpected error:', error);
     } finally {
       setLoading(false);
     }
@@ -41,11 +64,45 @@ export default function AdminUserManagement() {
   const searchUsers = async (query) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('search_auth_users', { p_search_query: query });
-      if (error) throw error;
-      setUsers(data || []);
+      // Try RPC first
+      try {
+        const { data, error } = await supabase.rpc('search_auth_users', { p_search_query: query });
+        if (!error && data) {
+          setUsers(data || []);
+          console.log(`✅ Found ${data.length} users via search RPC`);
+          return;
+        }
+      } catch (rpcErr) {
+        console.warn('⚠️ Search RPC not available, using direct query');
+      }
+
+      // Fallback: Client-side search on users table
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        setMessage('Error searching users: ' + error.message);
+        console.error('Query error:', error);
+        return;
+      }
+
+      // Filter results on client side
+      const searchLower = query.toLowerCase();
+      const filtered = (data || []).filter(user => 
+        user.email?.toLowerCase().includes(searchLower) ||
+        user.full_name?.toLowerCase().includes(searchLower) ||
+        user.phone?.toLowerCase().includes(searchLower) ||
+        user.role?.toLowerCase().includes(searchLower) ||
+        user.username?.toLowerCase().includes(searchLower)
+      );
+
+      setUsers(filtered);
+      console.log(`✅ Found ${filtered.length} users via client-side search`);
     } catch (error) {
       setMessage('Error: ' + error.message);
+      console.error('Unexpected error:', error);
     } finally {
       setLoading(false);
     }
@@ -60,35 +117,41 @@ export default function AdminUserManagement() {
 
     setAssigning({ ...assigning, [user.id]: true });
     try {
-      let result;
-      if (!user.has_profile) {
-        const { data, error } = await supabase.rpc('create_user_profile_from_auth', {
-          p_auth_id: user.id,
-          p_role: role
-        });
-        if (error) throw error;
-        result = data;
-      } else {
-        const { data, error } = await supabase.rpc('assign_user_role_by_email', {
-          p_email: user.email,
-          p_role: role
-        });
-        if (error) throw error;
-        result = data;
+      console.log(`🔧 Assigning ${user.email} as ${role}...`);
+
+      // Direct update using Supabase table operations (no RPC needed)
+      const { data, error } = await supabase
+        .from('users')
+        .update({
+          role: role,
+          is_active: true,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select();
+
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
       }
 
-      if (result && result.success) {
+      if (data && data.length > 0) {
+        console.log(`✅ Role assigned successfully: ${user.email} → ${role}`);
         setMessage(`✓ ${user.email} assigned as ${role}`);
         setSelectedRoles({ ...selectedRoles, [user.id]: '' });
+        
+        // Reload users to show updated role
         setTimeout(() => {
           setMessage('');
           loadAllUsers();
         }, 1000);
       } else {
-        setMessage(result?.error || 'Failed');
+        console.warn('⚠️ Update returned no data');
+        setMessage('Failed to update user');
       }
     } catch (error) {
-      setMessage(error.message);
+      console.error('Assignment error:', error);
+      setMessage(`Error: ${error.message}`);
     } finally {
       setAssigning({ ...assigning, [user.id]: false });
     }

@@ -86,38 +86,55 @@ const CashierAuth = () => {
         let { data: userData, error: fetchError } = await supabase
           .from('users')
           .select('*')
-          .eq('auth_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
 
         console.log('👤 User data from database:', userData);
 
-        if (fetchError) {
+        if (fetchError && fetchError.code !== 'PGRST116') {
           console.error('❌ Database error:', fetchError);
           throw fetchError;
         }
 
         if (!userData) {
-          console.log('📝 Creating placeholder cashier record...');
+          console.log('📝 Creating/linking cashier record...');
+          
+          // Use upsert to avoid conflicts
           const { data: newUser, error: createError } = await supabase
             .from('users')
-            .insert([{
+            .upsert({
+              id: user.id,
               auth_id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
               role: 'user',
               is_active: false,
               profile_completed: false,
-              created_at: new Date().toISOString()
-            }])
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { 
+              onConflict: 'id'
+            })
             .select()
             .single();
 
           if (createError) {
-            console.error('❌ Error creating placeholder user:', createError);
-            throw createError;
+            console.error('❌ Error creating/linking user:', createError);
+            // Try to fetch again - record might have been created
+            const { data: retryData } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .maybeSingle();
+            
+            if (retryData) {
+              userData = retryData;
+            } else {
+              throw createError;
+            }
+          } else {
+            userData = newUser;
           }
-
-          userData = newUser;
         }
 
         if (userData.role === 'cashier' && userData.is_active) {

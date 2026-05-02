@@ -61,7 +61,8 @@ const EmployeeAuth = () => {
         if (!userData) {
           const { data: newUser, error: insertError } = await supabase
             .from('users')
-            .insert({
+            .upsert({
+              id: user.id,
               auth_id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
@@ -69,13 +70,28 @@ const EmployeeAuth = () => {
               role: 'employee',
               is_active: false,
               profile_completed: false,
-              employee_id: `EMP-${Date.now().toString().slice(-6)}`
+              employee_id: `EMP-${Date.now().toString().slice(-6)}`,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'id'
             })
             .select()
             .single();
 
-          if (insertError) throw insertError;
-          userData = newUser;
+          if (insertError) {
+            // If upsert still fails, try to fetch existing record
+            const { data: existingUser, error: fetchError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .maybeSingle();
+            
+            if (fetchError) throw fetchError;
+            userData = existingUser;
+          } else {
+            userData = newUser;
+          }
           
           // New user - show profile completion form
           setCurrentUser(user);
@@ -481,7 +497,8 @@ const EmployeeAuth = () => {
 
       const { error: userError } = await supabase
         .from('users')
-        .insert({
+        .upsert({
+          id: authData.user.id,
           auth_id: authData.user.id,
           email: formData.email,
           full_name: formData.fullName,
@@ -502,7 +519,11 @@ const EmployeeAuth = () => {
           id_number: formData.idNumber,
           is_active: false,
           profile_completed: true,
-          employee_id: `EMP-${Date.now().toString().slice(-6)}`
+          employee_id: `EMP-${Date.now().toString().slice(-6)}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'id'
         });
 
       if (userError) throw userError;

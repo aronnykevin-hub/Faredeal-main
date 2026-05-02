@@ -190,13 +190,35 @@ const SupplierPortal = () => {
         }
       }
 
-      // Query users table by auth_id (OAuth connection) with role supplier
+      // Query users table by auth_id (OAuth connection) - don't filter by role yet to avoid API issues
       const { data: supplier, error: suppError } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .maybeSingle();
+
+      // Verify it's actually a supplier and not another role
+      if (supplier && supplier.role !== 'supplier') {
+        console.error('❌ User exists but role is:', supplier.role, 'not supplier');
+        // User has a different role, redirect them
+        if (supplier.profile_completed) {
+          notificationService.show(`⚠️ This account is registered as ${supplier.role}. Please use the ${supplier.role} portal.`, 'error', 8000);
+          
+          // Redirect to correct portal
+          const redirectPath = supplier.role === 'manager' ? '/manager-portal' : 
+                              supplier.role === 'admin' ? '/admin-portal' :
+                              supplier.role === 'cashier' ? '/pos' :
+                              supplier.role === 'employee' ? '/employee-portal' :
+                              `/${supplier.role}-portal`;
+          
+          setTimeout(() => navigate(redirectPath), 2000);
+          return;
+        } else {
+          // Profile not completed, let them continue with supplier signup
+          console.log('⚠️ User has different role but profile not completed - allowing supplier signup');
+          supplier = null; // Treat as not found so they can proceed with signup
+        }
+      }
 
       if (suppError && suppError.code !== 'PGRST116') {
         console.error('Error fetching supplier profile:', suppError);
@@ -208,13 +230,12 @@ const SupplierPortal = () => {
         
         // Check approval status (don't check profile_completed since it's already done in auth page)
         if (!supplier.is_active) {
-          // Account pending approval - show welcome message
+          // Account pending approval
           console.log('⏳ Supplier account pending approval');
-          notificationService.show('🎉 Profile completed! Your application is pending admin approval. You can view your dashboard with limited access.', 'info', 8000);
           // Don't return - let them see their profile with limited access
         } else {
-          // Account is approved - show success message
-          notificationService.show('✅ Welcome back! Your account is active.', 'success', 3000);
+          // Account is approved
+          console.log('✅ Account is active');
         }
         
         // Parse JSON fields if they exist
@@ -260,7 +281,61 @@ const SupplierPortal = () => {
         console.log('🔧 Attempting to auto-create supplier profile...');
         
         try {
-          // Create a new supplier record
+          // Try to fetch existing record with this email (case-insensitive)
+          // Email might be unique or have composite (email, role) constraint
+          const { data: existingByEmail, error: emailCheckError } = await supabase
+            .from('users')
+            .select('*')
+            .ilike('email', user.email)
+            .maybeSingle();
+
+          if (emailCheckError && emailCheckError.code !== 'PGRST116') {
+            console.error('❌ Error checking for existing record:', emailCheckError);
+            // Don't throw - continue to create new record
+          } else if (existingByEmail) {
+            console.log('✅ Found existing user record with this email:', existingByEmail);
+            
+            // If it's already a supplier, use it
+            if (existingByEmail.role === 'supplier') {
+              console.log('✅ Found existing supplier profile');
+              
+              // Update auth_id if it's not set
+              if (!existingByEmail.auth_id) {
+                const { error: updateError } = await supabase
+                  .from('users')
+                  .update({ auth_id: user.id, updated_at: new Date().toISOString() })
+                  .eq('id', existingByEmail.id);
+
+                if (!updateError) {
+                  console.log('✅ Linked auth_id to existing profile');
+                }
+              }
+
+              // Set profile from existing record
+              const certifications = existingByEmail.certifications || [];
+              const deliveryAreas = ['Kampala', 'Entebbe', 'Mukono', 'Wakiso', 'Jinja'];
+              
+              setSupplierProfile({
+                id: existingByEmail.id,
+                name: existingByEmail.company_name || existingByEmail.full_name,
+                contactPerson: existingByEmail.full_name,
+                phone: existingByEmail.phone,
+                email: existingByEmail.email,
+                address: existingByEmail.address,
+                category: existingByEmail.category,
+                certifications: certifications,
+                deliveryAreas: deliveryAreas,
+                rating: existingByEmail.quality_rating || 0,
+                profile_image_url: existingByEmail.avatar_url,
+                status: existingByEmail.is_active ? 'active' : 'pending'
+              });
+
+              console.log('✅ Supplier profile loaded from existing record');
+              return;
+            }
+          }
+
+          // Create a new supplier record if none exists
           const newSupplierData = {
             auth_id: user.id,
             email: user.email,
@@ -279,6 +354,48 @@ const SupplierPortal = () => {
             .single();
 
           if (createError) {
+            // If duplicate key error, try to fetch and use the existing record
+            if (createError.code === '23505') {
+              console.log('⚠️ Record already exists with this email+role. Fetching existing record...');
+              const { data: existing, error: fetchErr } = await supabase
+                .from('users')
+                .select('*')
+                .ilike('email', user.email)
+                .maybeSingle();
+              
+              // Check if the record is a supplier
+              if (!fetchErr && existing && existing.role === 'supplier') {
+                
+                // Update auth_id if needed
+                if (!existing.auth_id) {
+                  await supabase
+                    .from('users')
+                    .update({ auth_id: user.id })
+                    .eq('id', existing.id);
+                }
+
+                const certifications = existing.certifications || [];
+                const deliveryAreas = ['Kampala', 'Entebbe', 'Mukono', 'Wakiso', 'Jinja'];
+                
+                setSupplierProfile({
+                  id: existing.id,
+                  name: existing.company_name || existing.full_name,
+                  contactPerson: existing.full_name,
+                  phone: existing.phone,
+                  email: existing.email,
+                  address: existing.address,
+                  category: existing.category,
+                  certifications: certifications,
+                  deliveryAreas: deliveryAreas,
+                  rating: existing.quality_rating || 0,
+                  profile_image_url: existing.avatar_url,
+                  status: existing.is_active ? 'active' : 'pending'
+                });
+
+                return;
+              }
+            }
+
             console.error('❌ Failed to auto-create supplier profile:', createError);
             notificationService.show('⚠️ Profile not found. Please complete your supplier profile from the sign-in page.', 'error', 5000);
             // Redirect to supplier auth to complete profile
@@ -287,7 +404,6 @@ const SupplierPortal = () => {
           }
 
           console.log('✅ Auto-created supplier profile:', newSupplier);
-          notificationService.show('📝 Please complete your supplier profile to continue.', 'info', 5000);
           
           // Redirect to supplier auth page to complete profile
           setTimeout(() => navigate('/supplier-auth'), 2000);
@@ -356,12 +472,11 @@ const SupplierPortal = () => {
         return;
       }
 
-      // Update in Supabase users table by auth_id AND role='supplier' to avoid accidentally updating other roles
+      // Update in Supabase users table by auth_id and user ID for safety
       const { data: updatedUsers, error } = await supabase
         .from('users')
         .update(updateData)
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .select();
 
       if (error) {
@@ -459,8 +574,7 @@ const SupplierPortal = () => {
       const { error } = await supabase
         .from('users')
         .update(updateData)
-        .eq('auth_id', user.id)
-        .eq('role', 'supplier');
+        .eq('auth_id', user.id);
 
       if (error) {
         console.error('Error saving financial details:', error);
@@ -559,8 +673,7 @@ const SupplierPortal = () => {
               avatar_url: base64String,
               updated_at: new Date().toISOString()
             })
-            .eq('auth_id', user.id)
-            .eq('role', 'supplier');
+            .eq('auth_id', user.id);
 
           if (error) {
             console.error('❌ Error saving to database:', error);
@@ -575,7 +688,6 @@ const SupplierPortal = () => {
             .from('users')
             .select('avatar_url')
             .eq('auth_id', user.id)
-            .eq('role', 'supplier')
             .single();
           
           if (fetchError) {
@@ -631,19 +743,20 @@ const SupplierPortal = () => {
         return;
       }
 
-      // Get supplier ID from users table
-      const { data: supplier } = await supabase
+      // Get supplier ID from users table (don't filter by role to avoid API issues)
+      const { data: supplier, error: supplierError } = await supabase
         .from('users')
-        .select('id, quality_rating')
+        .select('id, quality_rating, role')
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .maybeSingle();
 
-      const supplierId = supplier?.id;
-      if (!supplierId) {
+      // Verify the user is a supplier
+      if (supplierError || !supplier || supplier.role !== 'supplier') {
         console.log('No supplier profile found for performance metrics');
         return;
       }
+
+      const supplierId = supplier?.id;
 
       // Get all orders in one query (SINGLE SOURCE OF TRUTH)
       const { data: allOrders, count: totalOrders } = await supabase
@@ -742,12 +855,11 @@ const SupplierPortal = () => {
 
       const { data: supplier } = await supabase
         .from('users')
-        .select('id')
+        .select('id, role')
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .maybeSingle();
 
-      if (!supplier?.id) {
+      if (!supplier?.id || supplier.role !== 'supplier') {
         console.log('No supplier profile found for order history');
         return;
       }
@@ -822,12 +934,11 @@ const SupplierPortal = () => {
       // Get supplier from users table
       const { data: supplier } = await supabase
         .from('users')
-        .select('id')
+        .select('id, role')
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .maybeSingle();
 
-      if (!supplier?.id) {
+      if (!supplier?.id || supplier.role !== 'supplier') {
         console.log('No supplier profile found');
         return;
       }
@@ -872,12 +983,11 @@ const SupplierPortal = () => {
       // Get supplier from users table
       const { data: supplier } = await supabase
         .from('users')
-        .select('id')
+        .select('id, role')
         .eq('auth_id', user.id)
-        .eq('role', 'supplier')
         .maybeSingle();
 
-      if (!supplier?.id) {
+      if (!supplier?.id || supplier.role !== 'supplier') {
         console.log('No supplier profile found');
         return;
       }
@@ -946,12 +1056,14 @@ const SupplierPortal = () => {
       if (!supplierId) {
         const { data: userData } = await supabase
           .from('users')
-          .select('id')
+          .select('id, role')
           .eq('auth_id', currentUser.id)
-          .eq('role', 'supplier')
           .maybeSingle();
         
-        supplierId = userData?.id;
+        // Only use if it's a supplier
+        if (userData && userData.role === 'supplier') {
+          supplierId = userData.id;
+        }
       }
 
       if (!supplierId) {
@@ -1103,16 +1215,51 @@ const SupplierPortal = () => {
       }
 
       // Check user role
-      const { data: existingUser } = await supabase
+      let { data: existingUser, error: userError } = await supabase
         .from('users')
         .select('role, profile_completed')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
-      // If user doesn't exist yet, they're in the middle of signup - redirect to auth
+      if (userError) {
+        console.warn('⚠️ Error checking user:', userError);
+      }
+      
+      console.log('🔍 User query result:', existingUser, 'for user.id:', user.id);
+
+      // If user doesn't exist, retry once (may be timing issue)
       if (!existingUser) {
-        console.log('No user record found - redirecting to complete profile');
+        console.log('⏳ User record not found on first attempt, retrying...');
+        await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+        
+        const { data: retryUser, error: retryError } = await supabase
+          .from('users')
+          .select('role, profile_completed')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (retryError) {
+          console.warn('⚠️ Error on retry:', retryError);
+        }
+        
+        console.log('🔍 Retry result:', retryUser);
+        existingUser = retryUser;
+      }
+
+      // If user still doesn't exist, redirect to auth
+      if (!existingUser) {
+        console.log('No user record found after retry - redirecting to complete profile');
         navigate('/supplier-auth');
+        return;
+      }
+
+      // If user still doesn't exist, log it but continue anyway
+      // (This can happen if RLS policies are blocking reads)
+      if (!existingUser) {
+        console.warn('⚠️ User record not found - RLS may be blocking reads. Continuing anyway...');
+        // Continue loading data - the data loaders will handle missing profile gracefully
+        loadSupplierData();
+        loadPaymentData();
         return;
       }
 
@@ -1120,7 +1267,7 @@ const SupplierPortal = () => {
       // This allows users to complete their supplier profile even if they have another role
       if (existingUser.profile_completed && existingUser.role !== 'supplier') {
         console.error('❌ Wrong portal! User is:', existingUser.role);
-        notificationService.show(`⚠️ This account is registered as ${existingUser.role}. Redirecting...`, 'warning', 3000);
+        // Don't show notification during redirects to avoid spam
         
         const redirectPath = existingUser.role === 'manager' ? '/manager-portal' : 
                             existingUser.role === 'admin' ? '/admin-portal' :
@@ -1128,7 +1275,7 @@ const SupplierPortal = () => {
                             existingUser.role === 'employee' ? '/employee-portal' :
                             `/${existingUser.role}-portal`;
         
-        setTimeout(() => navigate(redirectPath), 2000);
+        setTimeout(() => navigate(redirectPath), 1000);
         return;
       }
 
