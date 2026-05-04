@@ -54,7 +54,7 @@ const EmployeeAuth = () => {
         let { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
-          .eq('auth_id', user.id)
+          .eq('id', user.id)
           .single();
 
         // If no user record exists (Google/Magic Link first-time signin), create one
@@ -63,7 +63,6 @@ const EmployeeAuth = () => {
             .from('users')
             .upsert({
               id: user.id,
-              auth_id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.user_metadata?.name || '',
               phone: user.user_metadata?.phone || '',
@@ -427,7 +426,7 @@ const EmployeeAuth = () => {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', data.user.id)
+        .eq('id', data.user.id)
         .single();
 
       if (userError) throw userError;

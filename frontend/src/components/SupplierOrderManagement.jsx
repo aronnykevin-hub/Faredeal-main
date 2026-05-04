@@ -241,11 +241,13 @@ const SupplierOrderManagement = ({ onPosUpdated }) => {
    */
   const submitOrderApproval = async () => {
     try {
-      const managerId = await getManagerId();
-      if (!managerId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         alert('❌ Error: User not authenticated. Please log in again.');
         return;
       }
+
+      const managerId = user.id;
 
       const selectedOrderData = orders.find(o => o.id === approvalOrderId);
       
@@ -369,11 +371,13 @@ const SupplierOrderManagement = ({ onPosUpdated }) => {
     if (!reason) return;
 
     try {
-      const managerId = await getManagerId();
-      if (!managerId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         alert('❌ Error: User not authenticated. Please log in again.');
         return;
       }
+
+      const managerId = user.id;
       
       const response = await supplierOrdersService.rejectPurchaseOrder(orderId, reason, managerId);
 
@@ -396,11 +400,13 @@ const SupplierOrderManagement = ({ onPosUpdated }) => {
     if (!confirm('Send this order to the supplier?')) return;
 
     try {
-      const managerId = await getManagerId();
-      if (!managerId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
         alert('❌ Error: User not authenticated. Please log in again.');
         return;
       }
+
+      const managerId = user.id;
       
       const response = await supplierOrdersService.sendOrderToSupplier(orderId, managerId);
 
@@ -1752,16 +1758,15 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
     setSubmitting(true);
 
     try {
-      // Get manager ID from localStorage (custom authentication)
-      const storedUser = localStorage.getItem('supermarket_user');
+      // Get manager ID from Supabase auth (this is the actual user ID to filter orders)
+      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!storedUser) {
+      if (!user) {
         alert('❌ Error: No user session found. Please log in again.');
         return;
       }
 
-      const parsedUser = JSON.parse(storedUser);
-      const managerId = parsedUser.id;
+      const managerId = user.id;
       console.log('👤 Manager ID for order:', managerId);
       
       const orderData = {
@@ -1772,7 +1777,7 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
         deliveryInstructions,
         priority,
         notes,
-        orderedBy: managerId // Use internal user ID, not auth_id
+        orderedBy: managerId // Use Supabase auth user ID to match filter in getAllPurchaseOrders
       };
 
       const response = await supplierOrdersService.createPurchaseOrder(orderData);
@@ -1856,7 +1861,7 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
           {/* Supplier Selection */}
           <div className="bg-blue-50 rounded-lg p-4 border-2 border-blue-200">
             <label className="block text-sm font-bold text-gray-700 mb-2">
-              🏢 Select Supplier *
+              🏢 Select Supplier * {selectedSupplier && suppliers.find(s => s.id === selectedSupplier)?.full_name && <span className="text-green-600">✅ Real Name Available</span>}
             </label>
             <select
               value={selectedSupplier}
@@ -1867,10 +1872,43 @@ const CreateOrderModal = ({ suppliers, onClose, onSuccess }) => {
               <option value="">-- Choose Supplier --</option>
               {suppliers.map(supplier => (
                 <option key={supplier.id} value={supplier.id}>
-                  {supplier.business_name} ({supplier.supplier_code})
+                  {supplier.full_name ? `👤 ${supplier.full_name} - ${supplier.business_name}` : `🏢 ${supplier.business_name}`} ({supplier.supplier_code})
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-600 mt-2">
+              💡 Tip: Suppliers should update their profile after Google signup so managers can see their real names
+            </p>
+
+            {/* Selected Supplier Details Display */}
+            {selectedSupplier && suppliers.find(s => s.id === selectedSupplier) && (
+              <div className="mt-4 bg-white rounded-lg p-4 border-2 border-green-300">
+                {(() => {
+                  const selectedSupplierData = suppliers.find(s => s.id === selectedSupplier);
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          {selectedSupplierData.full_name && (
+                            <p className="text-lg font-bold text-green-700">👤 {selectedSupplierData.full_name}</p>
+                          )}
+                          <p className="text-base font-semibold text-blue-700">🏢 {selectedSupplierData.business_name}</p>
+                          <p className="text-sm text-gray-600">Code: {selectedSupplierData.supplier_code}</p>
+                        </div>
+                        {selectedSupplierData.full_name && (
+                          <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+                            ✅ Verified
+                          </span>
+                        )}
+                      </div>
+                      {selectedSupplierData.phone && (
+                        <p className="text-sm text-gray-700">📞 {selectedSupplierData.phone}</p>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Order Items - Using New Enhanced Selector */}

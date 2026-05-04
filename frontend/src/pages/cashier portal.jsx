@@ -351,7 +351,7 @@ const CashierPortal = () => {
       const { data: cashierData, error } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
@@ -511,7 +511,7 @@ const CashierPortal = () => {
       const { data: existingProfile } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (!existingProfile) {
@@ -562,7 +562,7 @@ const CashierPortal = () => {
             employee_id: existingProfile.employee_id || 'CASH-' + Math.random().toString(36).substr(2, 9).toUpperCase(),
             phone: existingProfile.phone || user.user_metadata?.phone || '+256'
           })
-          .eq('auth_id', user.id);
+          .eq('id', user.id);
 
         if (error) {
           console.error('❌ Error updating profile:', error);
@@ -623,8 +623,7 @@ const CashierPortal = () => {
               avatar_url: base64String,
               updated_at: new Date().toISOString()
             })
-            .eq('auth_id', user.id)
-            .eq('role', 'cashier');
+            .eq('id', user.id)
 
           if (error) {
             console.error('❌ Error saving to database:', error);
@@ -696,15 +695,6 @@ const CashierPortal = () => {
         return;
       }
 
-      // Get current metadata
-      const { data: currentData } = await supabase
-        .from('users')
-        .select('metadata')
-        .eq('auth_id', user.id)
-        .single();
-      
-      const currentMetadata = currentData?.metadata || {};
-
       // Update user profile in database
       const { error } = await supabase
         .from('users')
@@ -712,14 +702,9 @@ const CashierPortal = () => {
           full_name: editProfileForm.name,
           phone: editProfileForm.phone,
           email: editProfileForm.email,
-          metadata: {
-            ...currentMetadata,
-            languages: editProfileForm.languages
-          },
           updated_at: new Date().toISOString()
         })
-        .eq('auth_id', user.id)
-        .eq('role', 'cashier');
+        .eq('id', user.id);
 
       if (error) {
         console.error('Error updating profile:', error);
@@ -768,20 +753,6 @@ const CashierPortal = () => {
       
       // Save to localStorage
       localStorage.setItem('cashier_settings', JSON.stringify(settingsForm));
-      
-      // Optionally save to database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('users')
-          .update({
-            metadata: {
-              ...cashierProfile,
-              settings: settingsForm
-            }
-          })
-          .eq('auth_id', user.id);
-      }
 
       toast.success('⚙️ Settings saved successfully!');
       setShowSettingsModal(false);

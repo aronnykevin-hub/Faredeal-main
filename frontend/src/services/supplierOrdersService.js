@@ -188,11 +188,11 @@ export const getAllPurchaseOrders = async (filters = {}) => {
     
     if (user) {
       currentAuthId = user.id;
-      // Check user's role
+      // Check user's role - id column IS the auth.uid()
       const { data: managerData } = await supabase
         .from('users')
-        .select('role')
-        .eq('auth_id', user.id)
+        .select('role, id')
+        .eq('id', user.id)
         .single();
       
       // Only filter by created_by if user is a manager (not admin)
@@ -206,19 +206,11 @@ export const getAllPurchaseOrders = async (filters = {}) => {
       .select('*')
       .order('order_date', { ascending: false });
 
-    // Filter by current manager's internal user ID if they're a manager (not admin)
-    if (shouldFilterByManager && user) {
-      // Get internal user ID from users table
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', user.id)
-        .single();
-      
-      if (userData?.id) {
-        console.log('🔍 Filtering orders by manager ID:', userData.id);
-        query = query.eq('ordered_by', userData.id);
-      }
+    // Filter by current manager's user ID if they're a manager (not admin)
+    if (shouldFilterByManager && currentAuthId) {
+      // User ID is already the auth.uid(), use it directly
+      console.log('🔍 Filtering orders by manager ID:', currentAuthId);
+      query = query.eq('ordered_by', currentAuthId);
     }
 
     // Apply filters
@@ -392,11 +384,11 @@ export const getPendingPurchaseOrders = async () => {
 
     if (error) throw error;
 
-    // Fetch supplier details separately
+    // Fetch supplier details from users table
     const supplierIds = [...new Set(orders.map(o => o.supplier_id))];
     const { data: suppliers } = await supabase
-      .from('supplier_profiles')
-      .select('id, business_name, contact_person_name')
+      .from('users')
+      .select('id, company_name, full_name')
       .in('id', supplierIds);
 
     // Create supplier lookup
@@ -407,7 +399,7 @@ export const getPendingPurchaseOrders = async () => {
 
     const formattedOrders = orders.map(order => ({
       ...order,
-      supplierName: supplierMap[order.supplier_id]?.business_name || 'Unknown Supplier',
+      supplierName: supplierMap[order.supplier_id]?.company_name || 'Unknown Supplier',
       orderedBy: 'Manager',
       items: order.items || []
     }));
@@ -536,34 +528,32 @@ export const createPurchaseOrder = async (orderData) => {
         if (orderedQty > 0) {
           console.log(`🔄 Processing inventory for product_id ${item.product_id}, qty: ${orderedQty}`);
           
-          // Try to find existing inventory record (don't require .single() to succeed)
+          // Try to find existing inventory record
           const { data: invList, error: listError } = await supabase
             .from('inventory')
-            .select('id, quantity')
-            .eq('product_id', item.product_id)
-            .eq('is_active', true);
+            .select('id, current_stock')
+            .eq('product_id', item.product_id);
 
           let existingInv = invList && invList.length > 0 ? invList[0] : null;
 
           if (existingInv) {
             // Deduct ordered quantity from existing stock
-            const newQuantity = (existingInv.quantity || 0) - orderedQty;
+            const newQuantity = (existingInv.current_stock || 0) - orderedQty;
             const { error: updateError } = await supabase
               .from('inventory')
               .update({
-                quantity: newQuantity,
-                last_updated: new Date().toISOString()
+                current_stock: newQuantity,
+                updated_at: new Date().toISOString()
               })
               .eq('id', existingInv.id);
             
             if (updateError) {
               console.error('❌ Error updating inventory:', updateError);
             } else {
-              console.log(`📉 Inventory deducted for product ${item.product_id}: ${existingInv.quantity} → ${newQuantity} units (Order: ${data.po_number})`);
+              console.log(`📉 Inventory deducted for product ${item.product_id}: ${existingInv.current_stock} → ${newQuantity} units (Order: ${data.po_number})`);
             }
           } else {
             // No inventory record exists - create one with deducted balance
-            // This happens for newly added POS products
             const { data: product } = await supabase
               .from('products')
               .select('id, name')
@@ -575,11 +565,9 @@ export const createPurchaseOrder = async (orderData) => {
                 .from('inventory')
                 .insert({
                   product_id: item.product_id,
-                  quantity: -orderedQty, // Negative quantity to reflect backorder
+                  current_stock: -orderedQty, // Negative quantity to reflect backorder
                   minimum_stock: 10,
-                  reorder_point: 20,
-                  is_active: true,
-                  last_updated: new Date().toISOString()
+                  reorder_point: 20
                 })
                 .select('id');
               
@@ -724,10 +712,10 @@ export const sendOrderToSupplier = async (orderId, managerId) => {
 
     if (error) throw error;
 
-    // Get supplier info
+    // Get supplier company name from users table
     const { data: supplier } = await supabase
-      .from('supplier_profiles')
-      .select('business_name')
+      .from('users')
+      .select('company_name')
       .eq('id', data.supplier_id)
       .single();
 
@@ -745,7 +733,7 @@ export const sendOrderToSupplier = async (orderId, managerId) => {
     return {
       success: true,
       order: data,
-      message: `Order sent to ${supplier?.business_name || 'supplier'}`
+      message: `Order sent to ${supplier?.company_name || 'supplier'}`
     };
   } catch (error) {
     console.error('Error sending order to supplier:', error);
@@ -807,7 +795,17 @@ export const getAllDeliveries = async (filters = {}) => {
 
     const { data, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      // Table doesn't exist - return empty list
+      if (error.code === 'PGRST205' || error.message.includes('Could not find the table')) {
+        console.warn('⚠️ supplier_deliveries table not found (this is OK):', error.message);
+        return {
+          success: true,
+          deliveries: []
+        };
+      }
+      throw error;
+    }
 
     return {
       success: true,
@@ -827,117 +825,11 @@ export const getAllDeliveries = async (filters = {}) => {
  */
 export const recordDelivery = async (deliveryData) => {
   try {
-    const {
-      purchaseOrderId,
-      supplierId,
-      deliveryDate,
-      deliveryTime,
-      deliveredBySupplier,
-      deliveryVehicleNumber,
-      receivedBy,
-      items,
-      qualityCheckStatus,
-      qualityCheckNotes,
-      conditionOnArrival,
-      packagingCondition
-    } = deliveryData;
-
-    // Calculate item counts
-    const totalOrdered = items.reduce((sum, item) => sum + item.orderedQty, 0);
-    const totalDelivered = items.reduce((sum, item) => sum + item.deliveredQty, 0);
-    const totalAccepted = items.reduce((sum, item) => sum + item.acceptedQty, 0);
-    const totalRejected = items.reduce((sum, item) => sum + item.rejectedQty, 0);
-
-    const { data, error } = await supabase
-      .from('supplier_deliveries')
-      .insert({
-        purchase_order_id: purchaseOrderId,
-        supplier_id: supplierId,
-        delivery_date: deliveryDate,
-        delivery_time: deliveryTime,
-        delivered_by_supplier: deliveredBySupplier,
-        delivery_vehicle_number: deliveryVehicleNumber,
-        received_by: receivedBy,
-        items,
-        total_items_ordered: totalOrdered,
-        total_items_delivered: totalDelivered,
-        total_items_accepted: totalAccepted,
-        total_items_rejected: totalRejected,
-        delivery_status: totalRejected > 0 ? 'partially_delivered' : 'delivered',
-        quality_check_status: qualityCheckStatus,
-        quality_check_notes: qualityCheckNotes,
-        condition_on_arrival: conditionOnArrival,
-        packaging_condition: packagingCondition,
-        documentation_complete: true
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Update purchase order status
-    const newPOStatus = totalDelivered >= totalOrdered ? 'received' : 'partially_received';
-    await supabase
-      .from('purchase_orders')
-      .update({
-        status: newPOStatus,
-        actual_delivery_date: deliveryDate,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', purchaseOrderId);
-
-    // Update inventory for each delivered item
-    try {
-      for (const item of items) {
-        const acceptedQty = item.acceptedQty || 0;
-        
-        if (acceptedQty > 0) {
-          // Try to update existing inventory record
-          const { data: existingInv, error: existingError } = await supabase
-            .from('inventory')
-            .select('id, quantity')
-            .eq('product_id', item.product_id || item.productId)
-            .eq('is_active', true)
-            .single();
-
-          if (existingInv) {
-            // Update existing inventory
-            const newQuantity = (existingInv.quantity || 0) + acceptedQty;
-            await supabase
-              .from('inventory')
-              .update({
-                quantity: newQuantity,
-                last_updated: new Date().toISOString()
-              })
-              .eq('id', existingInv.id);
-            
-            console.log(`✅ Updated inventory for product ${item.product_id}: +${acceptedQty} units`);
-          } else {
-            // Create new inventory record if not exists
-            await supabase
-              .from('inventory')
-              .insert({
-                product_id: item.product_id || item.productId,
-                quantity: acceptedQty,
-                minimum_stock: 10,
-                reorder_point: 20,
-                is_active: true,
-                last_updated: new Date().toISOString()
-              });
-            
-            console.log(`✅ Created new inventory record for product ${item.product_id}: ${acceptedQty} units`);
-          }
-        }
-      }
-    } catch (invError) {
-      console.warn('⚠️ Warning: Inventory update failed (table may not exist):', invError.message);
-      // Don't fail the delivery if inventory update fails
-    }
-
+    console.warn('⚠️ Delivery recording feature not yet implemented (supplier_deliveries table missing)');
     return {
-      success: true,
-      delivery: data,
-      message: 'Delivery recorded successfully'
+      success: false,
+      error: 'Delivery recording system is not yet active. Please contact support.',
+      code: 'FEATURE_NOT_AVAILABLE'
     };
   } catch (error) {
     console.error('Error recording delivery:', error);
@@ -971,16 +863,21 @@ export const getSupplierOrderStats = async () => {
 
     if (supplierError) {
       console.error('⚠️ Error fetching supplier stats (table may not exist):', supplierError);
-      // Continue with empty supplier data - don't redeclare
-      // supplierData is already declared from const above
+      // Continue with empty supplier data
     }
 
-    // Get delivery stats
-    const { data: deliveryData, error: deliveryError } = await supabase
+    // Get delivery stats - table may not exist, so handle gracefully
+    let deliveryData = [];
+    const { data: deliveries, error: deliveryError } = await supabase
       .from('supplier_deliveries')
       .select('delivery_status, quality_check_status');
 
-    if (deliveryError) throw deliveryError;
+    if (deliveryError) {
+      console.warn('⚠️ supplier_deliveries table not found (this is OK):', deliveryError.message);
+      // Continue without delivery data
+    } else {
+      deliveryData = deliveries || [];
+    }
 
     // Get payment/invoice stats
     const { data: invoiceData, error: invoiceError } = await supabase
@@ -1001,8 +898,6 @@ export const getSupplierOrderStats = async () => {
       totalValue: orderStats?.reduce((sum, o) => sum + parseFloat(o.total_amount_ugx || 0), 0) || 0,
       
       totalSuppliers: supplierData?.length || 0,
-      // activeSuppliers: supplierData?.filter(s => s.status === 'active').length || 0, // status column doesn't exist
-      // pendingSuppliers: supplierData?.filter(s => s.status === 'pending_approval').length || 0, // status column doesn't exist
       
       totalDeliveries: deliveryData?.length || 0,
       pendingDeliveries: deliveryData?.filter(d => d.delivery_status === 'pending').length || 0,
@@ -1051,7 +946,7 @@ export const getRecentSupplierActivity = async (limit = 10) => {
       .from('supplier_activity_log')
       .select(`
         *,
-        supplier:supplier_profiles(business_name)
+        supplier:supplier_profiles(supplier_id)
       `)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -1101,11 +996,11 @@ export const getOrderHistory = async (filters = {}) => {
 
     if (error) throw error;
 
-    // Fetch supplier details
+    // Fetch supplier details from users table
     const supplierIds = [...new Set(orders.map(o => o.supplier_id))];
     const { data: suppliers } = await supabase
-      .from('supplier_profiles')
-      .select('id, business_name')
+      .from('users')
+      .select('id, company_name')
       .in('id', supplierIds);
 
     // Fetch invoice details
@@ -1131,7 +1026,7 @@ export const getOrderHistory = async (filters = {}) => {
       const invoice = invoiceMap[order.id];
       return {
         ...order,
-        supplierName: supplierMap[order.supplier_id]?.business_name || 'Unknown Supplier',
+        supplierName: supplierMap[order.supplier_id]?.company_name || 'Unknown Supplier',
         payment_status: invoice?.payment_status || 'unpaid',
         amount_paid: invoice?.amount_paid_ugx || 0,
         balance_due: invoice?.balance_due_ugx || order.total_amount_ugx
@@ -1167,11 +1062,11 @@ export const getOrdersByPaymentStatus = async (paymentStatus) => {
     
     if (user) {
       currentAuthId = user.id;
-      // Check user's role
+      // Check user's role - id column IS the auth.uid()
       const { data: managerData } = await supabase
         .from('users')
-        .select('role')
-        .eq('auth_id', user.id)
+        .select('role, id')
+        .eq('id', user.id)
         .single();
       
       // Only filter by created_by if user is a manager (not admin)
@@ -1187,18 +1082,10 @@ export const getOrdersByPaymentStatus = async (paymentStatus) => {
       .eq('payment_status', paymentStatus)
       .order('order_date', { ascending: false });
     
-    // Filter by current manager's internal user ID if they're a manager (not admin)
-    if (shouldFilterByManager && user) {
-      // Get internal user ID from users table
-      const { data: userData } = await supabase
-        .from('users')
-        .select('id')
-        .eq('auth_id', user.id)
-        .single();
-      
-      if (userData?.id) {
-        query = query.eq('ordered_by', userData.id);
-      }
+    // Filter by current manager's user ID if they're a manager (not admin)
+    if (shouldFilterByManager && currentAuthId) {
+      // User ID is already the auth.uid(), use it directly
+      query = query.eq('ordered_by', currentAuthId);
     }
 
     const { data: orders, error: ordersError } = await query;

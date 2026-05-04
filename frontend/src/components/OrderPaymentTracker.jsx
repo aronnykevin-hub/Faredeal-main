@@ -105,17 +105,8 @@ const OrderPaymentTracker = ({ order, onPaymentAdded, showAddPayment = false, us
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Get the internal user ID from users table (not auth_id)
-      let internalUserId = null;
-      if (user?.id) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id')
-          .eq('auth_id', user.id)
-          .single();
-        
-        internalUserId = userData?.id;
-      }
+      // Get the internal user ID from users table (id IS the auth.uid)
+      let internalUserId = user?.id; // The user.id is already the auth.uid
       
       // Call the record_payment_with_tracking function
       const orderId = order?.orderId || order?.order_uuid || order?.id;

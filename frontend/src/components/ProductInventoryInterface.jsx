@@ -166,7 +166,7 @@ const ProductInventoryInterface = () => {
       const { data: managerData, error: managerError } = await supabase
         .from('users')
         .select('id')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .eq('role', 'manager')
         .single();
 

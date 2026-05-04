@@ -153,13 +153,13 @@ const SupplierPortal = () => {
         return;
       }
 
-      console.log('🔍 Loading supplier profile for user:', user.email, 'auth_id:', user.id);
+      console.log('🔍 Loading supplier profile for user:', user.email, 'id:', user.id);
 
       // First check if user exists with any role
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (checkError && checkError.code !== 'PGRST116') {
@@ -190,11 +190,11 @@ const SupplierPortal = () => {
         }
       }
 
-      // Query users table by auth_id (OAuth connection) - don't filter by role yet to avoid API issues
+      // Query users table by id - don't filter by role yet to avoid API issues
       const { data: supplier, error: suppError } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       // Verify it's actually a supplier and not another role
@@ -447,8 +447,8 @@ const SupplierPortal = () => {
       // First check if user exists in users table
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
-        .select('id, auth_id, role')
-        .eq('auth_id', user.id)
+        .select('id, role')
+        .eq('id', user.id)
         .single();
 
       if (checkError) {
@@ -458,7 +458,7 @@ const SupplierPortal = () => {
       }
 
       if (!existingUser) {
-        console.error('❌ No user found with auth_id:', user.id);
+        console.error('❌ No user found with id:', user.id);
         alert('Failed to save: User profile not found. Please complete your profile first from the sign-in page.');
         return;
       }
@@ -574,7 +574,7 @@ const SupplierPortal = () => {
       const { error } = await supabase
         .from('users')
         .update(updateData)
-        .eq('auth_id', user.id);
+        .eq('id', user.id);
 
       if (error) {
         console.error('Error saving financial details:', error);
@@ -687,7 +687,7 @@ const SupplierPortal = () => {
           const { data: updatedData, error: fetchError } = await supabase
             .from('users')
             .select('avatar_url')
-            .eq('auth_id', user.id)
+            .eq('id', user.id)
             .single();
           
           if (fetchError) {
@@ -984,7 +984,7 @@ const SupplierPortal = () => {
       const { data: supplier } = await supabase
         .from('users')
         .select('id, role')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .maybeSingle();
 
       if (!supplier?.id || supplier.role !== 'supplier') {

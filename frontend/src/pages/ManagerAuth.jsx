@@ -85,11 +85,11 @@ const ManagerAuth = () => {
     const startPolling = () => {
       pollInterval = setInterval(async () => {
         try {
-          // Check ALL records with this email (not just by auth_id)
+          // Check ALL records with this email
           // because admin might have set role to 'manager' in a different record
           const { data: allUserRecords, error: fetchError } = await supabase
             .from('users')
-            .select('id, auth_id, email, full_name, role, is_active, phone')
+            .select('id, email, full_name, role, is_active, phone')
             .eq('email', currentUser.email);
 
           if (fetchError) {
@@ -172,8 +172,8 @@ const ManagerAuth = () => {
         // Check if user exists in database
         let { data: userData, error: fetchError } = await supabase
           .from('users')
-          .select('id, auth_id, email, full_name, role, is_active, phone')
-          .eq('auth_id', user.id)
+          .select('id, email, full_name, role, is_active, phone')
+          .eq('id', user.id)
           .maybeSingle();
 
         console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
@@ -185,7 +185,7 @@ const ManagerAuth = () => {
           const { data: insertData, error: insertError } = await supabase
             .from('users')
             .insert({
-              auth_id: user.id,
+              id: user.id,
               email: user.email,
               full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
               role: 'user',
@@ -193,7 +193,7 @@ const ManagerAuth = () => {
               phone: null,
               created_at: new Date().toISOString()
             })
-            .select('id, auth_id, email, full_name, role, is_active, phone')
+            .select('id, email, full_name, role, is_active, phone')
             .single();
 
           if (insertError) {
@@ -203,7 +203,7 @@ const ManagerAuth = () => {
               
               const { data: existingData, error: fetchExistingError } = await supabase
                 .from('users')
-                .select('id, auth_id, email, full_name, role, is_active, phone')
+                .select('id, email, full_name, role, is_active, phone')
                 .eq('email', user.email)
                 .eq('role', 'user')
                 .maybeSingle();
@@ -216,23 +216,6 @@ const ManagerAuth = () => {
               if (existingData) {
                 console.log('✅ Using existing user record:', existingData);
                 userData = existingData;
-                
-                // Update auth_id if it's null
-                if (!existingData.auth_id) {
-                  const { data: updatedData, error: updateError } = await supabase
-                    .from('users')
-                    .update({ auth_id: user.id, updated_at: new Date().toISOString() })
-                    .eq('id', existingData.id)
-                    .select('id, auth_id, email, full_name, role, is_active, phone')
-                    .single();
-                  
-                  if (updateError) {
-                    console.error('⚠️  Could not update auth_id:', updateError);
-                    // Non-fatal - continue with existing data
-                  } else {
-                    userData = updatedData;
-                  }
-                }
               }
             } else {
               console.error('❌ Failed to create placeholder user record:', insertError);

@@ -21,17 +21,17 @@ BEGIN
   RETURN QUERY
   SELECT 
     pt.id as transaction_id,
-    pt.transaction_number,
-    po.po_number,
+    pt.transaction_number::VARCHAR,
+    po.po_number::VARCHAR,
     po.id as order_id,
     pt.amount_ugx as amount_paid,
-    pt.payment_method,
-    pt.payment_reference,
+    pt.payment_method::VARCHAR,
+    pt.payment_reference::VARCHAR,
     pt.payment_date,
     EXTRACT(DAY FROM (NOW() - pt.payment_date))::INT as days_pending,
-    COALESCE(u.full_name, 'Unknown Manager') as manager_name,
-    COALESCE(u.email, 'N/A') as manager_email,
-    pt.payment_status as confirmation_status
+    COALESCE(u.full_name, 'Unknown Manager')::VARCHAR as manager_name,
+    COALESCE(u.email, 'N/A')::VARCHAR as manager_email,
+    pt.payment_status::VARCHAR as confirmation_status
   FROM payment_transactions pt
   JOIN purchase_orders po ON pt.purchase_order_id = po.id
   LEFT JOIN users u ON po.created_by = u.id

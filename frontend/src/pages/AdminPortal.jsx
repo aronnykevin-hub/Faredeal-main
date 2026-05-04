@@ -148,7 +148,7 @@ const AdminPortal = () => {
         const { data: userData, error } = await supabase
           .from('users')
           .select('role')
-          .eq('auth_id', user.id)
+          .eq('id', user.id)
           .maybeSingle();
 
         if (error) {

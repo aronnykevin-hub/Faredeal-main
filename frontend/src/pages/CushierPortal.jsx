@@ -334,7 +334,7 @@ const CashierPortal = () => {
       const { data: cashierData, error } = await supabase
         .from('users')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .eq('role', 'cashier')
         .maybeSingle();
 
@@ -434,7 +434,7 @@ const CashierPortal = () => {
               avatar_url: base64String,
               updated_at: new Date().toISOString()
             })
-            .eq('auth_id', user.id)
+            .eq('id', user.id)
             .eq('role', 'cashier');
 
           if (error) {
@@ -507,15 +507,6 @@ const CashierPortal = () => {
         return;
       }
 
-      // Get current metadata
-      const { data: currentData } = await supabase
-        .from('users')
-        .select('metadata')
-        .eq('auth_id', user.id)
-        .single();
-      
-      const currentMetadata = currentData?.metadata || {};
-
       // Update user profile in database
       const { error } = await supabase
         .from('users')
@@ -523,13 +514,9 @@ const CashierPortal = () => {
           full_name: editProfileForm.name,
           phone: editProfileForm.phone,
           email: editProfileForm.email,
-          metadata: {
-            ...currentMetadata,
-            languages: editProfileForm.languages
-          },
           updated_at: new Date().toISOString()
         })
-        .eq('auth_id', user.id)
+        .eq('id', user.id)
         .eq('role', 'cashier');
 
       if (error) {
@@ -579,20 +566,6 @@ const CashierPortal = () => {
       
       // Save to localStorage
       localStorage.setItem('cashier_settings', JSON.stringify(settingsForm));
-      
-      // Optionally save to database
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase
-          .from('users')
-          .update({
-            metadata: {
-              ...cashierProfile,
-              settings: settingsForm
-            }
-          })
-          .eq('auth_id', user.id);
-      }
 
       toast.success('⚙️ Settings saved successfully!');
       setShowSettingsModal(false);

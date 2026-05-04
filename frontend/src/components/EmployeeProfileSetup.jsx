@@ -107,7 +107,7 @@ const EmployeeProfileSetup = ({ user, onComplete }) => {
           profile_completed: true,
           submitted_at: new Date().toISOString()
         })
-        .eq('auth_id', user.id);
+        .eq('id', user.id);
 
       if (profileError) throw profileError;
 
