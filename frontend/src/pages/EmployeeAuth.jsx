@@ -11,8 +11,18 @@ import {
 
 const EmployeeAuth = () => {
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
   const [showPassword, setShowPassword] = useState(false);
   const [useMagicLink, setUseMagicLink] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
@@ -671,7 +681,7 @@ const EmployeeAuth = () => {
     return (
       <>
         <style>{customStyles}</style>
-        <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="flex items-center justify-center p-4 relative overflow-hidden">
           {/* Animated Background Elements */}
           <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-20 left-20 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
@@ -1092,7 +1102,7 @@ const EmployeeAuth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-600 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>

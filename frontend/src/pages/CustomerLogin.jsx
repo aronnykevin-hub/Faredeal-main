@@ -20,6 +20,17 @@ import axios from 'axios';
 const CustomerLogin = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
+
   const [loginData, setLoginData] = useState({
     email: '',
     phone: '',
@@ -99,7 +110,7 @@ const CustomerLogin = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex">
+    <div className="flex">
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes fadeInUp {

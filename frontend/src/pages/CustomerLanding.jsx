@@ -11,7 +11,17 @@ import LoyaltyRewards from '../components/LoyaltyRewards';
 import ARProductViewer from '../components/ARProductViewer';
 
 const CustomerLanding = () => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [currentTestimonial, setCurrentTestimonial] = useState(0);
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
   const [isVisible, setIsVisible] = useState(false);
   const [showLoyaltyRewards, setShowLoyaltyRewards] = useState(false);
   const [showARViewer, setShowARViewer] = useState(false);
@@ -115,7 +125,7 @@ const CustomerLanding = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 overflow-hidden">
+    <div className="overflow-hidden">
       {/* Header */}
       <div className="bg-white/90 backdrop-blur-sm shadow-lg border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">

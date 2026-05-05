@@ -884,7 +884,7 @@ const AdminProfile = () => {
   // Show loading spinner while loading
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 flex items-center justify-center">
+      <div className="flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600 text-lg">Loading your profile...</p>
@@ -894,7 +894,7 @@ const AdminProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+    <div>
       {/* Header - Mobile Optimized */}
       <div className="bg-white shadow-lg">
         <div className="max-w-7xl mx-auto px-3 md:px-6 lg:px-8 py-3 md:py-6">

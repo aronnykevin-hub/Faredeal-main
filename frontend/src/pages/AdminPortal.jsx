@@ -2307,7 +2307,7 @@ const AdminPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-3 md:space-y-4 lg:space-y-8">
+    <div className="space-y-3 md:space-y-4 lg:space-y-8 bg-gradient-to-br from-slate-900/50 via-slate-800/50 to-slate-900/50 rounded-xl p-4 md:p-6 lg:p-8">
       {/* Enhanced Master Dashboard Header - Mobile Optimized with Accordion */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-lg md:rounded-2xl p-3 md:p-4 lg:p-8 text-white shadow-xl md:shadow-2xl">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
@@ -2351,30 +2351,30 @@ const AdminPortal = () => {
       </div>
 
       {/* Admin Access Status Banner - Ultra Mobile Optimized */}
-      <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-emerald-900/30 dark:to-teal-900/30 border-2 border-green-200 dark:border-emerald-700 rounded-lg md:rounded-xl p-2 md:p-4 shadow-md dark:shadow-lg">
+      <div className="bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border-2 border-emerald-700 rounded-lg md:rounded-xl p-2 md:p-4 shadow-md dark:shadow-lg">
         <div className="flex items-start gap-1.5 md:gap-3">
           <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0 text-base md:text-lg">
             <span>✅</span>
             <span>🛡️</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-xs md:text-base font-bold text-green-900 dark:text-green-300 leading-tight">Admin Access Enabled</h3>
-            <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 line-clamp-2 md:line-clamp-none">Full control. Edit pricing, manage stock, apply bulk updates.</p>
+            <h3 className="text-xs md:text-base font-bold text-green-300 leading-tight">Admin Access Enabled</h3>
+            <p className="text-xs text-green-400 mt-0.5 line-clamp-2 md:line-clamp-none">Full control. Edit pricing, manage stock, apply bulk updates.</p>
           </div>
         </div>
       </div>
 
       {/* Quick Access Hub - Mobile Optimized Accordion */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-900/30 dark:via-purple-900/30 dark:to-pink-900/30 rounded-lg md:rounded-2xl shadow-lg md:shadow-2xl p-3 md:p-6 border-2 border-purple-200 dark:border-purple-700">
-        <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl -mr-24 md:-mr-32 -mt-24 md:-mt-32 animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-36 md:w-48 h-36 md:h-48 bg-gradient-to-tr from-pink-400/20 to-yellow-400/20 rounded-full blur-3xl -ml-18 md:-ml-24 -mb-18 md:-mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-900/30 via-purple-900/30 to-pink-900/30 rounded-lg md:rounded-2xl shadow-lg md:shadow-2xl p-3 md:p-6 border-2 border-purple-700 backdrop-blur-sm">
+        <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-full blur-3xl -mr-24 md:-mr-32 -mt-24 md:-mt-32 animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-36 md:w-48 h-36 md:h-48 bg-gradient-to-tr from-pink-400/10 to-yellow-400/10 rounded-full blur-3xl -ml-18 md:-ml-24 -mb-18 md:-mb-24 animate-pulse" style={{ animationDelay: '1s' }}></div>
         
         {/* Toggle Button - Compact */}
         <div 
-          className="relative flex items-center justify-between gap-2 md:gap-4 cursor-pointer hover:bg-white/50 p-2 md:p-3 rounded-lg transition-all duration-300 backdrop-blur-sm group"
+          className="relative flex items-center justify-between gap-2 md:gap-4 cursor-pointer hover:bg-slate-700/30 p-2 md:p-3 rounded-lg transition-all duration-300 backdrop-blur-sm group"
           onClick={() => setShowQuickAccess(!showQuickAccess)}
         >
-          <h3 className="text-base md:text-lg lg:text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-400 dark:to-pink-400 bg-clip-text text-transparent flex items-center gap-1 md:gap-2 lg:gap-3 flex-1 min-w-0">
+          <h3 className="text-base md:text-lg lg:text-2xl font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-1 md:gap-2 lg:gap-3 flex-1 min-w-0">
             <span className="text-lg md:text-2xl lg:text-3xl animate-bounce flex-shrink-0">🚀</span>
             <span className="truncate">Quick Access Hub</span>
           </h3>
@@ -2391,11 +2391,11 @@ const AdminPortal = () => {
         {showQuickAccess && (
           <div className="relative mt-3 md:mt-6 grid grid-cols-3 md:grid-cols-5 lg:grid-cols-5 gap-1.5 md:gap-3 lg:gap-4 animate-slideDown">
             {[
-              { id: 'inventory', label: 'Inventory', icon: '📦', stats: '6 Products', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50/80', border: 'border-emerald-300', bullet: 'text-emerald-500' },
-              { id: 'orders', label: 'Orders', icon: '📋', stats: '2,847 Orders', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-50/80', border: 'border-orange-300', bullet: 'text-orange-500' },
-              { id: 'payments', label: 'Payments', icon: '💳', stats: '$127K Revenue', gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-50/80', border: 'border-green-300', bullet: 'text-green-500' },
-              { id: 'suppliers', label: 'Suppliers', icon: '🏭', stats: '24 Suppliers', gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50/80', border: 'border-purple-300', bullet: 'text-purple-500' },
-              { id: 'users', label: 'Users', icon: '👥', stats: '1,234 Users', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50/80', border: 'border-blue-300', bullet: 'text-blue-500' }
+              { id: 'inventory', label: 'Inventory', icon: '📦', stats: '6 Products', gradient: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-900/20', border: 'border-emerald-600', bullet: 'text-emerald-400' },
+              { id: 'orders', label: 'Orders', icon: '📋', stats: '2,847 Orders', gradient: 'from-orange-500 to-amber-500', bg: 'bg-orange-900/20', border: 'border-orange-600', bullet: 'text-orange-400' },
+              { id: 'payments', label: 'Payments', icon: '💳', stats: '$127K Revenue', gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-900/20', border: 'border-green-600', bullet: 'text-green-400' },
+              { id: 'suppliers', label: 'Suppliers', icon: '🏭', stats: '24 Suppliers', gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-900/20', border: 'border-purple-600', bullet: 'text-purple-400' },
+              { id: 'users', label: 'Users', icon: '👥', stats: '1,234 Users', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-900/20', border: 'border-blue-600', bullet: 'text-blue-400' }
             ].map((section, index) => (
               <button
                 key={section.id}
@@ -6499,6 +6499,11 @@ const AdminPortal = () => {
             from { opacity: 0; transform: translateX(-50px); }
             to { opacity: 1; transform: translateX(0); }
           }
+          @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-slideInDown { animation: slideInDown 0.3s ease-out; }
           @keyframes slideInRight {
             from { opacity: 0; transform: translateX(50px); }
             to { opacity: 1; transform: translateX(0); }
@@ -6584,71 +6589,160 @@ const AdminPortal = () => {
         `
       }} />
 
-      {/* Mobile Header with Hamburger */}
-      {isMobile && (
-        <div className="fixed top-0 left-0 right-0 bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg z-50 px-4 py-3">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="p-2 bg-white/20 hover:bg-white/30 rounded-lg border-2 border-white/30 transition-all"
-            >
-              <FiMenu className="h-6 w-6 text-white" />
-            </button>
-            
-            <div className="flex items-center space-x-2">
-              <FiShield className="h-6 w-6 text-white" />
-              <h1 className="text-lg font-bold text-white">Admin Portal</h1>
-            </div>
-
-            {/* Mobile Theme Toggle */}
-            <div className="md:hidden">
-              <ThemeToggle />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Sidebar Menu */}
-      {isMobile && showMobileMenu && (
-        <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
-          <div 
-            className="w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
-              <button 
-                onClick={() => setShowMobileMenu(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-lg transition-colors"
-              >
-                <FiX className="h-5 w-5" />
-              </button>
-
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center border-2 border-white/30">
-                  <FiShield className="h-6 w-6" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold">{portalConfig.systemName}</h2>
-                  <p className="text-blue-100 text-sm">System Administrator</p>
-                </div>
+      {/* Creative Top Header */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 shadow-2xl border-b border-blue-500/20">
+        <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo & Branding */}
+            <div className="flex items-center gap-3 flex-shrink-0 group cursor-pointer hover:scale-105 transition-transform">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-2xl transition-all">
+                <FiShield className="h-7 w-7 text-white" />
+              </div>
+              <div className="hidden sm:block">
+                <h1 className="text-lg font-bold text-white">{portalConfig.systemName}</h1>
+                <p className="text-xs text-blue-200 font-medium">System Admin</p>
               </div>
             </div>
 
-            <nav className="p-4 space-y-1">
+            {/* Desktop Navigation - Center */}
+            <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center mx-8">
+              {[
+                { id: 'transactions', label: 'Transaction History', icon: FiFileText },
+                { id: 'inventory-pos', label: 'Order Inventory', icon: FiShoppingBag },
+                { id: 'users', label: 'User Management', icon: FiUsers },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 relative group ${
+                    activeSection === item.id
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                      : 'text-gray-300 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                  {item.id === 'users' && pendingUsers.length > 0 && (
+                    <span className="ml-2 inline-flex items-center justify-center w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse text-[10px]">
+                      {pendingUsers.length}
+                    </span>
+                  )}
+                  {activeSection !== item.id && (
+                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-gradient-to-r from-blue-400 to-purple-400 group-hover:w-12 transition-all duration-300"></div>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            {/* Right Controls */}
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Theme Toggle */}
+              <div className="hidden md:block">
+                <ThemeToggle />
+              </div>
+
+              {/* Notifications */}
+              <button className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                <FiBell className="h-5 w-5" />
+              </button>
+
+              {/* Settings */}
+              <button className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+                <FiSettings className="h-5 w-5" />
+              </button>
+
+              {/* Admin Profile Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 ml-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg border border-white/20 transition-all group"
+                >
+                  <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg flex items-center justify-center text-white">
+                    <FiShield className="h-3.5 w-3.5" />
+                  </div>
+                  <span className="text-sm font-medium text-white hidden sm:inline">Admin</span>
+                  <FiChevronDown className={`h-4 w-4 text-white transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Profile Dropdown */}
+                {showProfileMenu && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setShowProfileMenu(false)}
+                    ></div>
+                    <div className="absolute right-0 mt-3 w-72 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 z-20 overflow-hidden animate-slideInDown">
+                      <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-5 text-white">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/30">
+                            <FiShield className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-sm">Administrator</div>
+                            <div className="text-xs text-white/80">heradmin@faredeal.ug</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="py-2">
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            navigate('/admin-profile');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-slate-700/50 transition-colors"
+                        >
+                          <FiUser className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                          <div className="text-left text-sm">My Profile</div>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setActiveSection('settings');
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-slate-700/50 transition-colors"
+                        >
+                          <FiSettings className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                          <div className="text-left text-sm">Settings</div>
+                        </button>
+
+                        <div className="border-t border-gray-200 dark:border-slate-700 my-2"></div>
+
+                        <button
+                          onClick={() => {
+                            navigate('/admin-auth');
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          <FiLogOut className="h-5 w-5" />
+                          <div className="text-left text-sm font-medium">Logout</div>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+                className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-all"
+              >
+                <FiMenu className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Navigation Dropdown */}
+        {isMobile && showMobileMenu && (
+          <div className="border-t border-blue-500/20 bg-gradient-to-b from-slate-800 to-slate-900 px-4 py-4 space-y-2">
             {[
-              // { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
-              // { id: 'approvals', label: 'Pending Approvals', icon: FiUserCheck },
               { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
               { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
-              // { id: 'orders', label: 'Order Management', icon: FiCalendar },
-              // { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
-              // { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
               { id: 'users', label: 'User Management', icon: FiUsers },
-              // { id: 'analytics', label: 'Business Analytics', icon: FiPieChart },
-              // { id: 'operations', label: 'System Operations', icon: FiCpu },
-              // { id: 'settings', label: 'Configuration', icon: FiSettings },
-              // { id: 'security', label: 'Security Center', icon: FiLock },
-              // { id: 'monitoring', label: 'Live Monitoring', icon: FiActivity }
             ].map((item) => (
               <button
                 key={item.id}
@@ -6656,10 +6750,10 @@ const AdminPortal = () => {
                   setActiveSection(item.id);
                   setShowMobileMenu(false);
                 }}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 relative ${
-                  activeSection === item.id 
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
+                  activeSection === item.id
                     ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    : 'text-gray-300 hover:bg-white/10'
                 }`}
               >
                 <item.icon className="h-5 w-5" />
@@ -6669,101 +6763,34 @@ const AdminPortal = () => {
                     {pendingUsers.length}
                   </span>
                 )}
-                {activeSection === item.id && (
-                  <FiChevronRight className="h-5 w-5" />
-                )}
               </button>
             ))}
-            
-            <div className="p-4 border-t border-gray-200 mt-4 space-y-3 bg-gray-50 dark:bg-gray-800">
-              {/* Theme Toggle for Mobile */}
+
+            <div className="border-t border-white/10 pt-4 mt-4 space-y-3">
               <ThemeToggle mobile={true} />
-              
-              {/* Logout Button */}
-              <button
-                onClick={() => {
-                  navigate('/admin-auth');
-                  setShowMobileMenu(false);
-                }}
-                className="w-full p-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-xl border border-red-200 dark:border-red-800 transition-all flex items-center justify-center gap-2"
-              >
-                <FiLogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <span className="text-red-600 dark:text-red-400 font-medium">Logout</span>
-              </button>
             </div>
-          </nav>
           </div>
-          
-          <div className="flex-1 bg-black/50 backdrop-blur-sm" onClick={() => setShowMobileMenu(false)}></div>
-        </div>
-      )}
-
-      {/* Desktop Sidebar */}
-      {!isMobile && (
-        <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-50 container-glass animate-slideInLeft">
-          <div className="p-6">
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-                <FiShield className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">{portalConfig.systemName}</h2>
-                <p className="text-sm text-gray-500">System Admin</p>
-              </div>
-            </div>
-
-            <nav className="space-y-1">
-            {[
-              // { id: 'dashboard', label: 'Dashboard', icon: FiBarChart },
-              { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
-              { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
-              // { id: 'orders', label: 'Order Management', icon: FiCalendar },
-              // { id: 'payments', label: 'Payment Control', icon: FiDollarSign },
-              // { id: 'suppliers', label: 'Supplier Network', icon: FiTrendingUp },
-              { id: 'users', label: 'User Management', icon: FiUsers },
-              // { id: 'analytics', label: 'Business Analytics', icon: FiPieChart },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActiveSection(item.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-300 relative ${
-                  activeSection === item.id 
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="flex-1 text-left">{item.label}</span>
-                {item.id === 'users' && pendingUsers.length > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {pendingUsers.length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </nav>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Main Content Area */}
-      <div className={`${isMobile ? 'pt-16' : 'ml-64'} p-3 md:p-4 lg:p-8`}>
+      <div className="pt-24 px-3 md:px-4 lg:px-8 pb-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Header - Compact for mobile */}
-        <div className="container-glass dark:bg-slate-800/50 dark:border dark:border-slate-700 rounded-lg md:rounded-2xl shadow-lg dark:shadow-xl p-3 md:p-4 lg:p-6 mb-4 md:mb-6 lg:mb-8 animate-fadeInUp">
+        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-lg md:rounded-2xl shadow-2xl p-3 md:p-4 lg:p-6 mb-4 md:mb-6 lg:mb-8 animate-fadeInUp">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate">Admin Portal - System Administration</h1>
-              <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300 mt-0.5 md:mt-1">Welcome back to FareDeal Uganda, admin</p>
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white truncate">Admin Portal - System Administration</h1>
+              <p className="text-xs md:text-sm text-slate-300 mt-0.5 md:mt-1">Welcome back to FareDeal Uganda, admin</p>
             </div>
             <div className="flex items-center gap-1 md:gap-2 lg:gap-4 flex-shrink-0">
               <button 
-                className="p-1.5 md:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                 title="Notifications"
               >
                 <FiBell className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
               </button>
               <button 
-                className="p-1.5 md:p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
+                className="p-1.5 md:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                 title="Settings"
               >
                 <FiSettings className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
@@ -6778,15 +6805,15 @@ const AdminPortal = () => {
               <div className="relative">
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 bg-gray-50 dark:bg-slate-700 rounded-lg px-2 md:px-3 py-1.5 md:py-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg px-2 md:px-3 py-1.5 md:py-2 transition-colors cursor-pointer"
                   title="Admin Profile"
                 >
                   <div className="w-6 md:w-8 h-6 md:h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
                     <FiShield className="h-3 md:h-5 w-3 md:w-5" />
                   </div>
                   <div className="text-xs md:text-sm text-left hidden md:block">
-                    <div className="font-medium text-gray-900 dark:text-white">admin</div>
-                    <div className="text-gray-500 dark:text-gray-400 text-xs">Administrator</div>
+                    <div className="font-medium text-white">admin</div>
+                    <div className="text-slate-400 text-xs">Administrator</div>
                   </div>
                 </button>
 
@@ -6797,7 +6824,7 @@ const AdminPortal = () => {
                       className="fixed inset-0 z-10" 
                       onClick={() => setShowProfileMenu(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700 z-20 overflow-hidden">
+                    <div className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-20 overflow-hidden">
                       {/* Profile Header */}
                       <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white">
                         <div className="flex items-center space-x-3">
@@ -6818,12 +6845,12 @@ const AdminPortal = () => {
                             setShowProfileMenu(false);
                             navigate('/admin-profile');
                           }}
-                          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-blue-50 transition-colors"
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-colors"
                         >
-                          <FiUser className="h-5 w-5 text-blue-600" />
+                          <FiUser className="h-5 w-5 text-blue-400" />
                           <div className="text-left">
-                            <div className="font-medium text-sm">My Profile</div>
-                            <div className="text-xs text-gray-500">View and edit profile</div>
+                            <div className="font-medium text-sm text-white">My Profile</div>
+                            <div className="text-xs text-slate-400">View and edit profile</div>
                           </div>
                         </button>
 
@@ -6832,12 +6859,28 @@ const AdminPortal = () => {
                             setShowProfileMenu(false);
                             setActiveSection('settings');
                           }}
-                          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-purple-50 transition-colors"
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-slate-300 hover:bg-slate-700 transition-colors"
                         >
-                          <FiSettings className="h-5 w-5 text-purple-600" />
+                          <FiSettings className="h-5 w-5 text-purple-400" />
                           <div className="text-left">
-                            <div className="font-medium text-sm">Settings</div>
-                            <div className="text-xs text-gray-500">System configuration</div>
+                            <div className="font-medium text-sm text-white">Settings</div>
+                            <div className="text-xs text-slate-400">System configuration</div>
+                          </div>
+                        </button>
+
+                        <div className="border-t border-slate-700 my-2"></div>
+
+                        <button
+                          onClick={() => {
+                            navigate('/admin-auth');
+                            setShowProfileMenu(false);
+                          }}
+                          className="w-full flex items-center space-x-3 px-4 py-3 text-red-400 hover:bg-red-900/20 transition-colors"
+                        >
+                          <FiLogOut className="h-5 w-5" />
+                          <div className="text-left">
+                            <div className="font-medium text-sm">Logout</div>
+                            <div className="text-xs text-red-300">Sign out from admin</div>
                           </div>
                         </button>
 
@@ -6917,14 +6960,14 @@ const AdminPortal = () => {
             
             {/* 🧾 TRANSACTION HISTORY - Admin View */}
             {activeSection === 'transactions' && (
-              <div>
-                <div className={`bg-gradient-to-r from-yellow-500 via-red-600 to-black dark:from-yellow-700 dark:via-red-800 dark:to-gray-900 rounded-lg md:rounded-xl ${isMobile ? 'p-3 md:p-6' : 'p-6'} text-white shadow-lg dark:shadow-xl md:shadow-xl dark:md:shadow-2xl mb-4 md:mb-6`}>
+              <div className="bg-gradient-to-br from-slate-900/50 via-slate-800/50 to-slate-900/50 rounded-xl p-4 md:p-6 lg:p-8">
+                <div className={`bg-gradient-to-r from-yellow-600 via-red-700 to-slate-800 rounded-lg md:rounded-xl ${isMobile ? 'p-3 md:p-6' : 'p-6'} text-white shadow-lg dark:shadow-xl md:shadow-xl dark:md:shadow-2xl mb-4 md:mb-6`}>
                   <h2 className={`${isMobile ? 'text-base md:text-2xl' : 'text-3xl'} font-bold flex items-center gap-2`}>
                     <span className="text-lg md:text-2xl flex-shrink-0">🧾</span>
                     <span className="truncate">All Transactions</span>
                     <span className="text-sm md:text-lg flex-shrink-0">🇺🇬</span>
                   </h2>
-                  <p className={`text-yellow-100 dark:text-yellow-200 mt-2 ${isMobile ? 'text-xs md:text-sm' : 'text-base'}`}>
+                  <p className={`text-yellow-100 mt-2 ${isMobile ? 'text-xs md:text-sm' : 'text-base'}`}>
                     Complete transaction history with advanced analytics and financial insights
                   </p>
                 </div>
@@ -6935,21 +6978,21 @@ const AdminPortal = () => {
             )}
             
             {activeSection === 'security' && (
-              <div className="container-glass rounded-2xl p-8 shadow-lg">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+              <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
                   <span className="mr-3 text-3xl">🛡️</span>
                   Security Center
                 </h2>
-                <p className="text-gray-600">Advanced security monitoring and threat detection coming soon...</p>
+                <p className="text-slate-300">Advanced security monitoring and threat detection coming soon...</p>
               </div>
             )}
             {activeSection === 'monitoring' && (
-              <div className="container-glass rounded-2xl p-8 shadow-lg">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+              <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-8 shadow-2xl">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
                   <span className="mr-3 text-3xl">📡</span>
                   Live System Monitoring
                 </h2>
-                <p className="text-gray-600">Real-time system monitoring dashboard coming soon...</p>
+                <p className="text-slate-300">Real-time system monitoring dashboard coming soon...</p>
               </div>
             )}
           </div>

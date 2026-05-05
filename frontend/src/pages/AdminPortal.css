@@ -1644,6 +1644,98 @@ html.dark .admin-sidebar .bg-white {
   background-color: #1e293b !important;
 }
 
+/* Comprehensive Dark Mode Overrides for All Backgrounds */
+
+/* Main Page Wrapper Dark Mode */
+html.dark div[class*="min-h-screen"][class*="bg-gradient-to-br"][class*="from-gray-50"] {
+  background: linear-gradient(to bottom right, #0f172a, #1a2847) !important;
+}
+
+html.dark div[class*="bg-gradient-to-br"][class*="from-gray-50"] {
+  background: linear-gradient(to bottom right, #0f172a, #1a2847) !important;
+}
+
+html.dark div[class*="bg-gradient-to-r"][class*="from-gray-50"] {
+  background: linear-gradient(to right, #1e293b, #334155) !important;
+}
+
+/* Sidebar Dark Mode - bg-white override */
+html.dark div[class*="fixed"][class*="left-0"][class*="top-0"][class*="bg-white"] {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+html.dark div[class*="w-80"][class*="bg-white"][class*="shadow-2xl"] {
+  background-color: #1e293b !important;
+}
+
+html.dark div[class*="fixed"][class*="left-0"][class*="bg-white"] .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+
+html.dark div[class*="fixed"][class*="left-0"][class*="bg-white"] .text-gray-500,
+html.dark div[class*="fixed"][class*="left-0"][class*="bg-white"] .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark div[class*="fixed"][class*="left-0"][class*="bg-white"] .hover\:bg-gray-50:hover {
+  background-color: rgba(71, 85, 105, 0.2) !important;
+}
+
+/* All bg-white elements in dark mode */
+html.dark div[class*="bg-white"] {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark p[class*="text-gray"][class*="bg-white"] {
+  color: #cbd5e1 !important;
+}
+
+/* All gray backgrounds in dark mode */
+html.dark div[class*="bg-gray-50"] {
+  background-color: #1e293b !important;
+}
+
+html.dark div[class*="bg-gray-100"] {
+  background-color: #334155 !important;
+}
+
+html.dark div[class*="bg-gray-200"] {
+  background-color: #475569 !important;
+}
+
+html.dark button[class*="hover\:bg-gray-50"]:hover,
+html.dark div[class*="hover\:bg-gray-50"]:hover {
+  background-color: rgba(71, 85, 105, 0.2) !important;
+}
+
+html.dark button[class*="hover\:bg-gray-100"]:hover,
+html.dark div[class*="hover\:bg-gray-100"]:hover {
+  background-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+/* Text colors in dark mode */
+html.dark .text-gray-900 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-gray-800 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
 /* Responsive Dark Mode */
 @media (max-width: 768px) {
   html.dark .admin-options {

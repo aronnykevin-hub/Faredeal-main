@@ -11,6 +11,7 @@ import {
 
 const AdminAuth = () => {
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -21,6 +22,15 @@ const AdminAuth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [resetEmailSent, setResetEmailSent] = useState(false);
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -820,73 +830,84 @@ const AdminAuth = () => {
   const strengthInfo = getPasswordStrengthInfo();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center p-4 relative overflow-hidden">
+    <div style={{
+      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      transition: 'background-color 0.3s, color 0.3s'
+    }} className="flex items-center justify-center p-4 relative overflow-hidden min-h-screen">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/5 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl animate-pulse"></div>
+        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.05)' : 'rgba(255, 255, 255, 0.3)' }} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
 
       {/* Main container */}
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8 relative z-10">
         {/* Left side - Branding */}
-        <div className="hidden md:flex flex-col justify-center text-white space-y-8">
+        <div className="hidden md:flex flex-col justify-center space-y-8" style={{ color: isDarkMode ? '#e2e8f0' : '#ffffff' }}>
           <div>
             <div className="flex items-center space-x-3 mb-4">
-              <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-16 h-16 backdrop-blur-sm rounded-2xl flex items-center justify-center">
                 <FiShield className="w-10 h-10" />
               </div>
               <div>
                 <h1 className="text-4xl font-bold">FAREDEAL</h1>
-                <p className="text-blue-100">Admin Portal</p>
+                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }}>Admin Portal</p>
               </div>
             </div>
-            <p className="text-xl text-blue-50">
+            <p className="text-xl">
               Secure administrative access to your supermarket management system
             </p>
           </div>
 
           {/* Features */}
           <div className="space-y-4">
-            <div className="flex items-start space-x-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiZap className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Real-time Analytics</h3>
-                <p className="text-blue-100 text-sm">Monitor your business performance with live data and insights</p>
+                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Monitor your business performance with live data and insights</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiAward className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Complete Control</h3>
-                <p className="text-blue-100 text-sm">Manage users, inventory, sales, and suppliers from one place</p>
+                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Manage users, inventory, sales, and suppliers from one place</p>
               </div>
             </div>
 
-            <div className="flex items-start space-x-4 bg-white/10 backdrop-blur-sm rounded-xl p-4">
-              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiTrendingUp className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Business Growth</h3>
-                <p className="text-blue-100 text-sm">Powerful tools to scale your supermarket operations</p>
+                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Powerful tools to scale your supermarket operations</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Right side - Auth form */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 relative">
+        <div style={{
+          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+          borderColor: isDarkMode ? '#334155' : '#e2e8f0'
+        }} className="rounded-3xl shadow-2xl p-8 md:p-10 relative border">
           {/* Back button */}
           <button
             onClick={() => navigate('/portal-selection')}
-            className="absolute top-6 left-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all duration-300 group"
+            style={{
+              color: isDarkMode ? '#94a3b8' : '#4b5563',
+              backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9'
+            }}
+            className="absolute top-6 left-6 flex items-center space-x-2 hover:text-blue-600 px-3 py-2 rounded-lg transition-all duration-300 group"
             title="Go back to portal selection"
           >
             <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -899,23 +920,23 @@ const AdminAuth = () => {
               <FiShield className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">FAREDEAL</h2>
-              <p className="text-sm text-gray-600">Admin Portal</p>
+              <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>FAREDEAL</h2>
+              <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className="text-sm">Admin Portal</p>
             </div>
           </div>
 
           {/* Tab switcher */}
-          <div className="flex bg-gray-100 rounded-xl p-1 mb-8">
+          <div style={{ backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }} className="flex rounded-xl p-1 mb-8">
             <button
               onClick={() => {
                 setIsLogin(true);
                 setErrors({});
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${
-                isLogin
-                  ? 'bg-white text-blue-600 shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              style={{
+                backgroundColor: isLogin ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: isLogin ? '#6366f1' : isDarkMode ? '#94a3b8' : '#64748b'
+              }}
+              className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2"
             >
               <FiLogIn className="w-5 h-5" />
               <span>Login</span>
@@ -925,11 +946,11 @@ const AdminAuth = () => {
                 setIsLogin(false);
                 setErrors({});
               }}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2 ${
-                !isLogin
-                  ? 'bg-white text-blue-600 shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              style={{
+                backgroundColor: !isLogin ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: !isLogin ? '#6366f1' : isDarkMode ? '#94a3b8' : '#64748b'
+              }}
+              className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2"
             >
               <FiUserPlus className="w-5 h-5" />
               <span>Sign Up</span>
@@ -938,10 +959,10 @@ const AdminAuth = () => {
 
           {/* Form title */}
           <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <h2 style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-2xl font-bold mb-2">
               {isLogin ? 'Welcome back!' : 'Create admin account'}
             </h2>
-            <p className="text-gray-600">
+            <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
               {isLogin
                 ? 'Enter your credentials to access the admin portal'
                 : 'Fill in your details to create a new admin account'}

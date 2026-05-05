@@ -11,11 +11,21 @@ import {
 
 const CashierAuth = () => {
   const navigate = useNavigate();
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showWaitingScreen, setShowWaitingScreen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
   
   const [formData, setFormData] = useState({
     username: '',
@@ -386,7 +396,7 @@ const CashierAuth = () => {
   // =============================================
   if (showWaitingScreen) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-cyan-600 flex items-center justify-center p-4">
+      <div className="flex items-center justify-center p-4">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 text-center">
           <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <FiClock className="w-8 h-8 text-white" />
@@ -405,7 +415,7 @@ const CashierAuth = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-600 via-teal-600 to-cyan-600 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-white/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
