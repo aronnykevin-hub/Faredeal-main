@@ -385,7 +385,9 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
               // Auto-trigger AI analysis with a small delay
               setTimeout(() => {
                 if (canvas && canvasRef.current) {
-                  toast.info('💡 Analyzing image with AI to identify the product...');
+                  // DISABLED: Don't show notification for AI analysis to reduce notification spam
+                  // toast.info('💡 Analyzing image with AI to identify the product...');
+                  console.log('🤖 AI analysis triggered automatically');
                    analyzeImageWithAI(canvas);
                 }
               }, 100);
@@ -622,7 +624,8 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     setUSBDeviceConnected(true);
     setUSBDeviceName(deviceName);
     
-    toast.info(`📱 Device connected: ${deviceName}`);
+    // DISABLED: Don't show device connection notifications to reduce spam
+    // toast.info(`📱 Device connected: ${deviceName}`);
     // toast.info('🎥 You can now use Phone Camera scanning!');
     
     // NOTE: Don't call requestUSBPermission here - it requires a user gesture!
@@ -745,7 +748,8 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
 
       setSupabaseProducts(productsData || []);
       console.log(`✅ Loaded ${(productsData || []).length} products from Supabase`);
-      toast.info(`📦 Scanner ready with ${(productsData || []).length} products`);
+      // DISABLED: Don't show notification for initial product load to reduce notification spam
+      // toast.info(`📦 Scanner ready with ${(productsData || []).length} products`);
     } catch (error) {
       console.error('❌ Error loading products:', error);
       toast.error('Failed to load products from database');
@@ -915,12 +919,14 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
 
   const removeFromTransaction = (productId) => {
     setCurrentTransaction(prev => prev.filter(item => item.id !== productId));
-    toast.info('🗑️ Item removed from transaction');
+    // DISABLED: Don't show info notifications during normal operations
+    // toast.info('🗑️ Item removed from transaction');
   };
 
   const clearTransaction = () => {
     setCurrentTransaction([]);
-    toast.info('🧹 Transaction cleared');
+    // DISABLED: Don't show info notifications during normal operations
+    // toast.info('🧹 Transaction cleared');
   };
 
   // 💾 Save transaction to Supabase (creates real POS data for reporting)
@@ -1928,7 +1934,8 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
                               onClick={() => {
                                 if (isAdded) {
                                   setAddedProducts(addedProducts.filter(p => p.id !== product.id));
-                                  toast.info(`❌ ${product.name} removed`);
+                                  // DISABLED: Don't show info notifications during normal operations
+    // toast.info(`❌ ${product.name} removed`);
                                 } else {
                                   setAddedProducts([...addedProducts, {
                                     id: product.id,
