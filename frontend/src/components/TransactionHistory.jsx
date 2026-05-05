@@ -342,13 +342,13 @@ www.faredeal.ug
 
       {/* Header Stats - Responsive Grid */}
       <div className={`grid gap-3 md:gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-1 md:grid-cols-4'}`}>
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md hover:shadow-lg transition-shadow">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-700 dark:to-blue-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
           <FiShoppingCart className={`${isMobile ? 'h-5 w-5' : 'h-8 w-8'} mb-2 opacity-80`} />
           <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Transactions</p>
           <p className={`font-bold ${isMobile ? 'text-lg' : 'text-3xl'}`}>{statsData.totalTransactions}</p>
           <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>{dateFilter === 'today' ? 'Today' : dateFilter === 'week' ? 'This Week' : dateFilter === 'month' ? 'This Month' : 'This Year'}</p>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md hover:shadow-lg transition-shadow">
+        <div className="bg-gradient-to-br from-green-500 to-green-600 dark:from-green-700 dark:to-green-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
           <FiDollarSign className={`${isMobile ? 'h-5 w-5' : 'h-8 w-8'} mb-2 opacity-80`} />
           <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>Total Sales</p>
           <p className={`font-bold ${isMobile ? 'text-base' : 'text-2xl'}`}>{formatCurrency(statsData.totalSales)}</p>
@@ -356,13 +356,13 @@ www.faredeal.ug
         </div>
         {!isMobile && (
           <>
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-700 dark:to-purple-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
               <FiTrendingUp className={`h-8 w-8 mb-2 opacity-80`} />
               <p className={`opacity-80 text-sm`}>Avg Basket</p>
               <p className={`font-bold text-2xl`}>{formatCurrency(statsData.averageBasket)}</p>
               <p className={`opacity-60 mt-1 text-xs`}>Per Tx</p>
             </div>
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md hover:shadow-lg transition-shadow">
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-700 dark:to-orange-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
               <FiShoppingCart className={`h-8 w-8 mb-2 opacity-80`} />
               <p className={`opacity-80 text-sm`}>Items Sold</p>
               <p className={`font-bold text-3xl`}>{statsData.totalItems}</p>
@@ -371,14 +371,14 @@ www.faredeal.ug
           </>
         )}
         {isMobile && (
-          <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 text-white shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-700 dark:to-purple-800 rounded-lg p-3 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
             <FiTrendingUp className="h-5 w-5 mb-2 opacity-80" />
             <p className="opacity-80 text-xs">Avg Basket</p>
             <p className="font-bold text-base">{formatCurrency(statsData.averageBasket)}</p>
           </div>
         )}
         {isMobile && (
-          <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 text-white shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-700 dark:to-orange-800 rounded-lg p-3 text-white shadow-md dark:shadow-lg hover:shadow-lg dark:hover:shadow-xl transition-shadow">
             <FiShoppingCart className="h-5 w-5 mb-2 opacity-80" />
             <p className="opacity-80 text-xs">Items Sold</p>
             <p className="font-bold text-lg">{statsData.totalItems}</p>
@@ -390,14 +390,14 @@ www.faredeal.ug
       {dailyReport && (
         <div className={`grid gap-3 md:gap-4 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3'}`}>
           {/* Tax Collected */}
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 dark:from-indigo-700 dark:to-indigo-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg">
             <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>💰 Tax Collected</p>
             <p className={`font-bold ${isMobile ? 'text-lg' : 'text-2xl'}`}>{formatCurrency(dailyReport.total_tax_collected || 0)}</p>
             <p className={`opacity-60 mt-1 ${isMobile ? 'text-xs' : 'text-xs'}`}>18% VAT</p>
           </div>
 
           {/* Payment Methods Summary */}
-          <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md">
+          <div className="bg-gradient-to-br from-cyan-500 to-cyan-600 dark:from-cyan-700 dark:to-cyan-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg">
             <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>📊 Payment Methods</p>
             <div className={`${isMobile ? 'text-xs' : 'text-sm'} mt-2 space-y-1`}>
               {dailyReport.cash_transactions > 0 && <p>💵 Cash: {dailyReport.cash_transactions}</p>}
@@ -408,7 +408,7 @@ www.faredeal.ug
           </div>
 
           {/* Performance Metrics */}
-          <div className="bg-gradient-to-br from-rose-500 to-rose-600 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md">
+          <div className="bg-gradient-to-br from-rose-500 to-rose-600 dark:from-rose-700 dark:to-rose-800 rounded-lg md:rounded-xl p-3 md:p-4 text-white shadow-md dark:shadow-lg">
             <p className={`opacity-80 ${isMobile ? 'text-xs' : 'text-sm'}`}>📈 Performance</p>
             <div className={`${isMobile ? 'text-xs' : 'text-sm'} mt-2 space-y-1`}>
               <p>🏆 {formatCurrency(dailyReport.largest_transaction || 0)}</p>
@@ -420,18 +420,18 @@ www.faredeal.ug
       )}
 
       {/* Filters & Actions - Mobile Optimized */}
-      <div className={`bg-white rounded-lg md:rounded-xl shadow-md ${isMobile ? 'p-3' : 'p-6'}`}>
+      <div className={`bg-white dark:bg-slate-800 rounded-lg md:rounded-xl shadow-md dark:shadow-lg ${isMobile ? 'p-3' : 'p-6'}`}>
         <div className={`flex flex-col ${isMobile ? 'space-y-2' : 'md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0'} gap-2 ${!isMobile && 'md:gap-4'}`}>
           {/* Search */}
           <div className={`${isMobile ? 'w-full' : 'flex-1 max-w-md'}`}>
             <div className="relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 h-4 w-4" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={isMobile ? "Search..." : "Search receipt, customer..."}
-                className={`w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${isMobile ? 'text-sm' : ''}`}
+                className={`w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 ${isMobile ? 'text-sm' : ''}`}
               />
             </div>
           </div>
@@ -441,7 +441,7 @@ www.faredeal.ug
             <select
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white flex-1 ${isMobile ? 'text-xs' : ''}`}
+              className={`px-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 bg-white flex-1 ${isMobile ? 'text-xs' : ''}`}
             >
               <option value="today">Today</option>
               <option value="week">Week</option>
@@ -452,7 +452,7 @@ www.faredeal.ug
             <select
               value={paymentFilter}
               onChange={(e) => setPaymentFilter(e.target.value)}
-              className={`px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 flex-1 ${isMobile ? 'text-xs' : ''}`}
+              className={`px-3 py-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:focus:ring-blue-400 flex-1 ${isMobile ? 'text-xs' : ''}`}
             >
               <option value="all">All Payments</option>
               <option value="cash">Cash</option>
@@ -464,7 +464,7 @@ www.faredeal.ug
             <button
               onClick={loadTransactions}
               disabled={loading}
-              className={`bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'}`}
+              className={`bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors flex items-center space-x-2 ${isMobile ? 'px-3 py-2 text-sm' : 'px-4 py-2'}`}
             >
               <FiRefreshCw className={`${isMobile ? 'h-3 w-3' : 'h-4 w-4'} ${loading ? 'animate-spin' : ''}`} />
               <span>{isMobile ? 'Refresh' : 'Refresh'}</span>
@@ -510,11 +510,11 @@ www.faredeal.ug
       </div>
 
       {/* Transactions Table */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg dark:shadow-xl overflow-hidden">
         {/* Show indicator when viewing unsaved receipts */}
         {localReceiptsOnly && (
-          <div className={`bg-orange-50 border-b-2 border-orange-200 ${isMobile ? 'px-3 py-2' : 'px-6 py-3'}`}>
-            <p className={`text-orange-800 flex items-start ${isMobile ? 'text-xs' : 'text-sm'} space-x-2`}>
+          <div className={`bg-orange-50 dark:bg-orange-900/20 border-b-2 border-orange-200 dark:border-orange-700 ${isMobile ? 'px-3 py-2' : 'px-6 py-3'}`}>
+            <p className={`text-orange-800 dark:text-orange-300 flex items-start ${isMobile ? 'text-xs' : 'text-sm'} space-x-2`}>
               <span>⚠️</span>
               <span><strong>Viewing {savedReceipts.length} unsaved</strong> {isMobile ? 'receipt(s)' : 'receipt(s) - These are stored locally and may not be synced to the system yet'}</span>
             </p>

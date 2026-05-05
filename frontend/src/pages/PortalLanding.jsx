@@ -7,6 +7,7 @@ import {
   FiBriefcase, FiDollarSign, FiClock
 } from 'react-icons/fi';
 import SupabaseConnectionTest from '../components/SupabaseConnectionTest';
+import ThemeToggle from '../components/ThemeToggle';
 
 const PortalLanding = () => {
   const navigate = useNavigate();
@@ -114,6 +115,9 @@ const PortalLanding = () => {
                 <h1 className="text-2xl sm:text-3xl font-bold text-white">FareDeal</h1>
                 <p className="text-xs sm:text-sm text-gray-400">Professional Portals</p>
               </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
             </div>
           </div>
         </div>

@@ -28,6 +28,7 @@ import TillSuppliesOrderManagement from '../components/TillSuppliesOrderManageme
 import SupplierOrderManagement from '../components/SupplierOrderManagement';
 import OrderInventoryPOSControl from '../components/OrderInventoryPOSControl';
 import DualScannerInterface from '../components/DualScannerInterface';
+import ThemeToggle from '../components/ThemeToggle';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabase';
 
@@ -11874,6 +11875,13 @@ FAREDEAL Uganda Management Team
                   <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping" style={{ animationDelay: '0.5s' }}></div>
                 </button>
 
+                {/* Theme Toggle */}
+                <div className="relative group">
+                  <div className="p-3 bg-white/15 backdrop-blur-sm rounded-2xl border-2 border-white/20 hover:bg-white/25 transition-all duration-500 transform hover:scale-110 shadow-lg">
+                    <ThemeToggle />
+                  </div>
+                </div>
+
                 {/* Profile */}
                 <button
                   onClick={handleProfileClick}
@@ -12172,7 +12180,7 @@ FAREDEAL Uganda Management Team
         <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileDropdown(false)}>
           {/* Sidebar - slides from left */}
           <div 
-            className="mobile-dropdown-container w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out animate-slideInLeft overflow-y-auto"
+            className="mobile-dropdown-container w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-all duration-300 ease-out animate-slideInLeft overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with Profile */}
@@ -12227,7 +12235,7 @@ FAREDEAL Uganda Management Team
 
             {/* Navigation Menu - Clean List Style */}
             <div className="p-4 space-y-1">
-              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Main Menu
               </div>
               {[
@@ -12256,7 +12264,7 @@ FAREDEAL Uganda Management Team
                   className={`w-full group relative flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                     activeTab === item.id 
                       ? 'bg-gradient-to-r ' + item.gradient + ' text-white shadow-lg scale-[1.02]' 
-                      : 'text-gray-700 hover:bg-gray-100'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                 >
                   {/* Icon */}
@@ -12340,6 +12348,29 @@ FAREDEAL Uganda Management Team
             */}
 
             {/* Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 space-y-3">
+              {/* Theme Toggle for Mobile */}
+              <ThemeToggle mobile={true} />
+              
+              {/* Logout Button */}
+              <button
+                onClick={() => {
+                  handleManagerLogout();
+                  setShowMobileDropdown(false);
+                }}
+                className="w-full bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 text-red-700 dark:text-red-300 px-4 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 border border-red-200 dark:border-red-800"
+              >
+                <FiLogOut className="h-5 w-5" />
+                <span>Logout</span>
+              </button>
+
+              {/* App Info */}
+              <div className="text-center pt-2">
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  FAREDEAL v1.0 • Uganda
+                </p>
+              </div>
+            </div>
             {/* 
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <div className="text-center">

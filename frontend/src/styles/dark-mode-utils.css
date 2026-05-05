@@ -1,0 +1,240 @@
+/* ============================================
+   DARK MODE UTILITIES AND OVERRIDES
+   ============================================ */
+
+/* Ensure Tailwind dark mode classes work properly */
+html.dark .dark\:bg-slate-900 {
+  background-color: #0f172a !important;
+}
+
+html.dark .dark\:bg-slate-800 {
+  background-color: #1e293b !important;
+}
+
+html.dark .dark\:text-white {
+  color: #f1f5f9 !important;
+}
+
+html.dark .dark\:text-gray-100 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .dark\:text-gray-200 {
+  color: #e2e8f0 !important;
+}
+
+html.dark .dark\:border-gray-700 {
+  border-color: #475569 !important;
+}
+
+html.dark .dark\:border-gray-600 {
+  border-color: #64748b !important;
+}
+
+html.dark .dark\:hover\:bg-slate-800:hover {
+  background-color: #1e293b !important;
+}
+
+html.dark .dark\:hover\:bg-slate-700:hover {
+  background-color: #334155 !important;
+}
+
+/* Background Color Overrides for Dark Mode */
+html.dark {
+  background-color: #0f172a !important;
+}
+
+html.dark body {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark main {
+  background-color: #0f172a !important;
+}
+
+html.dark div {
+  transition: background-color 0.2s ease, color 0.2s ease !important;
+}
+
+/* Portal-specific Dark Mode */
+html.dark .portal-container {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+html.dark .header {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+html.dark .card {
+  background-color: #1e293b;
+  border-color: #475569;
+}
+
+html.dark .modal {
+  background-color: #1e293b;
+}
+
+html.dark .modal-header {
+  background-color: #334155;
+  border-color: #475569;
+}
+
+/* Navigation Dark Mode */
+html.dark .nav-link {
+  color: #cbd5e1;
+}
+
+html.dark .nav-link:hover {
+  color: #f1f5f9;
+  background-color: #334155;
+}
+
+html.dark .nav-link.active {
+  color: #f1f5f9;
+  background-color: #475569;
+}
+
+/* Tab Navigation Dark Mode */
+html.dark .tab {
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+html.dark .tab:hover {
+  color: #f1f5f9;
+  background-color: #334155;
+}
+
+html.dark .tab.active {
+  color: #f1f5f9;
+  background-color: #475569;
+  border-color: #64748b;
+}
+
+/* Ensure visibility in dark mode */
+html.dark .text-black {
+  color: #f1f5f9 !important;
+}
+
+html.dark .bg-white {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .bg-gray-50 {
+  background-color: #0f172a !important;
+}
+
+html.dark .bg-gray-100 {
+  background-color: #1e293b !important;
+}
+
+html.dark .bg-gray-200 {
+  background-color: #334155 !important;
+}
+
+html.dark .bg-gray-300 {
+  background-color: #475569 !important;
+}
+
+/* Shadows in Dark Mode */
+html.dark .shadow {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .shadow-2xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Dropdown/Select Dark Mode */
+html.dark select {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+html.dark select:focus {
+  background-color: #334155 !important;
+  border-color: #64748b !important;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.1) !important;
+}
+
+/* Badges and Pills */
+html.dark .badge,
+html.dark .pill {
+  background-color: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+/* Alerts in Dark Mode */
+html.dark .alert {
+  background-color: #1e293b;
+  border-color: #475569;
+  color: #cbd5e1;
+}
+
+html.dark .alert-error {
+  background-color: rgba(220, 38, 38, 0.2);
+  border-color: #dc2626;
+  color: #fca5a5;
+}
+
+html.dark .alert-success {
+  background-color: rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+  color: #86efac;
+}
+
+html.dark .alert-warning {
+  background-color: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+  color: #fbbf24;
+}
+
+html.dark .alert-info {
+  background-color: rgba(59, 130, 246, 0.2);
+  border-color: #3b82f6;
+  color: #93c5fd;
+}
+
+/* Code blocks and pre */
+html.dark pre {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  border-color: #475569;
+}
+
+html.dark code {
+  background-color: #1e293b;
+  color: #cbd5e1;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+/* Ensure proper contrast for all text */
+@media (prefers-contrast: more) {
+  html.dark {
+    background-color: #000000;
+  }
+
+  html.dark body {
+    background-color: #000000;
+    color: #ffffff;
+  }
+
+  html.dark .bg-slate-900 {
+    background-color: #1a1a1a;
+  }
+}

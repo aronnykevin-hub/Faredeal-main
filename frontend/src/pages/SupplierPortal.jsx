@@ -25,6 +25,7 @@ import PaymentService from '../services/paymentService';
 import AddProductModal from '../components/AddProductModal';
 import SupplierPaymentConfirmations from '../components/SupplierPaymentConfirmations';
 import OrderPaymentTracker from '../components/OrderPaymentTracker';
+import ThemeToggle from '../components/ThemeToggle';
 
 const SupplierPortal = () => {
   const navigate = useNavigate();
@@ -2835,6 +2836,8 @@ const SupplierPortal = () => {
 
               {/* Action Buttons Container */}
               <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm rounded-xl px-2 py-2 border border-white/20">
+                <ThemeToggle />
+                
                 {/* Notifications with Badge */}
                 <button className="relative p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300 group">
                   <FiBell className="h-6 w-6 group-hover:animate-bounce" />
@@ -2948,7 +2951,7 @@ const SupplierPortal = () => {
       {isMobile && showMobileMenu && (
         <div className="fixed inset-0 z-50 flex" onClick={() => setShowMobileMenu(false)}>
           <div 
-            className="w-80 max-w-[85vw] bg-white shadow-2xl transform transition-all duration-300 ease-out overflow-y-auto"
+            className="w-80 max-w-[85vw] bg-white dark:bg-gray-900 shadow-2xl transform transition-all duration-300 ease-out overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2990,7 +2993,7 @@ const SupplierPortal = () => {
 
             {/* Navigation Menu */}
             <div className="p-4 space-y-1">
-              <div className="px-3 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-2 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Main Menu
               </div>
               {tabs.map((tab) => (
@@ -3003,7 +3006,7 @@ const SupplierPortal = () => {
                   className={`w-full group relative flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                     activeTab === tab.id 
                       ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg scale-[1.02]' 
-                      : 'text-gray-700 hover:bg-gray-100'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
                   }`}
                 >
                   <div className={`w-10 h-10 flex items-center justify-center rounded-lg transition-all ${
@@ -3024,16 +3027,20 @@ const SupplierPortal = () => {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 space-y-3">
+              {/* Theme Toggle for Mobile */}
+              <ThemeToggle mobile={true} />
+              
+              {/* Logout Button */}
               <button
                 onClick={() => {
-                  // Handle logout
                   navigate('/supplier-auth');
+                  setShowMobileMenu(false);
                 }}
-                className="w-full p-3 bg-red-50 hover:bg-red-100 rounded-xl text-center border border-red-200 transition-all flex items-center justify-center gap-2"
+                className="w-full p-3 bg-red-50 hover:bg-red-100 dark:bg-red-900/20 dark:hover:bg-red-900/40 rounded-xl border border-red-200 dark:border-red-800 transition-all flex items-center justify-center gap-2"
               >
-                <FiLogOut className="h-4 w-4 text-red-600" />
-                <span className="text-red-600 font-medium">Logout</span>
+                <FiLogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <span className="text-red-600 dark:text-red-400 font-medium">Logout</span>
               </button>
             </div>
           </div>

@@ -128,14 +128,14 @@ const PortalDashboard = ({
   const renderMetrics = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
       {metrics?.map((metric, index) => (
-        <div key={index} className="bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+        <div key={index} className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg dark:shadow-lg dark:shadow-slate-900 hover:shadow-xl dark:hover:shadow-slate-800 transition-all duration-300 transform hover:scale-105">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-600 text-sm font-medium">{metric.title}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{metric.value}</p>
+              <p className="text-gray-600 dark:text-gray-300 text-sm font-medium">{metric.title}</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">{metric.value}</p>
               {metric.change && (
                 <p className={`text-sm font-medium mt-1 ${
-                  metric.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                  metric.change.startsWith('+') ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                 }`}>
                   {metric.change}
                 </p>
@@ -151,14 +151,14 @@ const PortalDashboard = ({
   );
 
   const renderChart = () => (
-    <div className="bg-white rounded-xl p-6 shadow-lg mb-6">
+    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg dark:shadow-lg dark:shadow-slate-900 mb-6">
       <div className="flex items-center justify-between mb-6">
-        <h3 className="text-xl font-bold text-gray-900">Performance Trends</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white">Performance Trends</h3>
         <div className="flex space-x-2">
           {['7d', '30d', '90d'].map((range) => (
             <button
               key={range}
-              className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-300"
+              className="px-3 py-1 rounded-lg text-sm font-medium bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-all duration-300"
             >
               {range}
             </button>
@@ -221,19 +221,19 @@ const PortalDashboard = ({
       <div className="space-y-4">
         {notifications?.map((notification, index) => (
           <div key={index} className={`border-l-4 p-4 rounded-lg ${
-            notification.type === 'critical' ? 'border-red-500 bg-red-50' :
-            notification.type === 'warning' ? 'border-yellow-500 bg-yellow-50' :
-            notification.type === 'info' ? 'border-blue-500 bg-blue-50' :
-            'border-green-500 bg-green-50'
+            notification.type === 'critical' ? 'border-red-500 dark:border-red-700 bg-red-50 dark:bg-red-900/20' :
+            notification.type === 'warning' ? 'border-yellow-500 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20' :
+            notification.type === 'info' ? 'border-blue-500 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20' :
+            'border-green-500 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
           }`}>
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-semibold text-gray-900">{notification.title}</h4>
-                <p className="text-gray-600">{notification.message}</p>
-                <p className="text-sm text-gray-500 mt-1">{notification.timestamp}</p>
+                <h4 className="font-semibold text-gray-900 dark:text-white">{notification.title}</h4>
+                <p className="text-gray-600 dark:text-gray-300">{notification.message}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{notification.timestamp}</p>
               </div>
               {notification.action && (
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-300 text-sm">
+                <button className="bg-blue-600 dark:bg-blue-700 text-white px-4 py-2 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-all duration-300 text-sm">
                   {notification.action}
                 </button>
               )}
@@ -245,7 +245,7 @@ const PortalDashboard = ({
   );
 
   return (
-    <div className="space-y-6 animate-fadeInUp">
+    <div className="space-y-6 animate-fadeInUp dark:text-gray-200">
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes fadeInUp {

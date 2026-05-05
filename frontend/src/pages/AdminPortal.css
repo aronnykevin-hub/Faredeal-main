@@ -1167,3 +1167,490 @@
     padding: 25px;
   }
 }
+
+/* ============================================
+   DARK MODE OVERRIDES FOR ADMIN PORTAL
+   ============================================ */
+
+/* Main Portal Backgrounds */
+html.dark .admin-portal {
+  background: #0f172a;
+}
+
+html.dark .admin-content {
+  background: #0f172a;
+}
+
+/* Sidebar Dark Mode */
+html.dark .admin-sidebar {
+  background: linear-gradient(135deg, #1a2a3a, #243447);
+  border-right: 1px solid #475569;
+}
+
+html.dark .admin-logo {
+  border-bottom-color: #475569;
+}
+
+html.dark .admin-nav .nav-item {
+  color: #cbd5e1;
+}
+
+html.dark .admin-nav .nav-item:hover {
+  background: rgba(71, 85, 105, 0.3);
+  color: #f1f5f9;
+}
+
+html.dark .admin-nav .nav-item.active {
+  border-right-color: #e74c3c;
+}
+
+html.dark .admin-user-info {
+  border-top-color: #475569;
+}
+
+/* Headers and Titles */
+html.dark .dashboard-header h2 {
+  color: #f1f5f9;
+}
+
+html.dark .management-header h2 {
+  color: #f1f5f9;
+}
+
+html.dark .user-type-section h3 {
+  color: #f1f5f9;
+  border-bottom-color: #3b82f6;
+}
+
+html.dark .card-header h3 {
+  color: #f1f5f9;
+}
+
+/* Analytics Cards */
+html.dark .analytics-card {
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-color: #475569;
+}
+
+html.dark .analytics-card.users,
+html.dark .analytics-card.orders,
+html.dark .analytics-card.inventory,
+html.dark .analytics-card.financial {
+  border-top-color: inherit;
+}
+
+html.dark .card-content .main-stat {
+  color: #f1f5f9;
+}
+
+html.dark .sub-stats div {
+  color: #94a3b8;
+}
+
+html.dark .status-indicator {
+  background: #334155;
+  color: #f1f5f9;
+}
+
+/* Tables */
+html.dark .users-table table {
+  background: #1e293b;
+}
+
+html.dark .users-table th,
+html.dark .users-table td {
+  border-bottom-color: #475569;
+  color: #f1f5f9;
+}
+
+html.dark .users-table th {
+  background: #0f172a;
+  color: #f1f5f9;
+}
+
+html.dark .users-table tbody tr:hover {
+  background: #334155;
+}
+
+html.dark .users-table tr.inactive {
+  opacity: 0.6;
+}
+
+html.dark .role-badge {
+  background: #3b82f6;
+  color: white;
+}
+
+html.dark .status-badge {
+  background: #1e293b;
+  color: #f1f5f9;
+  border: 1px solid #475569;
+}
+
+html.dark .status-badge.active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border-color: #10b981;
+}
+
+html.dark .status-badge.inactive {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: #ef4444;
+}
+
+/* Form Elements */
+html.dark .setting-item input,
+html.dark .setting-item select {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+html.dark .setting-item input:focus,
+html.dark .setting-item select:focus {
+  background: #475569;
+  border-color: #64748b;
+  outline: none;
+}
+
+html.dark .setting-item label {
+  color: #f1f5f9;
+}
+
+/* Settings Sections */
+html.dark .settings-section {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+html.dark .settings-section h3 {
+  color: #f1f5f9;
+}
+
+/* Pending Approvals */
+html.dark .pending-approvals {
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .pending-approvals h3 {
+  color: #f1f5f9;
+}
+
+html.dark .approval-count {
+  color: #f87171;
+}
+
+/* User Management */
+html.dark .user-management {
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .management-header {
+  border-bottom-color: #475569;
+}
+
+/* System Settings */
+html.dark .system-settings {
+  background: #1e293b;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .system-settings h2 {
+  color: #f1f5f9;
+}
+
+/* Buttons */
+html.dark .refresh-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  box-shadow: 0 0 0 1px rgba(71, 85, 105, 0.2);
+}
+
+html.dark .refresh-btn:hover {
+  box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3), 0 0 0 1px rgba(71, 85, 105, 0.2);
+}
+
+html.dark .view-approvals-btn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+html.dark .view-approvals-btn:hover {
+  box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+}
+
+html.dark .bulk-btn.activate {
+  background: #10b981;
+}
+
+html.dark .bulk-btn.deactivate {
+  background: #f59e0b;
+}
+
+html.dark .bulk-btn.delete {
+  background: #ef4444;
+}
+
+html.dark .action-btn {
+  transition: all 0.3s ease;
+}
+
+html.dark .action-btn.activate {
+  background: #10b981;
+}
+
+html.dark .action-btn.deactivate {
+  background: #f59e0b;
+}
+
+html.dark .action-btn.delete {
+  background: #ef4444;
+}
+
+html.dark .backup-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+html.dark .backup-btn:hover {
+  box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+}
+
+/* Security Screen */
+html.dark .security-container {
+  background: #1e293b;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+html.dark .security-container h2 {
+  color: #f1f5f9;
+}
+
+html.dark .security-container p {
+  color: #cbd5e1;
+}
+
+html.dark .security-info {
+  background: #334155;
+  border-color: #475569;
+}
+
+html.dark .security-badge,
+html.dark .session-timer {
+  color: #cbd5e1;
+}
+
+html.dark .security-form label {
+  color: #f1f5f9;
+}
+
+html.dark .security-form input {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+html.dark .security-form input:focus {
+  background: #475569;
+  border-color: #64748b;
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2);
+}
+
+html.dark .security-form input.error {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+html.dark .security-warning {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #d97706;
+  color: #fcd34d;
+}
+
+html.dark .security-hint details {
+  background: #334155;
+  border-color: #475569;
+}
+
+html.dark .security-hint summary {
+  color: #f1f5f9;
+}
+
+html.dark .security-hint p {
+  color: #cbd5e1;
+}
+
+/* Quick Admin Registration */
+html.dark .quick-admin-register {
+  background: linear-gradient(135deg, #1f2937, #111827);
+  border-color: #374151;
+}
+
+html.dark .quick-admin-register {
+  color: #f1f5f9;
+}
+
+html.dark .quick-register-header h3 {
+  color: #f1f5f9;
+}
+
+html.dark .quick-register-header p {
+  color: #cbd5e1;
+}
+
+html.dark .form-group label {
+  color: #f1f5f9;
+}
+
+html.dark .form-group input {
+  background: #334155;
+  color: #f1f5f9;
+  border-color: #475569;
+}
+
+html.dark .form-group input::placeholder {
+  color: #94a3b8;
+}
+
+html.dark .form-group input:focus {
+  background: #475569;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .quick-features {
+  background: rgba(71, 85, 105, 0.2);
+  border-color: #475569;
+}
+
+html.dark .quick-features h4 {
+  color: #f1f5f9;
+}
+
+html.dark .quick-features li {
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+/* Verification Screen */
+html.dark .verification-container {
+  background: #1e293b;
+}
+
+html.dark .verification-header h2 {
+  color: #f1f5f9;
+}
+
+html.dark .verification-header p {
+  color: #cbd5e1;
+}
+
+html.dark .user-info {
+  background: linear-gradient(135deg, #334155, #1e293b);
+  border-color: #475569;
+}
+
+html.dark .current-user,
+html.dark .user-type {
+  color: #f1f5f9;
+}
+
+html.dark .option-card {
+  background: #334155;
+  border-color: #475569;
+}
+
+html.dark .option-card:hover {
+  background: #475569;
+  border-color: #64748b;
+  box-shadow: 0 15px 30px rgba(59, 130, 246, 0.2);
+}
+
+html.dark .option-card h3 {
+  color: #f1f5f9;
+}
+
+html.dark .option-card p {
+  color: #cbd5e1;
+}
+
+html.dark .login-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+html.dark .login-btn:hover {
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.4);
+}
+
+/* Loading Overlay */
+html.dark .loading-overlay {
+  background: rgba(15, 23, 42, 0.9);
+}
+
+html.dark .loading-spinner {
+  color: #3b82f6;
+}
+
+html.dark .loading-spinner {
+  border-color: #334155;
+  border-top-color: #3b82f6;
+}
+
+/* Container Glass Dark Mode - Override inline styles */
+html.dark .container-glass {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(71, 85, 105, 0.3) !important;
+  backdrop-filter: blur(10px);
+}
+
+html.dark .container-glass:hover {
+  background: rgba(51, 65, 85, 0.9) !important;
+  border-color: rgba(100, 116, 139, 0.4) !important;
+}
+
+/* Container Neon Dark Mode */
+html.dark .container-neon {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.2) !important;
+}
+
+html.dark .container-neon:hover {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Mobile Sidebar Dark Mode */
+html.dark .fixed.left-0.top-0.h-full.w-64.bg-white {
+  background-color: #1e293b !important;
+}
+
+html.dark .bg-white.shadow-lg.z-50.container-glass {
+  background: rgba(30, 41, 59, 0.95) !important;
+}
+
+/* Glass Card Elements Dark Mode */
+html.dark div[style*="backdrop-filter"] {
+  background-color: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(71, 85, 105, 0.3) !important;
+}
+
+/* Ensure all white backgrounds in admin portal get dark treatment */
+html.dark .admin-portal .bg-white {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+html.dark .admin-sidebar .bg-white {
+  background-color: #1e293b !important;
+}
+
+/* Responsive Dark Mode */
+@media (max-width: 768px) {
+  html.dark .admin-options {
+    grid-template-columns: 1fr;
+  }
+  
+  html.dark .user-info {
+    background: linear-gradient(135deg, #334155, #1e293b);
+  }
+}

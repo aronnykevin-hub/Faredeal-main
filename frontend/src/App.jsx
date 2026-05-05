@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { AppProvider } from '@/contexts/AppContext';
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import AdminProtectedRoute from '@/components/AdminProtectedRoute';
 
@@ -34,6 +35,9 @@ import CustomerDelivery from '@/pages/CustomerDelivery';
 
 // Styles
 import 'react-toastify/dist/ReactToastify.css';
+import './styles/theme.css';
+import './styles/dark-mode-utils.css';
+import './styles/mobile-dark-mode.css';
 
 function App() {
   // Validate if current URL is allowed for admin access
@@ -85,9 +89,10 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AppProvider>
-          <div className={`app-container ${isAdmin ? 'admin-mode' : 'standard-mode'}`}>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppProvider>
+            <div className={`app-container ${isAdmin ? 'admin-mode' : 'standard-mode'}`}>
             <Routes>
               {/* Main landing with portal selection - but check for admin hash */}
               <Route 
@@ -217,6 +222,7 @@ function App() {
           </div>
         </AppProvider>
       </AuthProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }

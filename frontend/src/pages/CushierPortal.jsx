@@ -23,6 +23,7 @@ import Receipt from '../components/Receipt';
 import TransactionHistory from '../components/TransactionHistory';
 import TillSuppliesSection from '../components/TillSuppliesSection';
 import OrderSuppliesModal from '../components/OrderSuppliesModal';
+import ThemeToggle from '../components/ThemeToggle';
 import inventoryService from '../services/inventorySupabaseService';
 import transactionService from '../services/transactionService';
 import cashierOrdersService from '../services/cashierOrdersService';
@@ -1739,7 +1740,7 @@ const CashierPortal = () => {
   );
 
   const renderDashboard = () => (
-    <div className="space-y-3 md:space-y-6 animate-slideInLeft container-3d bg-white rounded-lg md:rounded-2xl p-4 md:p-8 shadow-2xl">
+    <div className="space-y-3 md:space-y-6 animate-slideInLeft container-3d bg-white dark:bg-slate-800 rounded-lg md:rounded-2xl p-4 md:p-8 shadow-2xl dark:shadow-2xl dark:shadow-slate-900">
       {/* Ugandan-themed Welcome Section - Responsive */}
       <div className="bg-gradient-to-r from-yellow-500 via-red-600 to-black rounded-lg md:rounded-xl p-3 md:p-6 text-white shadow-lg">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
@@ -2706,6 +2707,7 @@ const CashierPortal = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
+              <ThemeToggle />
               <button 
                 onClick={() => setActiveTab('profile')}
                 className="text-right hover:bg-gray-50 p-2 rounded-lg transition-all duration-300 cursor-pointer group"

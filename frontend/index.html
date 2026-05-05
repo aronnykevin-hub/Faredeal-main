@@ -1,11 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" id="html-root">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <title>FareDeal - Business Management Portal</title>
+    <script>
+      // Initialize theme before React renders to prevent flash
+      (function() {
+        try {
+          const saved = localStorage.getItem('faredeal-theme');
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const isDark = saved === 'dark' || (saved === null && prefersDark);
+          const htmlEl = document.documentElement;
+          if (isDark) {
+            htmlEl.classList.add('dark');
+            document.body.style.backgroundColor = '#0f172a';
+            document.body.style.color = '#f1f5f9';
+          } else {
+            htmlEl.classList.remove('dark');
+            document.body.style.backgroundColor = '#ffffff';
+            document.body.style.color = '#1e293b';
+          }
+        } catch (e) {
+          console.error('Theme init error:', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
