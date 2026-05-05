@@ -6725,18 +6725,18 @@ const AdminPortal = () => {
               </div>
 
               {/* Notifications */}
-              <button style={{
+              {/* <button style={{
                 color: isDarkMode ? '#94a3b8' : '#64748b'
               }} className={`p-2 rounded-lg transition-all ${isDarkMode ? 'hover:text-blue-400 hover:bg-slate-700' : 'hover:text-blue-600 hover:bg-gray-100'}`}>
                 <FiBell className="h-5 w-5" />
-              </button>
+              </button> */}
 
               {/* Settings */}
-              <button style={{
+              {/* <button style={{
                 color: isDarkMode ? '#94a3b8' : '#64748b'
               }} className={`p-2 rounded-lg transition-all ${isDarkMode ? 'hover:text-purple-400 hover:bg-slate-700' : 'hover:text-purple-600 hover:bg-gray-100'}`}>
                 <FiSettings className="h-5 w-5" />
-              </button>
+              </button> */}
 
               {/* Admin Profile Dropdown */}
               <div className="relative">
