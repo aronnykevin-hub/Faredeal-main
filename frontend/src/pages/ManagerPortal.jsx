@@ -11833,8 +11833,8 @@ FAREDEAL Uganda Management Team
               </button>
             ) : (
               <>
-                {/* Notification Bell */}
-                <button
+                {/* Notification Bell - DISABLED */}
+                {/* <button
                   onClick={handleNotificationClick}
                   className="relative group"
                   title="Notifications"
@@ -11852,10 +11852,10 @@ FAREDEAL Uganda Management Team
                     
                     <div className="absolute inset-0 rounded-2xl border-2 border-blue-400/50 opacity-0 group-hover:opacity-100 animate-ping"></div>
                   </div>
-                </button>
+                </button> */}
 
-                {/* Settings */}
-                <button
+                {/* Settings - DISABLED */}
+                {/* <button
                   onClick={() => {
                     startEditingProfile();
                     toast.info('💼 Edit your profile details');
@@ -11873,7 +11873,7 @@ FAREDEAL Uganda Management Team
                   
                   <div className="absolute -top-1 -left-1 w-2 h-2 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping"></div>
                   <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-pink-400 rounded-full opacity-0 group-hover:opacity-100 animate-ping" style={{ animationDelay: '0.5s' }}></div>
-                </button>
+                </button> */}
 
                 {/* Theme Toggle */}
                 <div className="relative group">

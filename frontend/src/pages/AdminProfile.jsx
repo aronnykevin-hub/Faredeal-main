@@ -72,23 +72,13 @@ const AdminProfile = () => {
       // Try to get current user from Supabase
       let { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
-      // If no user, try to sign in with admin credentials
+      // DISABLED: Auto-login has been removed for security
+      // If no user, require manual login
       if (!currentUser || userError) {
-        console.log('No user found, attempting auto-login...');
-        
-        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-          email: 'heradmin@faredeal.ug',
-          password: 'Administrator'
-        });
-        
-        if (signInError) {
-          console.error('Auto-login error:', signInError);
-          // Load from localStorage as fallback
-          loadFromLocalStorage();
-          return;
-        }
-        
-        currentUser = signInData?.user;
+        console.log('No authenticated user - login required');
+        // Load from localStorage as fallback
+        loadFromLocalStorage();
+        return;
       }
 
       if (currentUser) {

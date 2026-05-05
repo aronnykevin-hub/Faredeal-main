@@ -15,24 +15,10 @@ const AdminEntry = () => {
 
   const checkAuthAndRedirect = async () => {
     try {
-      // Check if user has valid session
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Session check error:', error);
-        navigate('/admin-login', { replace: true });
-        return;
-      }
-
-      if (session && session.user) {
-        // User is authenticated, go to portal
-        localStorage.setItem('adminKey', 'true');
-        navigate('/admin-portal', { replace: true });
-      } else {
-        // Not authenticated, go to login
-        localStorage.removeItem('adminKey');
-        navigate('/admin-login', { replace: true });
-      }
+      // DISABLED: Auto-redirect has been removed for security
+      // Always require manual login - no auto-redirect to portal
+      localStorage.removeItem('adminKey');
+      navigate('/admin-login', { replace: true });
     } catch (error) {
       console.error('Unexpected error:', error);
       navigate('/admin-login', { replace: true });

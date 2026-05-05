@@ -159,96 +159,10 @@ const ManagerAuth = () => {
   const checkAuth = async () => {
     try {
       console.log('🔍 Checking manager authentication...');
-      const [
-        { data: { session } },
-        { data: { user: directUser } }
-      ] = await Promise.all([
-        supabase.auth.getSession(),
-        supabase.auth.getUser()
-      ]);
-
-      const user = directUser || session?.user || null;
-      
-      if (user) {
-        console.log('✅ User authenticated:', user.email);
-        setCurrentUser(user);
-        
-        // Check if user exists in database
-        let { data: userData, error: fetchError } = await supabase
-          .from('users')
-          .select('id, email, full_name, role, is_active, phone')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        console.log('👤 User data from database:', userData, 'Error:', fetchError?.code);
-
-        // If user doesn't exist yet, create a minimal placeholder row for email-based role assignment
-        if (!userData && !fetchError) {
-          console.log('📝 User record not found. Creating minimal placeholder...');
-
-          const { data: insertData, error: insertError } = await supabase
-            .from('users')
-            .insert({
-              id: user.id,
-              email: user.email,
-              full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-              role: 'user',
-              is_active: false,
-              phone: null,
-              created_at: new Date().toISOString()
-            })
-            .select('id, email, full_name, role, is_active, phone')
-            .single();
-
-          if (insertError) {
-            // If duplicate email+role constraint violation, try to fetch the existing record
-            if (insertError.code === '23505' || insertError.details?.includes('users_email_role_unique')) {
-              console.log('⚠️  User record already exists with this email+role. Fetching existing record...');
-              
-              const { data: existingData, error: fetchExistingError } = await supabase
-                .from('users')
-                .select('id, email, full_name, role, is_active, phone')
-                .eq('email', user.email)
-                .eq('role', 'user')
-                .maybeSingle();
-              
-              if (fetchExistingError) {
-                console.error('❌ Failed to fetch existing user record:', fetchExistingError);
-                throw fetchExistingError;
-              }
-              
-              if (existingData) {
-                console.log('✅ Using existing user record:', existingData);
-                userData = existingData;
-              }
-            } else {
-              console.error('❌ Failed to create placeholder user record:', insertError);
-              throw insertError;
-            }
-          } else {
-            userData = insertData;
-            console.log('✅ Placeholder user record created:', userData);
-          }
-        } else if (fetchError) {
-          console.error('❌ Database error:', fetchError);
-          throw fetchError;
-        }
-
-        const hasManagerRole = userData?.role === 'manager';
-        const isActiveManager = userData?.is_active === true;
-        console.log('🔀 User status - Manager Role:', hasManagerRole, 'Active:', isActiveManager, 'Email:', userData?.email);
-
-        if (hasManagerRole && isActiveManager) {
-          console.log('✅ Manager role assigned - Redirecting to Manager Portal');
-          navigate('/manager');
-        } else {
-          console.log('⏳ Manager role not assigned yet - Showing waiting screen');
-          setShowWaitingScreen(true);
-          // Don't sign out — keep user logged in so polling can detect role updates
-        }
-      } else {
-        console.log('❌ No authenticated user found');
-      }
+      // DISABLED: Auto-redirect has been removed for security
+      // Always show login page - no auto-redirect based on session state
+      console.log('❌ Auto-redirect disabled - requiring manual login');
+      // Do not call navigate() - let user see login page
     } catch (error) {
       console.error('❌ Auth check error:', error);
     }
