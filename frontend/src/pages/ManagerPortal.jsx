@@ -27,6 +27,7 @@ import Receipt from '../components/Receipt';
 import TillSuppliesOrderManagement from '../components/TillSuppliesOrderManagement';
 import SupplierOrderManagement from '../components/SupplierOrderManagement';
 import OrderInventoryPOSControl from '../components/OrderInventoryPOSControl';
+import DualScannerInterface from '../components/DualScannerInterface';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabase';
 
@@ -232,6 +233,68 @@ const ManagerPortal = () => {
   const [posItems, setPosItems] = useState([]);
   const [loadingPosItems, setLoadingPosItems] = useState(false);
   const [refreshingPosItems, setRefreshingPosItems] = useState(false);
+
+  // 🛒 POS TRANSACTION STATE - From Cashier Portal
+  const [currentTransaction, setCurrentTransaction] = useState({
+    items: [],
+    subtotal: 0,
+    tax: 0,
+    total: 0,
+    paymentMethod: null,
+    customer: null
+  });
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [refreshingProducts, setRefreshingProducts] = useState(false);
+  const [cashReceived, setCashReceived] = useState('');
+  const [paymentModal, setPaymentModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [lastScannedBarcode, setLastScannedBarcode] = useState(null);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+  const [savedReceipts, setSavedReceipts] = useState([]);
+
+  // Payment methods available in Uganda
+  const paymentMethods = [
+    {
+      id: 'mtn_momo',
+      name: 'MTN Mobile Money',
+      icon: '📱',
+      color: 'bg-yellow-600 hover:bg-yellow-700',
+      description: 'Pay with MTN MoMo',
+      fee: 0.015,
+      limit: 10000000
+    },
+    {
+      id: 'airtel_money',
+      name: 'Airtel Money',
+      icon: '📲',
+      color: 'bg-red-600 hover:bg-red-700',
+      description: 'Pay with Airtel Money',
+      fee: 0.02,
+      limit: 5000000
+    },
+    {
+      id: 'card_payment',
+      name: 'Card Payment',
+      icon: '💳',
+      color: 'bg-blue-600 hover:bg-blue-700',
+      description: 'Visa/Mastercard',
+      fee: 0.025,
+      limit: 50000000
+    },
+    {
+      id: 'cash_ugx',
+      name: 'Cash (UGX)',
+      icon: '💵',
+      color: 'bg-green-600 hover:bg-green-700',
+      description: 'Uganda Shillings',
+      fee: 0,
+      limit: Infinity
+    }
+  ];
   
   // Modal and UI States
   const [showInventoryModal, setShowInventoryModal] = useState(false);
@@ -4638,6 +4701,160 @@ _Automated Business Report System_`)}`;
     }
   };
 
+  // 🛒 POS FUNCTIONS - From Cashier Portal
+  const formatUGX = (amount) => {
+    return new Intl.NumberFormat('en-UG', {
+      style: 'currency',
+      currency: 'UGX',
+      minimumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const loadProductsFromSupabase = async () => {
+    try {
+      setProductsLoading(true);
+      setRefreshingProducts(true);
+      
+      const { data: productsData } = await supabase
+        .from('products')
+        .select('id, name, price, selling_price, cost_price, category, barcode, sku, is_active')
+        .eq('is_active', true);
+
+      const { data: inventoryData } = await supabase
+        .from('inventory')
+        .select('product_id, current_stock, reserved_stock, minimum_stock, reorder_point');
+
+      const inventoryMap = {};
+      inventoryData?.forEach(inv => {
+        inventoryMap[inv.product_id] = inv;
+      });
+
+      const allProducts = (productsData || []).map(product => {
+        const inv = inventoryMap[product.id];
+        return {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          price: product.price || 0,
+          selling_price: product.selling_price || 0,
+          cost_price: product.cost_price || 0,
+          category: product.category || 'General',
+          categoryName: product.category || 'General',
+          is_active: product.is_active,
+          stock: inv?.current_stock || 0,
+          current_stock: inv?.current_stock || 0,
+          available_stock: (inv?.current_stock || 0) - (inv?.reserved_stock || 0),
+          reserved_stock: inv?.reserved_stock || 0,
+          minimum_stock: inv?.minimum_stock || 10,
+          reorder_point: inv?.reorder_point || 20
+        };
+      });
+
+      setProducts(allProducts);
+      setProductsLoading(false);
+      toast.success(`✅ Loaded ${allProducts.length} products`);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      toast.error('Failed to load products');
+      setProductsLoading(false);
+    } finally {
+      setRefreshingProducts(false);
+    }
+  };
+
+  const addItemToTransaction = (product) => {
+    const productStock = product.stock || product.available_stock || 0;
+    const currentQuantity = currentTransaction.items.find(item => item.id === product.id)?.quantity || 0;
+    
+    if (productStock <= currentQuantity) {
+      toast.error(`⚠️ Insufficient stock for ${product.name}. Available: ${productStock}`);
+      return;
+    }
+    
+    setCurrentTransaction(prev => {
+      const existingItem = prev.items.find(item => item.id === product.id);
+      let newItems;
+      
+      if (existingItem) {
+        newItems = prev.items.map(item =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        const price = product.selling_price || product.price;
+        newItems = [...prev.items, { ...product, quantity: 1, price }];
+      }
+      
+      const subtotal = newItems.reduce((sum, item) => {
+        const itemPrice = item.selling_price || item.price || 0;
+        return sum + (itemPrice * item.quantity);
+      }, 0);
+      const tax = subtotal * 0.18;
+      const total = subtotal + tax;
+      
+      return {
+        ...prev,
+        items: newItems,
+        subtotal,
+        tax,
+        total
+      };
+    });
+    
+    setCashReceived('');
+    toast.success(`✅ Added ${product.name} to cart`);
+  };
+
+  const removeItemFromTransaction = (productId) => {
+    setCurrentTransaction(prev => {
+      const newItems = prev.items.filter(item => item.id !== productId);
+      const subtotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * 0.18;
+      const total = subtotal + tax;
+      
+      return {
+        ...prev,
+        items: newItems,
+        subtotal,
+        tax,
+        total
+      };
+    });
+    
+    setCashReceived('');
+  };
+
+  const updateItemQuantity = (productId, newQuantity) => {
+    if (newQuantity <= 0) {
+      removeItemFromTransaction(productId);
+      return;
+    }
+    
+    setCurrentTransaction(prev => {
+      const newItems = prev.items.map(item =>
+        item.id === productId
+          ? { ...item, quantity: newQuantity }
+          : item
+      );
+      
+      const subtotal = newItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const tax = subtotal * 0.18;
+      const total = subtotal + tax;
+      
+      return {
+        ...prev,
+        items: newItems,
+        subtotal,
+        tax,
+        total
+      };
+    });
+    
+    setCashReceived('');
+  };
+
   // Load Business Metrics from Supabase
   const loadBusinessMetrics = async () => {
     try {
@@ -5494,6 +5711,7 @@ _Automated Business Report System_`)}`;
     loadDashboardData();
     loadPendingOrdersFromDatabase();
     loadPosItems();
+    loadProductsFromSupabase(); // Load POS products on mount
     
     // Refresh dashboard data every 30 seconds for real-time updates
     const interval = setInterval(loadDashboardData, 30 * 1000);
@@ -12014,18 +12232,19 @@ FAREDEAL Uganda Management Team
               </div>
               {[
                 { id: 'overview', icon: '📊', label: 'Dashboard', desc: 'Business overview', gradient: 'from-blue-500 to-blue-600' },
+                // { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', gradient: 'from-green-500 to-green-600' },
+                { id: 'transactions', icon: '🧾', label: 'Transaction History', desc: 'Sales transactions & receipts', gradient: 'from-yellow-500 to-yellow-600' },
                 // { id: 'portal-control', icon: '🚀', label: 'Portal Control', desc: 'AI management', gradient: 'from-cyan-500 to-cyan-600' }, // DISABLED - Portal control feature removed
-                { id: 'analytics', icon: '📈', label: 'Analytics', desc: 'Data insights', gradient: 'from-green-500 to-green-600' },
-                { id: 'transactions', icon: '🧾', label: 'Transactions', desc: 'Sales & receipts', gradient: 'from-yellow-500 to-yellow-600' },
                 // { id: 'team', icon: '👥', label: 'Team', desc: 'Staff management', gradient: 'from-purple-500 to-purple-600' }, // DISABLED - Team management removed
                 // { id: 'suppliers', icon: '🤝', label: 'Suppliers', desc: 'Partner verification', gradient: 'from-orange-500 to-orange-600' }, // DISABLED - Supplier verification moved to Order Management
                 { id: 'orders', icon: '📦', label: 'Orders', desc: 'Order management', gradient: 'from-cyan-500 to-cyan-600' },
-                { id: 'pos', icon: '🛒', label: 'POS Items', desc: 'Products for sale', gradient: 'from-emerald-500 to-emerald-600' },
-                { id: 'pos-control', icon: '⚙️', label: 'POS Pricing', desc: 'Manage pricing & stock', gradient: 'from-orange-500 to-orange-600' },
+                { id: 'pos', icon: '🛒', label: 'POS (Cashier)', desc: 'Point of sale system', gradient: 'from-green-500 to-emerald-600' },
+                // { id: 'pos-control', icon: '⚙️', label: 'POS Pricing', desc: 'Manage pricing & stock', gradient: 'from-orange-500 to-orange-600' },
                 // { id: 'tillsupplies', icon: '🏪', label: 'Till Supplies', desc: 'Cashier requests', gradient: 'from-teal-500 to-teal-600' }, // DISABLED - Cashier supply ordering removed
                 // { id: 'inventory', icon: '📋', label: 'Inventory', desc: 'Stock control', gradient: 'from-indigo-500 to-indigo-600' }, // DISABLED - Inventory management removed
-                { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', gradient: 'from-pink-500 to-pink-600' },
-                { id: 'alerts', icon: '🔔', label: 'Alerts', desc: 'Notifications', gradient: 'from-red-500 to-red-600' }
+                // { id: 'reports', icon: '📄', label: 'Reports', desc: 'Access control', gradient: 'from-pink-500 to-pink-600' },
+                // { id: 'alerts', icon: '🔔', label: 'Alerts', desc: 'Notifications', gradient: 'from-red-500 to-red-600' },
+                { id: 'profile', icon: '👤', label: 'Profile', desc: 'My profile', gradient: 'from-green-500 to-green-600' }
               ].map((item) => (
                 <button
                   key={item.id}
@@ -12066,6 +12285,7 @@ FAREDEAL Uganda Management Team
             </div>
 
             {/* Quick Actions - Collapsible */}
+            {/* 
             <div className="p-4 border-t border-gray-200">
               <button
                 onClick={() => setShowQuickActions(!showQuickActions)}
@@ -12117,8 +12337,10 @@ FAREDEAL Uganda Management Team
                 </div>
               )}
             </div>
+            */}
 
             {/* Footer */}
+            {/* 
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <div className="text-center">
                 <p className="text-xs text-gray-600">
@@ -12127,6 +12349,7 @@ FAREDEAL Uganda Management Team
                 <p className="text-xs text-gray-500 mt-1">"For God and My Country"</p>
               </div>
             </div>
+            */}
           </div>
 
           {/* Backdrop - dark overlay on the right */}
@@ -13423,6 +13646,230 @@ FAREDEAL Uganda Management Team
                 </p>
               </div>
               <TransactionHistory viewMode="manager" />
+            </div>
+          )}
+
+          {/* 🛒 POS SYSTEM - Manager as Cashier */}
+          {activeTab === 'pos' && (
+            <div className="animate-fadeInUp space-y-6">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-xl mb-6">
+                <h2 className="text-3xl font-bold flex items-center">
+                  🛒 Point of Sale (POS) System 🇺🇬
+                </h2>
+                <p className="text-green-100 mt-2">
+                  Manager can perform cashier duties - Process transactions, manage inventory, and accept multiple payment methods
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Product Selection */}
+                <div className="lg:col-span-2 bg-white rounded-lg p-6 shadow-lg">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 gap-3">
+                    <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center">
+                      🛍️ Product Selection
+                    </h3>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowBarcodeScanner(!showBarcodeScanner)}
+                        className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white rounded-lg font-bold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg"
+                      >
+                        <FiCamera className="h-5 w-5" />
+                        <span>Barcode Scanner</span>
+                      </button>
+                      <button
+                        onClick={loadProductsFromSupabase}
+                        disabled={refreshingProducts}
+                        className={`px-4 py-2 ${refreshingProducts ? 'bg-gray-400' : 'bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700'} text-white rounded-lg font-bold transition-all duration-300 transform hover:scale-105 flex items-center justify-center space-x-2 shadow-lg`}
+                      >
+                        <FiRefreshCw className={`h-5 w-5 ${refreshingProducts ? 'animate-spin' : ''}`} />
+                        <span>{refreshingProducts ? 'Loading...' : 'Load Products'}</span>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Product Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4 bg-gray-50">
+                    {productsLoading ? (
+                      <div className="col-span-3 text-center py-8">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <p className="text-gray-500 mt-2">Loading products...</p>
+                      </div>
+                    ) : products.length === 0 ? (
+                      <div className="col-span-3 text-center py-8">
+                        <p className="text-gray-500">No products available. Click "Load Products" to refresh.</p>
+                      </div>
+                    ) : (
+                      products.map((product) => {
+                        const productPrice = product.selling_price || product.price || 0;
+                        const productStock = product.stock || product.available_stock || 0;
+                        const isOutOfStock = productStock === 0;
+                        
+                        return (
+                          <div
+                            key={product.id}
+                            onClick={() => !isOutOfStock && addItemToTransaction(product)}
+                            className={`border rounded-lg p-3 text-center cursor-pointer transition-all duration-300 ${
+                              isOutOfStock 
+                                ? 'cursor-not-allowed opacity-50 bg-gray-100 border-gray-300' 
+                                : 'hover:bg-yellow-50 border-gray-200 hover:border-yellow-300 hover:shadow-md'
+                            }`}
+                          >
+                            <div className="text-2xl mb-1">🏪</div>
+                            <h4 className="font-semibold text-xs text-gray-900 mb-1 line-clamp-2">{product.name}</h4>
+                            <p className="text-green-600 font-bold">{formatUGX(productPrice)}</p>
+                            <div className="text-xs mt-1 text-gray-500">
+                              {isOutOfStock ? '❌ Out' : `✓ ${productStock}`}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Transaction Summary */}
+                <div className="bg-white rounded-lg p-6 shadow-lg">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                    🧾 Current Transaction
+                  </h3>
+                  
+                  {/* Items List */}
+                  <div className="space-y-3 max-h-64 overflow-y-auto mb-6 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    {currentTransaction.items.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No items added</p>
+                    ) : (
+                      currentTransaction.items.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 text-sm">{item.name}</h4>
+                            <p className="text-xs text-gray-600">{formatUGX(item.price)} x {item.quantity}</p>
+                          </div>
+                          <button
+                            onClick={() => removeItemFromTransaction(item.id)}
+                            className="ml-2 text-red-500 hover:text-red-700"
+                          >
+                            <FiX className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Totals */}
+                  {currentTransaction.items.length > 0 && (
+                    <div className="border-t pt-3 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="font-semibold">{formatUGX(currentTransaction.subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600">VAT (18%):</span>
+                        <span className="font-semibold">{formatUGX(currentTransaction.tax)}</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold bg-gradient-to-r from-green-50 to-emerald-50 py-2 px-3 rounded-lg">
+                        <span>TOTAL:</span>
+                        <span className="text-green-600">{formatUGX(currentTransaction.total)}</span>
+                      </div>
+
+                      {/* Cash Input */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-2">
+                        <label className="text-xs font-semibold text-blue-900">💵 Cash Received</label>
+                        <input
+                          type="number"
+                          value={cashReceived}
+                          onChange={(e) => setCashReceived(e.target.value)}
+                          placeholder="Enter amount..."
+                          className="w-full px-3 py-2 text-lg font-bold text-center border-2 border-blue-300 rounded-lg focus:ring-4 focus:ring-blue-500"
+                        />
+                        {cashReceived && parseFloat(cashReceived) >= currentTransaction.total && (
+                          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded-lg p-2 text-center">
+                            <div className="text-sm font-bold text-yellow-900">
+                              💰 CHANGE: {formatUGX(parseFloat(cashReceived) - currentTransaction.total)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setCurrentTransaction({ items: [], subtotal: 0, tax: 0, total: 0, paymentMethod: null, customer: null });
+                            setCashReceived('');
+                          }}
+                          className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-semibold text-sm"
+                        >
+                          Clear Cart
+                        </button>
+                        <button
+                          onClick={() => setPaymentModal(true)}
+                          disabled={currentTransaction.items.length === 0}
+                          className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-sm disabled:opacity-50"
+                        >
+                          Complete Sale
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Methods */}
+              {paymentModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
+                  <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                    <h3 className="text-xl font-bold mb-4">Select Payment Method</h3>
+                    <div className="grid grid-cols-2 gap-3">
+                      {paymentMethods.map((method) => (
+                        <button
+                          key={method.id}
+                          onClick={() => {
+                            setSelectedPaymentMethod(method.id);
+                            toast.success(`✅ ${method.name} selected`);
+                            setPaymentModal(false);
+                          }}
+                          className={`p-4 rounded-lg border-2 text-center transition-all ${method.color} text-white font-semibold`}
+                        >
+                          <div className="text-2xl mb-1">{method.icon}</div>
+                          {method.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setPaymentModal(false)}
+                      className="w-full mt-4 px-4 py-2 bg-gray-300 text-gray-900 rounded-lg hover:bg-gray-400 font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Barcode Scanner Modal */}
+              {showBarcodeScanner && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 rounded-lg">
+                  <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-screen overflow-y-auto">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-2xl font-bold flex items-center">
+                        📱 Barcode Scanner
+                      </h3>
+                      <button
+                        onClick={() => setShowBarcodeScanner(false)}
+                        className="text-red-500 hover:text-red-700 text-3xl"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <DualScannerInterface 
+                      onProductScanned={(product) => {
+                        addItemToTransaction(product);
+                        toast.success(`✅ Added ${product.name} to cart`);
+                      }}
+                      onClose={() => setShowBarcodeScanner(false)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </Suspense>

@@ -2,7 +2,7 @@
 import React from 'react';
 import { 
   FiBarChart, FiPieChart, FiUsers, FiCheckCircle, FiTruck, 
-  FiPackage, FiSettings, FiBell, FiRefreshCw, FiDownload 
+  FiPackage, FiSettings, FiBell, FiRefreshCw, FiDownload, FiUser, FiShoppingBag
 } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 
@@ -16,30 +16,30 @@ const ManagerNavigation = ({ activeTab, setActiveTab, isMobile }) => {
       color: 'from-blue-500 to-blue-600',
       ugandaEmoji: '📊'
     },
-    { 
-      id: 'analytics', 
-      label: 'Analytics', 
-      icon: FiPieChart,
-      description: 'Data insights',
-      color: 'from-purple-500 to-purple-600',
-      ugandaEmoji: '📈'
-    },
-    { 
-      id: 'team', 
-      label: 'Team', 
-      icon: FiUsers,
-      description: 'Staff management',
-      color: 'from-green-500 to-green-600',
-      ugandaEmoji: '👥'
-    },
-    { 
-      id: 'suppliers', 
-      label: 'Suppliers', 
-      icon: FiCheckCircle,
-      description: 'Verify partners',
-      color: 'from-yellow-500 to-yellow-600',
-      ugandaEmoji: '🤝'
-    },
+    // { 
+    //   id: 'analytics', 
+    //   label: 'Analytics', 
+    //   icon: FiPieChart,
+    //   description: 'Data insights',
+    //   color: 'from-purple-500 to-purple-600',
+    //   ugandaEmoji: '📈'
+    // },
+    // { 
+    //   id: 'team', 
+    //   label: 'Team', 
+    //   icon: FiUsers,
+    //   description: 'Staff management',
+    //   color: 'from-green-500 to-green-600',
+    //   ugandaEmoji: '👥'
+    // },
+    // { 
+    //   id: 'suppliers', 
+    //   label: 'Suppliers', 
+    //   icon: FiCheckCircle,
+    //   description: 'Verify partners',
+    //   color: 'from-yellow-500 to-yellow-600',
+    //   ugandaEmoji: '🤝'
+    // },
     { 
       id: 'orders', 
       label: 'Orders', 
@@ -48,30 +48,46 @@ const ManagerNavigation = ({ activeTab, setActiveTab, isMobile }) => {
       color: 'from-orange-500 to-orange-600',
       ugandaEmoji: '📦'
     },
+    // { 
+    //   id: 'inventory', 
+    //   label: 'Inventory', 
+    //   icon: FiPackage,
+    //   description: 'Stock control',
+    //   color: 'from-indigo-500 to-indigo-600',
+    //   ugandaEmoji: '📋'
+    // },
     { 
-      id: 'inventory', 
-      label: 'Inventory', 
-      icon: FiPackage,
-      description: 'Stock control',
-      color: 'from-indigo-500 to-indigo-600',
-      ugandaEmoji: '📋'
+      id: 'transactions', 
+      label: 'Transaction History', 
+      icon: FiDownload,
+      description: 'Sales transactions & receipts',
+      color: 'from-yellow-500 to-yellow-600',
+      ugandaEmoji: '🧾'
     },
     { 
-      id: 'reports', 
-      label: 'Reports', 
-      icon: FiSettings,
-      description: 'Access control',
-      color: 'from-pink-500 to-pink-600',
-      ugandaEmoji: '📄'
+      id: 'pos', 
+      label: 'POS (Cashier)', 
+      icon: FiShoppingBag,
+      description: 'Point of sale system',
+      color: 'from-green-500 to-emerald-600',
+      ugandaEmoji: '🛒'
     },
     { 
-      id: 'alerts', 
-      label: 'Alerts', 
-      icon: FiBell,
-      description: 'Notifications',
-      color: 'from-red-500 to-red-600',
-      ugandaEmoji: '🔔'
-    }
+      id: 'profile', 
+      label: 'Profile', 
+      icon: FiUser,
+      description: 'My profile',
+      color: 'from-green-500 to-green-600',
+      ugandaEmoji: '👤'
+    },
+    // { 
+    //   id: 'alerts', 
+    //   label: 'Alerts', 
+    //   icon: FiBell,
+    //   description: 'Notifications',
+    //   color: 'from-red-500 to-red-600',
+    //   ugandaEmoji: '🔔'
+    // }
   ];
 
   const handleTabClick = (tabId, tabLabel) => {
