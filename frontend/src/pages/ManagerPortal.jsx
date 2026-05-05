@@ -12,7 +12,7 @@ import {
   FiMaximize, FiMinimize, FiRotateCw, FiUpload, FiPrinter,
   FiTag, FiHash, FiImage, FiCheckCircle, FiXCircle, FiTruck,
   FiX, FiSend, FiFileText, FiCopy, FiExternalLink, FiCheck,
-  FiPlay, FiCpu, FiMonitor, FiDatabase
+  FiPlay, FiCpu, FiMonitor, FiDatabase, FiArrowLeft
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -226,9 +226,19 @@ const CHART_COLORS = {
 
 const ManagerPortal = () => {
   // Core State Management
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [timeRange, setTimeRange] = useState('7d');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
   
   // POS Items State
   const [posItems, setPosItems] = useState([]);
@@ -9119,7 +9129,7 @@ _Automated Business Report System_`)}`;
         <div className="absolute top-1/2 right-8 text-lg animate-bounce opacity-30">☕</div>
       </div>
 
-      {/* Enhanced Uganda Business Metrics - Mobile Optimized with Responsive Badges */}
+      {/* COMMENTED OUT - Large White Business Metrics Container
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-6">
         {[
           { 
@@ -9171,43 +9181,35 @@ _Automated Business Report System_`)}`;
               setActiveTab('analytics');
             }}
           >
-            {/* Background pattern */}
             <div className="absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity duration-300">
               <div className="absolute inset-0 bg-gradient-to-br from-yellow-400 via-red-500 to-black"></div>
             </div>
             
             <div className="relative z-10">
               <div className="flex flex-col items-start justify-between gap-1.5 sm:gap-2 mb-2 sm:mb-3 md:mb-4">
-                {/* Top Row: Icon + Title */}
                 <div className="flex items-center space-x-1.5 sm:space-x-2 w-full">
                   <span className="text-lg sm:text-xl md:text-2xl flex-shrink-0">{metric.icon}</span>
                   <p className="text-gray-600 text-xs sm:text-sm font-bold truncate flex-1">{metric.title}</p>
                 </div>
                 
-                {/* Value */}
                 <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 group-hover:text-green-600 transition-colors w-full break-words">
                   {metric.value}
                 </p>
                 
-                {/* Badges Row - Responsive */}
                 <div className="flex flex-wrap items-center gap-0.5 sm:gap-1 md:gap-2 w-full">
-                  {/* Growth Badge */}
                   <span className="text-green-600 text-xs font-semibold flex items-center bg-green-50 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap inline-flex">
                     <FiTrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 flex-shrink-0" />
                     <span className="text-xs sm:text-xs">{metric.change}</span>
                   </span>
                   
-                  {/* Uganda Info Badge - Hidden on mobile */}
                   <span className="text-xs text-gray-500 bg-gray-50 px-1 sm:px-2 py-0.5 sm:py-1 rounded-full whitespace-nowrap hidden sm:inline-flex">
                     {metric.ugandaInfo}
                   </span>
                 </div>
                 
-                {/* Subtitle */}
                 <p className="text-gray-500 text-xs line-clamp-1 sm:line-clamp-2 w-full">{metric.subtitle}</p>
               </div>
               
-              {/* Icon Container - Right side on desktop, below on mobile */}
               <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1.5 sm:pt-2 md:pt-3 border-t border-gray-100">
                 <div className={`p-1.5 sm:p-2 md:p-4 rounded-lg md:rounded-xl bg-gradient-to-r ${metric.color} shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-110 flex-shrink-0`}>
                   <div className="text-lg sm:text-xl md:text-3xl text-white group-hover:animate-bounce">
@@ -9215,7 +9217,6 @@ _Automated Business Report System_`)}`;
                   </div>
                 </div>
                 
-                {/* Mini sparkline - Hidden on small screens */}
                 <div className="flex items-end space-x-0.5 sm:space-x-1 hidden sm:flex flex-1 justify-end h-8">
                   {metric.sparkline.map((value, i) => (
                     <div
@@ -9229,14 +9230,12 @@ _Automated Business Report System_`)}`;
                   ))}
                 </div>
                 
-                {/* Live indicator - Mobile */}
                 <div className="flex items-center space-x-0.5 text-green-600 sm:hidden">
                   <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse"></div>
                   <span className="text-xs font-semibold">Live</span>
                 </div>
               </div>
               
-              {/* Uganda-specific indicators - Bottom line */}
               <div className="hidden sm:flex items-center justify-between gap-1 md:gap-2 pt-1.5 md:pt-2 text-xs border-t border-gray-100 mt-1.5 md:mt-2">
                 <div className="flex items-center space-x-0.5 text-gray-500">
                   <span className="text-xs">Uganda Market</span>
@@ -9250,6 +9249,7 @@ _Automated Business Report System_`)}`;
           </div>
         ))}
       </div>
+      */}
 
       {/* Enhanced Real-time Uganda Business Activity Feed - Mobile Optimized */}
       <div className="bg-white rounded-lg md:rounded-xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -11983,9 +11983,37 @@ FAREDEAL Uganda Management Team
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      minHeight: '100vh'
+    }}>
       <style dangerouslySetInnerHTML={{
-        __html: `
+        __html: isDarkMode ? `
+          body, .manager-portal {
+            background-color: #0f172a;
+            color: #e2e8f0;
+          }
+          .bg-white {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+          }
+          .bg-gray-50, .bg-gray-100 {
+            background-color: #0f172a !important;
+          }
+          .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900 {
+            color: #cbd5e1 !important;
+          }
+          .text-gray-500, .text-gray-400 {
+            color: #94a3b8 !important;
+          }
+          .border-gray-200, .border-gray-300 {
+            border-color: #334155 !important;
+          }
+          input, select, textarea {
+            background-color: #334155 !important;
+            color: #e2e8f0 !important;
+          }
           @keyframes fadeInUp {
             from {
               opacity: 0;
@@ -12019,42 +12047,67 @@ FAREDEAL Uganda Management Team
               transform: rotate(360deg);
             }
           }
-          .animate-spin-slow {
-            animation: spin-slow 3s linear infinite;
+          
+          .animate-slideInRight {
+            animation: slideInRight 0.8s ease-out;
           }
           
-          /* Custom scrollbar styles */
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-          
-          /* Smooth scroll for mobile navigation */
-          .mobile-nav-scroll {
-            scroll-behavior: smooth;
-            scroll-snap-type: x mandatory;
-          }
-          .mobile-nav-scroll > * {
-            scroll-snap-align: start;
+          @keyframes slideInDown {
+            from {
+              opacity: 0;
+              transform: translateY(-20px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
           }
           
-          /* Gradient background animation */
-          @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+          .animate-slideInDown {
+            animation: slideInDown 0.6s ease-out;
           }
           
-          .animated-gradient {
-            background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
+          @keyframes scaleIn {
+            from {
+              opacity: 0;
+              transform: scale(0.9);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1);
+            }
           }
           
-          /* Pulse animation for notifications */
+          .animate-scaleIn {
+            animation: scaleIn 0.4s ease-out;
+          }
+          
+          @keyframes pulse {
+            0%, 100% {
+              opacity: 1;
+            }
+            50% {
+              opacity: 0.5;
+            }
+          }
+          
+          .animate-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+          }
+          
+          @keyframes spin {
+            from {
+              transform: rotate(0deg);
+            }
+            to {
+              transform: rotate(360deg);
+            }
+          }
+          
+          .animate-spin {
+            animation: spin 1s linear infinite;
+          }
+          
           @keyframes notification-pulse {
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.1); opacity: 0.8; }
@@ -12113,52 +12166,32 @@ FAREDEAL Uganda Management Team
             animation: glow 2s ease-in-out infinite;
           }
           
-          .animate-morph-border {
-            animation: morphBorder 4s ease-in-out infinite;
+          .animate-morphBorder {
+            animation: morphBorder 8s ease-in-out infinite;
           }
           
-          /* Hexagon effect */
-          .hexagon {
-            clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
+          /* Profile animations */
+          @keyframes profileShine {
+            0% { background-position: -200% 0; }
+            100% { background-position: calc(200% + 200px) 0; }
           }
           
-          /* Diamond rotation effect */
-          .diamond-container {
-            perspective: 1000px;
+          .profile-shine {
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.2) 20%, rgba(255, 255, 255, 0) 40%);
+            background-size: 200% 100%;
+            animation: profileShine 2s infinite;
           }
           
-          .diamond-inner {
-            transform-style: preserve-3d;
-            transition: transform 0.6s;
-          }
-          
-          .diamond-container:hover .diamond-inner {
-            transform: rotateY(180deg);
-          }
-          
-          /* Glassmorphism effect */
-          .glass-morphism {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-          }
-          
-          /* Neon glow effect */
-          .neon-glow {
-            text-shadow: 0 0 5px currentColor, 0 0 10px currentColor, 0 0 15px currentColor;
-          }
-          
-          /* Profile container morphing */
           @keyframes profileMorph {
-            0% { border-radius: 25px; }
-            50% { border-radius: 15px 25px 15px 25px; }
+            0% { border-radius: 20px; }
+            50% { border-radius: 50px; }
             100% { border-radius: 25px; }
           }
           
           .profile-morph:hover {
             animation: profileMorph 1s ease-in-out;
           }
-        `
+        ` : ''
       }} />
       
       {/* Custom Header matching the image design */}

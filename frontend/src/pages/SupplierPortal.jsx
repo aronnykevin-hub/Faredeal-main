@@ -13,7 +13,7 @@ import {
   FiMaximize, FiMinimize, FiRotateCw, FiUpload, FiPrinter,
   FiTag, FiHash, FiImage, FiCheckCircle, FiXCircle, FiUsers,
   FiShoppingCart, FiPercent, FiFlag, FiWifi, FiSend, FiFileText,
-  FiMenu, FiX, FiChevronUp
+  FiMenu, FiX, FiChevronUp, FiArrowLeft
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,

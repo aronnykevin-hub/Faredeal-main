@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { notificationService } from '../services/notificationService';
 import { portalConfigService } from '../services/portalConfigService';
@@ -18,7 +19,7 @@ import {
   FiXCircle, FiUserPlus, FiSearch, FiFilter, FiDownload,
   FiUpload, FiTrash2, FiEdit, FiEye, FiRotateCw, FiX,
   FiMoreVertical, FiMail, FiPhone, FiBriefcase, FiFileText,
-  FiChevronDown, FiMenu, FiChevronUp, FiChevronRight, FiLogOut, FiInfo
+  FiChevronDown, FiMenu, FiChevronUp, FiChevronRight, FiLogOut, FiInfo, FiArrowLeft
 } from 'react-icons/fi';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -27,6 +28,7 @@ import {
 
 const AdminPortal = () => {
   const navigate = useNavigate();
+  const { isDarkMode } = useTheme();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [systemData, setSystemData] = useState({
@@ -6456,25 +6458,32 @@ const AdminPortal = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div style={{
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      minHeight: '100vh'
+    }}>
       {/* Authorization Check */}
       {authLoading ? (
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Verifying access...</p>
+            <p style={{ color: isDarkMode ? '#94a3b8' : '#4b5563' }} className="text-lg">Verifying access...</p>
           </div>
         </div>
       ) : !isAdmin ? (
-        <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-orange-50">
-          <div className="max-w-md w-full mx-auto p-8 bg-white rounded-xl shadow-lg border-2 border-red-300">
+        <div style={{ backgroundColor: isDarkMode ? '#0f172a' : '#fef2f2', minHeight: '100vh' }} className="flex items-center justify-center">
+          <div style={{
+            backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+            borderColor: isDarkMode ? '#7f1d1d' : '#fecaca'
+          }} className="max-w-md w-full mx-auto p-8 rounded-xl shadow-lg border-2">
             <div className="text-center">
               <div className="text-6xl mb-4">🚫</div>
-              <h1 className="text-2xl font-bold text-red-600 mb-2">Access Denied</h1>
-              <p className="text-gray-700 mb-6">
+              <h1 style={{ color: isDarkMode ? '#fca5a5' : '#dc2626' }} className="text-2xl font-bold mb-2">Access Denied</h1>
+              <p style={{ color: isDarkMode ? '#cbd5e1' : '#374151' }} className="mb-6">
                 This portal is for administrators only. Your account does not have the required permissions.
               </p>
-              <p className="text-sm text-gray-600 mb-6">
+              <p style={{ color: isDarkMode ? '#94a3b8' : '#4b5563' }} className="text-sm mb-6">
                 If you believe this is an error, please contact your administrator.
               </p>
               <button
@@ -6489,6 +6498,51 @@ const AdminPortal = () => {
       ) : (
         <>
       <NotificationCenter />
+      <style dangerouslySetInnerHTML={{
+        __html: isDarkMode ? `
+          body, .admin-portal {
+            background-color: #0f172a;
+            color: #e2e8f0;
+          }
+          .bg-white {
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
+          }
+          .bg-gray-50, .bg-gray-100 {
+            background-color: #0f172a !important;
+            color: #e2e8f0 !important;
+          }
+          .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900 {
+            color: #cbd5e1 !important;
+          }
+          .text-gray-500, .text-gray-400 {
+            color: #94a3b8 !important;
+          }
+          .border-gray-200, .border-gray-300 {
+            border-color: #334155 !important;
+          }
+          input, select, textarea {
+            background-color: #334155 !important;
+            color: #e2e8f0 !important;
+            border-color: #475569 !important;
+          }
+          input::placeholder {
+            color: #94a3b8 !important;
+          }
+          .hover\:bg-gray-100:hover {
+            background-color: #334155 !important;
+          }
+          .shadow, .shadow-lg, .shadow-xl, .shadow-2xl {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5) !important;
+          }
+          .bg-red-50, .bg-red-100, .bg-orange-50 {
+            background-color: #1e293b !important;
+          }
+          .bg-blue-50, .bg-blue-100, .bg-green-50, .bg-purple-50 {
+            background-color: #334155 !important;
+          }
+        ` : ''
+      }} />
       <style dangerouslySetInnerHTML={{
         __html: `
           @keyframes fadeInUp {
@@ -6590,17 +6644,38 @@ const AdminPortal = () => {
       }} />
 
       {/* Creative Top Header */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 shadow-2xl border-b border-blue-500/20">
+      <div style={{
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+        borderColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)'
+      }} className="fixed top-0 left-0 right-0 z-50 shadow-2xl border-b">
         <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            {/* Logo & Branding */}
-            <div className="flex items-center gap-3 flex-shrink-0 group cursor-pointer hover:scale-105 transition-transform">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-2xl transition-all">
-                <FiShield className="h-7 w-7 text-white" />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-bold text-white">{portalConfig.systemName}</h1>
-                <p className="text-xs text-blue-200 font-medium">System Admin</p>
+            {/* Back Button & Logo & Branding */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {/* Back Button */}
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 rounded-lg transition-all duration-300 hover:scale-110 group"
+                style={{
+                  backgroundColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                  color: isDarkMode ? '#94a3b8' : '#64748b',
+                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(226, 232, 240, 0.8)',
+                  border: '1px solid'
+                }}
+                title="Go to previous page"
+              >
+                <FiArrowLeft className="h-5 w-5 group-hover:scale-125 transition-transform" />
+              </button>
+
+              {/* Logo & Branding */}
+              <div className="flex items-center gap-2 group cursor-pointer hover:scale-105 transition-transform">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-2xl transition-all">
+                  <FiShield className="h-7 w-7 text-white" />
+                </div>
+                <div className="hidden sm:block">
+                  <h1 style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-lg font-bold">{portalConfig.systemName}</h1>
+                  <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className="text-xs font-medium">System Admin</p>
+                </div>
               </div>
             </div>
 
@@ -6614,10 +6689,18 @@ const AdminPortal = () => {
                 <button
                   key={item.id}
                   onClick={() => setActiveSection(item.id)}
+                  style={{
+                    backgroundColor: activeSection === item.id 
+                      ? undefined 
+                      : isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(226, 232, 240, 0.5)',
+                    color: activeSection === item.id 
+                      ? '#ffffff' 
+                      : isDarkMode ? '#cbd5e1' : '#475569'
+                  }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 relative group ${
                     activeSection === item.id
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                      : 'text-gray-300 hover:text-white hover:bg-white/10'
+                      : `${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`
                   }`}
                 >
                   <item.icon className="h-4 w-4" />
@@ -6642,12 +6725,16 @@ const AdminPortal = () => {
               </div>
 
               {/* Notifications */}
-              <button className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+              <button style={{
+                color: isDarkMode ? '#94a3b8' : '#64748b'
+              }} className={`p-2 rounded-lg transition-all ${isDarkMode ? 'hover:text-blue-400 hover:bg-slate-700' : 'hover:text-blue-600 hover:bg-gray-100'}`}>
                 <FiBell className="h-5 w-5" />
               </button>
 
               {/* Settings */}
-              <button className="p-2 text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-all">
+              <button style={{
+                color: isDarkMode ? '#94a3b8' : '#64748b'
+              }} className={`p-2 rounded-lg transition-all ${isDarkMode ? 'hover:text-purple-400 hover:bg-slate-700' : 'hover:text-purple-600 hover:bg-gray-100'}`}>
                 <FiSettings className="h-5 w-5" />
               </button>
 
@@ -6655,13 +6742,18 @@ const AdminPortal = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 ml-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-lg border border-white/20 transition-all group"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                    borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(226, 232, 240, 0.8)',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                  }}
+                  className="flex items-center gap-2 ml-2 px-3 py-1.5 backdrop-blur-sm rounded-lg border transition-all group"
                 >
                   <div className="w-6 h-6 bg-gradient-to-r from-blue-400 to-purple-500 rounded-lg flex items-center justify-center text-white">
                     <FiShield className="h-3.5 w-3.5" />
                   </div>
-                  <span className="text-sm font-medium text-white hidden sm:inline">Admin</span>
-                  <FiChevronDown className={`h-4 w-4 text-white transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
+                  <span style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-sm font-medium hidden sm:inline">Admin</span>
+                  <FiChevronDown style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className={`h-4 w-4 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Profile Dropdown */}
@@ -6725,107 +6817,254 @@ const AdminPortal = () => {
                 )}
               </div>
 
-              {/* Mobile Menu Button */}
+              {/* Mobile Menu Button - 3 Dashes Hamburger */}
               <button
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
-                className="lg:hidden p-2 text-white hover:bg-white/10 rounded-lg transition-all"
+                title={showMobileMenu ? 'Close menu' : 'Open menu'}
+                style={{
+                  color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                  backgroundColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                  borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.3)' : 'rgba(226, 232, 240, 0.8)',
+                  padding: '10px 12px'
+                }}
+                className={`md:hidden p-2 rounded-lg border transition-all duration-300 ${isDarkMode ? 'hover:bg-slate-700 hover:text-blue-400' : 'hover:bg-gray-100 hover:text-blue-600'}`}
               >
-                <FiMenu className="h-6 w-6" />
+                {/* Hamburger Icon - 3 horizontal dashes */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', width: '24px', height: '20px' }}>
+                  <div style={{
+                    width: '100%',
+                    height: '2.5px',
+                    backgroundColor: 'currentColor',
+                    borderRadius: '2px',
+                    transition: 'all 0.3s'
+                  }} className={showMobileMenu ? 'transform rotate-45 translate-y-2.5' : ''}></div>
+                  <div style={{
+                    width: '100%',
+                    height: '2.5px',
+                    backgroundColor: 'currentColor',
+                    borderRadius: '2px',
+                    transition: 'all 0.3s',
+                    opacity: showMobileMenu ? 0 : 1
+                  }}></div>
+                  <div style={{
+                    width: '100%',
+                    height: '2.5px',
+                    backgroundColor: 'currentColor',
+                    borderRadius: '2px',
+                    transition: 'all 0.3s'
+                  }} className={showMobileMenu ? 'transform -rotate-45 -translate-y-2.5' : ''}></div>
+                </div>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Navigation Dropdown */}
-        {isMobile && showMobileMenu && (
-          <div className="border-t border-blue-500/20 bg-gradient-to-b from-slate-800 to-slate-900 px-4 py-4 space-y-2">
-            {[
-              { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
-              { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
-              { id: 'users', label: 'User Management', icon: FiUsers },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setActiveSection(item.id);
-                  setShowMobileMenu(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
-                  activeSection === item.id
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                    : 'text-gray-300 hover:bg-white/10'
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="flex-1 text-left">{item.label}</span>
-                {item.id === 'users' && pendingUsers.length > 0 && (
-                  <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-2 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {pendingUsers.length}
-                  </span>
-                )}
-              </button>
-            ))}
-
-            <div className="border-t border-white/10 pt-4 mt-4 space-y-3">
-              <ThemeToggle mobile={true} />
+        {/* Mobile Navigation Dropdown - Fixed overlay for mobile */}
+        {showMobileMenu && (
+          <>
+            {/* Overlay backdrop */}
+            <div
+              onClick={() => setShowMobileMenu(false)}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                zIndex: 39,
+                animation: 'fadeIn 0.2s ease-out'
+              }}
+              className="md:hidden"
+            >
+              <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
             </div>
-          </div>
+            
+            {/* Mobile Menu */}
+            <div
+              style={{
+                backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                borderColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                position: 'fixed',
+                top: 80,
+                left: 0,
+                right: 0,
+                zIndex: 40,
+                maxHeight: 'calc(100vh - 80px)',
+                overflowY: 'auto',
+                animation: 'slideDown 0.3s ease-out'
+              }}
+              className="md:hidden border-t"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <style>{`@keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }`}</style>
+              
+              <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-2">
+                {/* Close Button */}
+                <button
+                  onClick={() => setShowMobileMenu(false)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    marginBottom: '8px',
+                    backgroundColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    textAlign: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  className={isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}
+                >
+                  ✕ Close Menu
+                </button>
+
+                {/* Navigation Items */}
+                {[
+                  { id: 'transactions', label: '🧾 Transaction History', icon: FiFileText },
+                  { id: 'inventory-pos', label: '📦 Order Inventory - POS', icon: FiShoppingBag },
+                  { id: 'users', label: '👥 User Management', icon: FiUsers },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveSection(item.id);
+                      setShowMobileMenu(false);
+                    }}
+                    style={{
+                      backgroundColor: activeSection === item.id
+                        ? undefined
+                        : isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                      color: activeSection === item.id
+                        ? '#ffffff'
+                        : isDarkMode ? '#cbd5e1' : '#475569',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px 14px',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontWeight: '600',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s',
+                      textAlign: 'left'
+                    }}
+                    className={`${
+                      activeSection === item.id
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
+                        : `${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-gray-100'}`
+                    }`}
+                  >
+                    <item.icon style={{ width: '20px', height: '20px', flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.id === 'users' && pendingUsers.length > 0 && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: '24px',
+                        height: '24px',
+                        padding: '0 6px',
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        borderRadius: '9999px',
+                        animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        flexShrink: 0
+                      }}>
+                        {pendingUsers.length}
+                      </span>
+                    )}
+                  </button>
+                ))}
+
+                {/* Divider */}
+                <div style={{
+                  height: '1px',
+                  backgroundColor: isDarkMode ? 'rgba(51, 65, 85, 0.3)' : 'rgba(226, 232, 240, 0.5)',
+                  margin: '12px 0'
+                }}></div>
+
+                {/* Theme Toggle in Mobile Menu */}
+                <div style={{ padding: '8px 0' }}>
+                  <ThemeToggle mobile={true} />
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
       {/* Main Content Area */}
-      <div className="pt-24 px-3 md:px-4 lg:px-8 pb-8 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        {/* Header - Compact for mobile */}
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 rounded-lg md:rounded-2xl shadow-2xl p-3 md:p-4 lg:p-6 mb-4 md:mb-6 lg:mb-8 animate-fadeInUp">
+      <div style={{
+        backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+        color: isDarkMode ? '#e2e8f0' : '#1e293b'
+      }} className="pt-24 px-3 md:px-4 lg:px-8 pb-8 min-h-screen">
+        {/* COMMENTED OUT - Admin Portal Header Section
+        <div style={{
+          backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.8)' : 'rgba(248, 250, 252, 0.8)',
+          borderColor: isDarkMode ? 'rgba(51, 65, 85, 0.5)' : 'rgba(226, 232, 240, 0.5)'
+        }} className="backdrop-blur-sm border rounded-lg md:rounded-2xl shadow-2xl p-3 md:p-4 lg:p-6 mb-4 md:mb-6 lg:mb-8 animate-fadeInUp">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white truncate">Admin Portal - System Administration</h1>
-              <p className="text-xs md:text-sm text-slate-300 mt-0.5 md:mt-1">Welcome back to FareDeal Uganda, admin</p>
+              <h1 style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-xl md:text-2xl lg:text-3xl font-bold truncate">Admin Portal - System Administration</h1>
+              <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className="text-xs md:text-sm mt-0.5 md:mt-1">Welcome back to FareDeal Uganda, admin</p>
             </div>
             <div className="flex items-center gap-1 md:gap-2 lg:gap-4 flex-shrink-0">
               <button 
-                className="p-1.5 md:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
+                className="p-1.5 md:p-2 hover:text-blue-600 rounded-lg transition-colors"
                 title="Notifications"
               >
                 <FiBell className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
               </button>
               <button 
-                className="p-1.5 md:p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}
+                className="p-1.5 md:p-2 hover:text-blue-600 rounded-lg transition-colors"
                 title="Settings"
               >
                 <FiSettings className="h-4 md:h-5 lg:h-6 w-4 md:w-5 lg:w-6" />
               </button>
               
-              {/* Theme Toggle */}
               <div className="md:block hidden">
                 <ThemeToggle />
               </div>
               
-              {/* Admin Profile Dropdown - Compact */}
               <div className="relative">
                 <button 
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg px-2 md:px-3 py-1.5 md:py-2 transition-colors cursor-pointer"
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(71, 85, 105, 0.5)' : 'rgba(226, 232, 240, 0.5)',
+                    color: isDarkMode ? '#e2e8f0' : '#1e293b'
+                  }}
+                  className="flex items-center gap-2 rounded-lg px-2 md:px-3 py-1.5 md:py-2 transition-colors cursor-pointer"
                   title="Admin Profile"
                 >
                   <div className="w-6 md:w-8 h-6 md:h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white flex-shrink-0">
                     <FiShield className="h-3 md:h-5 w-3 md:w-5" />
                   </div>
                   <div className="text-xs md:text-sm text-left hidden md:block">
-                    <div className="font-medium text-white">admin</div>
-                    <div className="text-slate-400 text-xs">Administrator</div>
+                    <div className="font-medium">admin</div>
+                    <div style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className="text-xs">Administrator</div>
                   </div>
                 </button>
 
-                {/* Dropdown Menu */}
                 {showProfileMenu && (
                   <>
                     <div 
                       className="fixed inset-0 z-10" 
                       onClick={() => setShowProfileMenu(false)}
                     ></div>
-                    <div className="absolute right-0 mt-2 w-64 bg-slate-800 rounded-xl shadow-2xl border border-slate-700 z-20 overflow-hidden">
-                      {/* Profile Header */}
+                    <div style={{
+                      backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
+                      borderColor: isDarkMode ? '#334155' : '#e2e8f0'
+                    }} className="absolute right-0 mt-2 w-64 rounded-xl shadow-2xl border z-20 overflow-hidden">
                       <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4 text-white">
                         <div className="flex items-center space-x-3">
                           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-lg flex items-center justify-center">
@@ -6838,7 +7077,6 @@ const AdminPortal = () => {
                         </div>
                       </div>
 
-                      {/* Menu Items */}
                       <div className="py-2">
                         <button
                           onClick={() => {
@@ -6924,6 +7162,7 @@ const AdminPortal = () => {
             </div>
           </div>
         </div>
+        */}
 
         {/* Main Content */}
         <div className="space-y-8">

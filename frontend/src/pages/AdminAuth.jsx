@@ -6,12 +6,27 @@ import { fastCache, optimizedApiCall } from '../utils/fastConnectionCache';
 import {
   FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone,
   FiShield, FiCheckCircle, FiAlertCircle, FiArrowRight,
-  FiLogIn, FiUserPlus, FiZap, FiAward, FiTrendingUp, FiArrowLeft
+  FiLogIn, FiUserPlus, FiZap, FiAward, FiTrendingUp, FiArrowLeft,
+  FiMoon, FiSun
 } from 'react-icons/fi';
 
 const AdminAuth = () => {
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [manualDarkMode, setManualDarkMode] = useState(null); // null = auto, true/false = manual override
+  
+  // Handle smart back navigation with smooth history checking
+  const handleBackNavigation = () => {
+    // Try going back in history first
+    const historyLength = window.history.length;
+    if (historyLength > 1) {
+      // Go back smoothly through browser history
+      window.history.back();
+    } else {
+      // Fallback: no history available, go to portal selection
+      navigate('/portal-selection');
+    }
+  };
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +46,14 @@ const AdminAuth = () => {
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
     return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
   }, []);
+
+  // Determine effective dark mode (manual override or system preference)
+  const effectiveDarkMode = manualDarkMode !== null ? manualDarkMode : isDarkMode;
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    setManualDarkMode(prev => prev === null ? !isDarkMode : !prev);
+  };
   
   // Form state
   const [formData, setFormData] = useState({
@@ -831,29 +854,29 @@ const AdminAuth = () => {
 
   return (
     <div style={{
-      backgroundColor: isDarkMode ? '#0f172a' : '#ffffff',
-      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+      color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
       transition: 'background-color 0.3s, color 0.3s'
     }} className="flex items-center justify-center p-4 relative overflow-hidden min-h-screen">
       {/* Animated background elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl animate-pulse"></div>
-        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.05)' : 'rgba(255, 255, 255, 0.3)' }} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl animate-pulse delay-2000"></div>
+        <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl animate-pulse"></div>
+        <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.5)' }} className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.05)' : 'rgba(255, 255, 255, 0.3)' }} className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl animate-pulse delay-2000"></div>
       </div>
 
       {/* Main container */}
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8 relative z-10">
         {/* Left side - Branding */}
-        <div className="hidden md:flex flex-col justify-center space-y-8" style={{ color: isDarkMode ? '#e2e8f0' : '#ffffff' }}>
+        <div className="hidden md:flex flex-col justify-center space-y-8" style={{ color: effectiveDarkMode ? '#e2e8f0' : '#ffffff' }}>
           <div>
             <div className="flex items-center space-x-3 mb-4">
-              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-16 h-16 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+              <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-16 h-16 backdrop-blur-sm rounded-2xl flex items-center justify-center">
                 <FiShield className="w-10 h-10" />
               </div>
               <div>
                 <h1 className="text-4xl font-bold">FAREDEAL</h1>
-                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }}>Admin Portal</p>
+                <p style={{ color: effectiveDarkMode ? '#cbd5e1' : '#e0e7ff' }}>Admin Portal</p>
               </div>
             </div>
             <p className="text-xl">
@@ -863,33 +886,33 @@ const AdminAuth = () => {
 
           {/* Features */}
           <div className="space-y-4">
-            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
-              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiZap className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Real-time Analytics</h3>
-                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Monitor your business performance with live data and insights</p>
+                <p style={{ color: effectiveDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Monitor your business performance with live data and insights</p>
               </div>
             </div>
 
-            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
-              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiAward className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Complete Control</h3>
-                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Manage users, inventory, sales, and suppliers from one place</p>
+                <p style={{ color: effectiveDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Manage users, inventory, sales, and suppliers from one place</p>
               </div>
             </div>
 
-            <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
-              <div style={{ backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(255, 255, 255, 0.1)' }} className="flex items-start space-x-4 backdrop-blur-sm rounded-xl p-4">
+              <div style={{ backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(255, 255, 255, 0.2)' }} className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FiTrendingUp className="w-6 h-6" />
               </div>
               <div>
                 <h3 className="font-semibold text-lg">Business Growth</h3>
-                <p style={{ color: isDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Powerful tools to scale your supermarket operations</p>
+                <p style={{ color: effectiveDarkMode ? '#cbd5e1' : '#e0e7ff' }} className="text-sm">Powerful tools to scale your supermarket operations</p>
               </div>
             </div>
           </div>
@@ -897,21 +920,38 @@ const AdminAuth = () => {
 
         {/* Right side - Auth form */}
         <div style={{
-          backgroundColor: isDarkMode ? '#1e293b' : '#ffffff',
-          borderColor: isDarkMode ? '#334155' : '#e2e8f0'
+          backgroundColor: effectiveDarkMode ? '#1e293b' : '#ffffff',
+          borderColor: effectiveDarkMode ? '#334155' : '#e2e8f0'
         }} className="rounded-3xl shadow-2xl p-8 md:p-10 relative border">
           {/* Back button */}
           <button
-            onClick={() => navigate('/portal-selection')}
+            onClick={handleBackNavigation}
             style={{
-              color: isDarkMode ? '#94a3b8' : '#4b5563',
-              backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9'
+              color: effectiveDarkMode ? '#94a3b8' : '#4b5563',
+              backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9'
             }}
             className="absolute top-6 left-6 flex items-center space-x-2 hover:text-blue-600 px-3 py-2 rounded-lg transition-all duration-300 group"
-            title="Go back to portal selection"
+            title="Go back to previous page"
           >
             <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
             <span className="text-sm font-medium">Back</span>
+          </button>
+
+          {/* Dark mode toggle button */}
+          <button
+            onClick={toggleDarkMode}
+            style={{
+              color: effectiveDarkMode ? '#94a3b8' : '#4b5563',
+              backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.1)' : '#f1f5f9'
+            }}
+            className="absolute top-6 right-6 flex items-center justify-center w-10 h-10 rounded-lg transition-all duration-300 hover:text-blue-600 group"
+            title={effectiveDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {effectiveDarkMode ? (
+              <FiSun className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            ) : (
+              <FiMoon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            )}
           </button>
 
           {/* Mobile branding */}
@@ -920,21 +960,21 @@ const AdminAuth = () => {
               <FiShield className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold" style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }}>FAREDEAL</h2>
-              <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }} className="text-sm">Admin Portal</p>
+              <h2 className="text-2xl font-bold" style={{ color: effectiveDarkMode ? '#e2e8f0' : '#1e293b' }}>FAREDEAL</h2>
+              <p style={{ color: effectiveDarkMode ? '#94a3b8' : '#64748b' }} className="text-sm">Admin Portal</p>
             </div>
           </div>
 
           {/* Tab switcher */}
-          <div style={{ backgroundColor: isDarkMode ? '#334155' : '#f1f5f9' }} className="flex rounded-xl p-1 mb-8">
+          <div style={{ backgroundColor: effectiveDarkMode ? '#334155' : '#f1f5f9' }} className="flex rounded-xl p-1 mb-8">
             <button
               onClick={() => {
                 setIsLogin(true);
                 setErrors({});
               }}
               style={{
-                backgroundColor: isLogin ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
-                color: isLogin ? '#6366f1' : isDarkMode ? '#94a3b8' : '#64748b'
+                backgroundColor: isLogin ? (effectiveDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: isLogin ? '#6366f1' : effectiveDarkMode ? '#94a3b8' : '#64748b'
               }}
               className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2"
             >
@@ -947,8 +987,8 @@ const AdminAuth = () => {
                 setErrors({});
               }}
               style={{
-                backgroundColor: !isLogin ? (isDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
-                color: !isLogin ? '#6366f1' : isDarkMode ? '#94a3b8' : '#64748b'
+                backgroundColor: !isLogin ? (effectiveDarkMode ? '#1e293b' : '#ffffff') : 'transparent',
+                color: !isLogin ? '#6366f1' : effectiveDarkMode ? '#94a3b8' : '#64748b'
               }}
               className="flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2"
             >
@@ -959,10 +999,10 @@ const AdminAuth = () => {
 
           {/* Form title */}
           <div className="mb-6">
-            <h2 style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-2xl font-bold mb-2">
+            <h2 style={{ color: effectiveDarkMode ? '#e2e8f0' : '#1e293b' }} className="text-2xl font-bold mb-2">
               {isLogin ? 'Welcome back!' : 'Create admin account'}
             </h2>
-            <p style={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+            <p style={{ color: effectiveDarkMode ? '#94a3b8' : '#64748b' }}>
               {isLogin
                 ? 'Enter your credentials to access the admin portal'
                 : 'Fill in your details to create a new admin account'}
@@ -1026,7 +1066,7 @@ const AdminAuth = () => {
             {/* Full Name (Signup only) */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label style={{ color: effectiveDarkMode ? '#cbd5e1' : '#374151' }} className="block text-sm font-medium mb-2">
                   Full Name *
                 </label>
                 <div className="relative">
@@ -1037,10 +1077,15 @@ const AdminAuth = () => {
                     value={formData.fullName}
                     onChange={handleChange}
                     placeholder="Enter your full name"
+                    style={{
+                      backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+                      color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
+                      borderColor: errors.fullName ? '#ef4444' : effectiveDarkMode ? '#475569' : '#e5e7eb'
+                    }}
                     className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
                       errors.fullName
-                        ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-                        : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                        ? 'focus:border-red-500 focus:ring-red-200'
+                        : 'focus:border-blue-500 focus:ring-blue-200'
                     }`}
                   />
                 </div>
@@ -1055,7 +1100,7 @@ const AdminAuth = () => {
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label style={{ color: effectiveDarkMode ? '#cbd5e1' : '#374151' }} className="block text-sm font-medium mb-2">
                 Email Address *
               </label>
               <div className="relative">
@@ -1066,10 +1111,15 @@ const AdminAuth = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="admin@faredeal.ug"
+                  style={{
+                    backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+                    color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
+                    borderColor: errors.email ? '#ef4444' : effectiveDarkMode ? '#475569' : '#e5e7eb'
+                  }}
                   className={`w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
                     errors.email
-                      ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-                      : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                      ? 'focus:border-red-500 focus:ring-red-200'
+                      : 'focus:border-blue-500 focus:ring-blue-200'
                   }`}
                 />
               </div>
@@ -1084,7 +1134,7 @@ const AdminAuth = () => {
             {/* Phone (Signup only) */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label style={{ color: effectiveDarkMode ? '#cbd5e1' : '#374151' }} className="block text-sm font-medium mb-2">
                   Phone Number
                 </label>
                 <div className="relative">
@@ -1095,7 +1145,12 @@ const AdminAuth = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     placeholder="+256 700 000 000"
-                    className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                    style={{
+                      backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+                      color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
+                      borderColor: effectiveDarkMode ? '#475569' : '#e5e7eb'
+                    }}
+                    className="w-full pl-12 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
                   />
                 </div>
               </div>
@@ -1103,7 +1158,7 @@ const AdminAuth = () => {
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label style={{ color: effectiveDarkMode ? '#cbd5e1' : '#374151' }} className="block text-sm font-medium mb-2">
                 Password *
               </label>
               <div className="relative">
@@ -1114,16 +1169,22 @@ const AdminAuth = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter your password"
+                  style={{
+                    backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+                    color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
+                    borderColor: errors.password ? '#ef4444' : effectiveDarkMode ? '#475569' : '#e5e7eb'
+                  }}
                   className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
                     errors.password
-                      ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-                      : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                      ? 'focus:border-red-500 focus:ring-red-200'
+                      : 'focus:border-blue-500 focus:ring-blue-200'
                   }`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  style={{ color: effectiveDarkMode ? '#94a3b8' : '#9ca3af' }}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 hover:text-blue-600 transition-colors"
                 >
                   {showPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                 </button>
@@ -1139,7 +1200,7 @@ const AdminAuth = () => {
               {!isLogin && formData.password && (
                 <div className="mt-2">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-gray-600">Password strength:</span>
+                    <span style={{ color: effectiveDarkMode ? '#94a3b8' : '#4b5563' }} className="text-xs">Password strength:</span>
                     <span className={`text-xs font-medium ${strengthInfo.textColor}`}>
                       {strengthInfo.text}
                     </span>
@@ -1157,7 +1218,7 @@ const AdminAuth = () => {
             {/* Confirm Password (Signup only) */}
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label style={{ color: effectiveDarkMode ? '#cbd5e1' : '#374151' }} className="block text-sm font-medium mb-2">
                   Confirm Password *
                 </label>
                 <div className="relative">
@@ -1168,16 +1229,22 @@ const AdminAuth = () => {
                     value={formData.confirmPassword}
                     onChange={handleChange}
                     placeholder="Confirm your password"
+                    style={{
+                      backgroundColor: effectiveDarkMode ? '#0f172a' : '#ffffff',
+                      color: effectiveDarkMode ? '#e2e8f0' : '#1e293b',
+                      borderColor: errors.confirmPassword ? '#ef4444' : effectiveDarkMode ? '#475569' : '#e5e7eb'
+                    }}
                     className={`w-full pl-12 pr-12 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 transition-all ${
                       errors.confirmPassword
-                        ? 'border-red-300 focus:border-red-500 focus:ring-red-200'
-                        : 'border-gray-200 focus:border-blue-500 focus:ring-blue-200'
+                        ? 'focus:border-red-500 focus:ring-red-200'
+                        : 'focus:border-blue-500 focus:ring-blue-200'
                     }`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    style={{ color: effectiveDarkMode ? '#94a3b8' : '#9ca3af' }}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 hover:text-blue-600 transition-colors"
                   >
                     {showConfirmPassword ? <FiEyeOff className="w-5 h-5" /> : <FiEye className="w-5 h-5" />}
                   </button>
@@ -1230,7 +1297,7 @@ const AdminAuth = () => {
               {isLogin && !magicLinkSent && (
                 <>
                   <div className="mt-4 text-center">
-                    <p className="text-xs text-gray-500">
+                    <p style={{ color: effectiveDarkMode ? '#94a3b8' : '#6b7280' }} className="text-xs">
                       {useMagicLink ? (
                         <>No password needed! Just click the link we send to your email.</>
                       ) : (
@@ -1242,10 +1309,13 @@ const AdminAuth = () => {
                   {/* Divider */}
                   <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300"></div>
+                      <div style={{ borderColor: effectiveDarkMode ? '#475569' : '#d1d5db' }} className="w-full border-t"></div>
                     </div>
                     <div className="relative flex justify-center text-sm">
-                      <span className="px-4 bg-white text-gray-500 font-medium">Or continue with</span>
+                      <span style={{
+                        backgroundColor: effectiveDarkMode ? '#1e293b' : '#ffffff',
+                        color: effectiveDarkMode ? '#94a3b8' : '#6b7280'
+                      }} className="px-4 font-medium">Or continue with</span>
                     </div>
                   </div>
 
@@ -1254,7 +1324,12 @@ const AdminAuth = () => {
                     onClick={handleGoogleSignIn}
                     disabled={loading}
                     type="button"
-                    className="w-full flex items-center justify-center space-x-3 px-4 py-3 border-2 border-gray-300 rounded-xl hover:border-blue-500 hover:bg-gray-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
+                    style={{
+                      borderColor: effectiveDarkMode ? '#475569' : '#d1d5db',
+                      backgroundColor: effectiveDarkMode ? 'rgba(148, 163, 184, 0.05)' : '#ffffff',
+                      color: effectiveDarkMode ? '#e2e8f0' : '#374151'
+                    }}
+                    className="w-full flex items-center justify-center space-x-3 px-4 py-3 border-2 rounded-xl hover:border-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                       <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -1262,7 +1337,7 @@ const AdminAuth = () => {
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                     </svg>
-                    <span className="text-gray-700 font-semibold group-hover:text-blue-700">
+                    <span style={{ color: effectiveDarkMode ? '#e2e8f0' : '#374151' }} className="font-semibold group-hover:text-blue-700">
                       Sign in with Google
                     </span>
                   </button>
@@ -1273,7 +1348,7 @@ const AdminAuth = () => {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p style={{ color: effectiveDarkMode ? '#94a3b8' : '#4b5563' }} className="text-sm">
               {isLogin ? "Don't have an account? " : 'Already have an account? '}
               <button
                 onClick={() => {
@@ -1288,21 +1363,27 @@ const AdminAuth = () => {
           </div>
 
           {/* Security note */}
-          <div className="mt-6 flex items-start space-x-2 bg-blue-50 rounded-xl p-4">
+          <div style={{
+            backgroundColor: effectiveDarkMode ? 'rgba(59, 130, 246, 0.1)' : '#eff6ff',
+            borderColor: effectiveDarkMode ? '#475569' : '#bfdbfe'
+          }} className="mt-6 flex items-start space-x-2 border rounded-xl p-4">
             <FiShield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-blue-900">
+            <p style={{ color: effectiveDarkMode ? '#93c5fd' : '#1e40af' }} className="text-xs">
               Your data is secured with enterprise-grade encryption. We never share your information with third parties.
             </p>
           </div>
 
           {/* Troubleshooting Guide - Login Issues */}
           {isLogin && (
-            <div className="mt-6 bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+            <div style={{
+              backgroundColor: effectiveDarkMode ? 'rgba(180, 83, 9, 0.1)' : '#fef3c7',
+              borderColor: effectiveDarkMode ? '#92400e' : '#fcd34d'
+            }} className="mt-6 border-2 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <div className="text-xl">🔧</div>
                 <div className="flex-1">
-                  <p className="font-semibold text-amber-900 mb-2">🔑 Login Troubleshooting</p>
-                  <ul className="text-xs text-amber-800 space-y-1">
+                  <p style={{ color: effectiveDarkMode ? '#fed7aa' : '#92400e' }} className="font-semibold mb-2">🔑 Login Troubleshooting</p>
+                  <ul style={{ color: effectiveDarkMode ? '#fed7aa' : '#b45309' }} className="text-xs space-y-1">
                     <li>✓ <strong>SLOW CONNECTION?</strong> Use "Use Email Link instead" - works much better on slow internet!</li>
                     <li>✓ Make sure you've signed up first if this is your first time</li>
                     <li>✓ Check that email and password are correct (case-sensitive)</li>

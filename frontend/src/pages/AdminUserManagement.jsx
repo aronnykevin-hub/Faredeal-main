@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../services/supabase';
 import { FiSearch } from 'react-icons/fi';
 
@@ -9,16 +10,7 @@ export default function AdminUserManagement() {
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState({});
   const [message, setMessage] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  // Detect system dark mode preference
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(prefersDark);
-    const listener = (e) => setIsDarkMode(e.matches);
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
-    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
-  }, []);
+  const { isDarkMode } = useTheme();
 
   useEffect(() => {
     loadAllUsers();

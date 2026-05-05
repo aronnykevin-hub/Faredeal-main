@@ -30,8 +30,19 @@ import cashierOrdersService from '../services/cashierOrdersService';
 import { supabase } from '../services/supabase';
 
 const CashierPortal = () => {
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('pos');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Detect dark mode preference
+  useEffect(() => {
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setIsDarkMode(prefersDark);
+    const listener = (e) => setIsDarkMode(e.matches);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
+    return () => window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
+  }, []);
+
   const [currentTransaction, setCurrentTransaction] = useState({
     items: [],
     subtotal: 0,
@@ -2623,9 +2634,39 @@ const CashierPortal = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{
+      backgroundColor: isDarkMode ? '#0f172a' : '#f8fafc',
+      color: isDarkMode ? '#e2e8f0' : '#1e293b',
+      minHeight: '100vh'
+    }}>
       <style dangerouslySetInnerHTML={{
         __html: `
+          ${isDarkMode ? `
+            body, .cashier-portal {
+              background-color: #0f172a;
+              color: #e2e8f0;
+            }
+            .bg-white {
+              background-color: #1e293b !important;
+              color: #e2e8f0 !important;
+            }
+            .bg-gray-50, .bg-gray-100 {
+              background-color: #0f172a !important;
+            }
+            .text-gray-600, .text-gray-700, .text-gray-800, .text-gray-900 {
+              color: #cbd5e1 !important;
+            }
+            .text-gray-500, .text-gray-400 {
+              color: #94a3b8 !important;
+            }
+            .border-gray-200, .border-gray-300 {
+              border-color: #334155 !important;
+            }
+            input, select, textarea {
+              background-color: #334155 !important;
+              color: #e2e8f0 !important;
+            }
+          ` : ''}
           @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(30px); }
             to { opacity: 1; transform: translateY(0); }
