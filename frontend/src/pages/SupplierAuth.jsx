@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { notificationService } from '../services/notificationService';
-import { FiClock } from 'react-icons/fi';
+import { FiClock, FiArrowLeft } from 'react-icons/fi';
 import './SupplierAuth.css';
 
 /**
@@ -31,11 +31,12 @@ const SupplierAuth = () => {
       const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
       
       if (hasOAuthCallback) {
-        console.log('🔄 OAuth callback detected, waiting for session...');
+        console.log('🔄 OAuth callback detected');
         // Wait for Supabase to process the OAuth callback
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
+      // ALWAYS call checkAuthStatus to process authentication
       checkAuthStatus();
     };
     
@@ -136,7 +137,10 @@ const SupplierAuth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/supplier-auth`
+          redirectTo: `${window.location.origin}/supplier-auth`,
+          queryParams: {
+            prompt: 'select_account'
+          }
         }
       });
 
@@ -169,7 +173,17 @@ const SupplierAuth = () => {
 
   if (waiting) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-br from-orange-500 via-amber-500 to-red-500 flex items-center justify-center p-4 relative">
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/portal-selection')}
+          className="absolute top-6 left-6 flex items-center space-x-2 text-white hover:bg-white/20 px-3 py-2 rounded-lg transition-all duration-300 group"
+          title="Go back to portal selection"
+        >
+          <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          <span className="text-sm font-medium">Back</span>
+        </button>
+
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl p-8 text-center">
           <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <FiClock className="w-12 h-12 text-white" />
@@ -189,6 +203,17 @@ const SupplierAuth = () => {
 
   return (
     <div className="auth-container">
+      {/* Back button */}
+      <button
+        onClick={() => navigate('/portal-selection')}
+        className="absolute top-6 left-6 flex items-center space-x-2 text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-all duration-300 group"
+        title="Go back to portal selection"
+        style={{ zIndex: 10 }}
+      >
+        <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+        <span className="text-sm font-medium">Back</span>
+      </button>
+
       <div className="auth-box">
         <h1 className="auth-title">Supplier Portal</h1>
         <p className="auth-subtitle">Sign in with your Google account to request supplier access.</p>

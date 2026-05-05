@@ -145,10 +145,11 @@ const AdminPortal = () => {
       }
 
       try {
+        // Query using auth_id field since auth.users.id may not match users.id
         const { data: userData, error } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('auth_id', user.id)  // Match against auth_id field
           .maybeSingle();
 
         if (error) {

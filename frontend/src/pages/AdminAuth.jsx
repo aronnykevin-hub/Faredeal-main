@@ -6,7 +6,7 @@ import { fastCache, optimizedApiCall } from '../utils/fastConnectionCache';
 import {
   FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone,
   FiShield, FiCheckCircle, FiAlertCircle, FiArrowRight,
-  FiLogIn, FiUserPlus, FiZap, FiAward, FiTrendingUp
+  FiLogIn, FiUserPlus, FiZap, FiAward, FiTrendingUp, FiArrowLeft
 } from 'react-icons/fi';
 
 const AdminAuth = () => {
@@ -44,11 +44,11 @@ const AdminAuth = () => {
     checkURLAccess();
   }, []);
 
-  // Check if already logged in
+  // Check if already logged in - DISABLED AUTO-REDIRECT
+  // Users should explicitly choose their portal and login action
   useEffect(() => {
-    if (urlAllowed) {
-      checkAuth();
-    }
+    // Don't auto-redirect - let user control the flow
+    console.log('✅ Admin auth page loaded - user can choose login/signup');
   }, [urlAllowed]);
 
   const checkURLAccess = () => {
@@ -99,26 +99,55 @@ const AdminAuth = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        // Already logged in, redirect to admin portal
-        localStorage.setItem('adminKey', 'true');
-        navigate('/admin-portal');
+        console.log('✅ User authenticated:', user.email);
+        // Don't auto-redirect - just confirm user is logged in
+        // User should click button to proceed
+        return true;
       }
+      return false;
     } catch (error) {
       console.log('Not authenticated yet');
+      return false;
     }
   };
 
-  // Handle OAuth callback and auto-create admin user record
-  useEffect(() => {
-    // Cleanup timeout on unmount
-    return () => {
-      if (oauthTimeoutRef.current) {
-        clearTimeout(oauthTimeoutRef.current);
+  // Handle proceeding to admin portal after OAuth
+  const handleProceedToPortal = async () => {
+    try {
+      console.log('🔐 Checking authentication before proceeding...');
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        notificationService.show(
+          '❌ Not authenticated. Please sign in with Google first.',
+          'error'
+        );
+        return;
       }
-    };
-  }, []);
 
-  // Listen for OAuth completion
+      console.log('✅ Authenticated as:', user.email);
+      localStorage.setItem('adminKey', 'true');
+      localStorage.setItem('supermarket_user', JSON.stringify({
+        id: user.id,
+        name: user.user_metadata?.full_name || user.email,
+        role: 'admin',
+        email: user.email,
+        accessLevel: 'system',
+        timestamp: Date.now()
+      }));
+      
+      console.log('🚀 Proceeding to admin portal...');
+      navigate('/admin-portal');
+    } catch (error) {
+      console.error('❌ Error proceeding to portal:', error);
+      notificationService.show(
+        'Failed to proceed. Please try again.',
+        'error'
+      );
+    }
+  };
+
+  // Listen for OAuth completion - FIXED TO NOT AUTO-REDIRECT
   useEffect(() => {
     const handleOAuthCompletion = async () => {
       // ⚡ CRITICAL: Only process OAuth callback ONCE
@@ -145,7 +174,7 @@ const AdminAuth = () => {
 
         // Mark processing to prevent duplicate calls
         oauthProcessingRef.current = true;
-        console.log('✅ [OAUTH] Processing Google OAuth for:', user.email);
+        console.log('✅ [OAUTH] Google OAuth detected for:', user.email);
         
         // Get user data
         const fullName = user.user_metadata?.full_name || user.user_metadata?.name || 'Admin User';
@@ -167,7 +196,6 @@ const AdminAuth = () => {
 
           if (error) {
             console.warn('⚠️ [OAUTH] Database sync warning:', error.message);
-            // Continue anyway - not critical for OAuth flow
           } else {
             console.log('✅ [OAUTH] Database record synced');
           }
@@ -175,7 +203,7 @@ const AdminAuth = () => {
           console.warn('⚠️ [OAUTH] Database error (non-blocking):', dbError);
         }
         
-        // ✅ IMMEDIATELY set auth state
+        // ✅ Set auth state
         console.log('🔐 [OAUTH] Setting admin access...');
         localStorage.setItem('adminKey', 'true');
         localStorage.setItem('supermarket_user', JSON.stringify({
@@ -188,24 +216,24 @@ const AdminAuth = () => {
         }));
         
         notificationService.show(
-          '✅ Welcome to Admin Portal!',
+          '✅ Google sign-in successful! Accessing admin portal...',
           'success',
-          1000
+          2000
         );
         
-        // 🚀 REDIRECT immediately - don't wait for anything
-        oauthTimeoutRef.current = setTimeout(() => {
-          console.log('🚀 [OAUTH] Redirecting to admin portal...');
+        // 🚀 Automatically proceed to admin portal after OAuth
+        setTimeout(() => {
+          console.log('🚀 [OAUTH] Navigating to admin portal...');
           navigate('/admin-portal');
-        }, 800);
+        }, 1500);
         
       } catch (error) {
         console.error('🔐 [OAUTH] Error:', error.message);
-        oauthProcessingRef.current = false; // Reset on error for retry
+        oauthProcessingRef.current = false;
       }
     };
 
-    // Listen for auth state changes
+    // Listen for auth state changes - but DON'T auto-redirect
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === 'SIGNED_IN' && !oauthProcessingRef.current) {
@@ -213,6 +241,7 @@ const AdminAuth = () => {
           if (isGoogle) {
             console.log('🔐 [OAUTH] Detected Google OAuth signin event');
             handleOAuthCompletion();
+            // Don't auto-redirect - let user control it
           }
         }
       }
@@ -351,7 +380,7 @@ const AdminAuth = () => {
           redirectTo: `${window.location.origin}/admin-auth`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
+            prompt: 'select_account'
           }
         }
       });
@@ -853,7 +882,17 @@ const AdminAuth = () => {
         </div>
 
         {/* Right side - Auth form */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 relative">
+          {/* Back button */}
+          <button
+            onClick={() => navigate('/portal-selection')}
+            className="absolute top-6 left-6 flex items-center space-x-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all duration-300 group"
+            title="Go back to portal selection"
+          >
+            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+
           {/* Mobile branding */}
           <div className="md:hidden flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">

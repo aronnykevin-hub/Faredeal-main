@@ -6,7 +6,7 @@ import {
   FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone,
   FiShield, FiAlertCircle, FiArrowRight, FiLogIn,
   FiUserPlus, FiUsers, FiCheckCircle, FiClock, FiBriefcase,
-  FiMapPin, FiCalendar, FiAward, FiHeart, FiZap
+  FiMapPin, FiCalendar, FiAward, FiHeart, FiZap, FiArrowLeft
 } from 'react-icons/fi';
 
 const EmployeeAuth = () => {
@@ -44,7 +44,22 @@ const EmployeeAuth = () => {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    checkAuth();
+    const initAuth = async () => {
+      // Check if we're returning from OAuth
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
+      
+      if (hasOAuthCallback) {
+        console.log('🔄 OAuth callback detected');
+        // Wait for Supabase to process the OAuth callback
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      
+      // ALWAYS call checkAuth to process authentication
+      checkAuth();
+    };
+    
+    initAuth();
   }, []);
 
   const checkAuth = async () => {
@@ -375,7 +390,10 @@ const EmployeeAuth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/employee-auth`
+          redirectTo: `${window.location.origin}/employee-auth`,
+          queryParams: {
+            prompt: 'select_account'
+          }
         }
       });
 
@@ -1126,7 +1144,17 @@ const EmployeeAuth = () => {
         </div>
 
         {/* Right side - Auth form */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 relative">
+          {/* Back button */}
+          <button
+            onClick={() => navigate('/portal-selection')}
+            className="absolute top-6 left-6 flex items-center space-x-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-lg transition-all duration-300 group"
+            title="Go back to portal selection"
+          >
+            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+
           <div className="md:hidden flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
               <FiUsers className="w-7 h-7 text-white" />

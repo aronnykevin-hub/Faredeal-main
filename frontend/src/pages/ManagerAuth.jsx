@@ -36,7 +36,10 @@ const ManagerAuth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/manager-auth`
+          redirectTo: `${window.location.origin}/manager-auth`,
+          queryParams: {
+            prompt: 'select_account'
+          }
         }
       });
 
@@ -61,11 +64,12 @@ const ManagerAuth = () => {
       const hasOAuthCallback = hashParams.has('access_token') || window.location.search.includes('code=');
       
       if (hasOAuthCallback) {
-        console.log('🔄 OAuth callback detected, waiting for session...');
+        console.log('🔄 OAuth callback detected');
         // Wait for Supabase to process the OAuth callback
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
       
+      // ALWAYS call checkAuth to process authentication
       checkAuth();
     };
     
@@ -518,7 +522,17 @@ const ManagerAuth = () => {
         </div>
 
         {/* Right side - Auth form */}
-        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10">
+        <div className="bg-white rounded-3xl shadow-2xl p-8 md:p-10 relative">
+          {/* Back button */}
+          <button
+            onClick={() => navigate('/portal-selection')}
+            className="absolute top-6 left-6 flex items-center space-x-2 text-gray-600 hover:text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg transition-all duration-300 group"
+            title="Go back to portal selection"
+          >
+            <FiArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Back</span>
+          </button>
+
           {/* Mobile branding */}
           <div className="md:hidden flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-xl flex items-center justify-center">
