@@ -184,11 +184,11 @@ const OrderInventoryPOSControl = () => {
 
       console.log('🔍 Checking admin access for user:', user.id);
 
-      // Check user role in database
+      // Check user role in database using auth_id field
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('role, email, full_name')
-        .eq('id', user.id)
+        .eq('auth_id', user.id)
         .maybeSingle();
 
       if (userError) {

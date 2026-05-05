@@ -33,13 +33,13 @@ const SupplierPaymentConfirmations = () => {
         return null;
       }
 
-      console.log('🔍 Looking up supplier with id:', user.id);
+      console.log('🔍 Looking up supplier with auth_id:', user.id);
 
-      // Get internal user ID from users table (id IS the auth.uid())
+      // Get internal user ID from users table using auth_id
       const { data: userData, error } = await supabase
         .from('users')
         .select('id, role, email, full_name')
-        .eq('id', user.id)
+        .eq('auth_id', user.id)
         .eq('role', 'supplier')
         .single();
 
