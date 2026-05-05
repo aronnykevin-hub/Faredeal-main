@@ -101,7 +101,6 @@ const OrderInventoryPOSControl = () => {
           cost_price: 0,
           selling_price: 0,
           tax_rate: 18,
-          quantity: 0,
           is_active: true,
           created_at: new Date().toISOString()
         }])
@@ -110,15 +109,17 @@ const OrderInventoryPOSControl = () => {
 
       if (createError) {
         console.error('❌ Error creating product:', createError);
-        toast.error('❌ Failed to register barcode');
+        console.error('Error details:', createError.details, createError.message);
+        toast.error('❌ Failed to register barcode: ' + (createError.message || 'Unknown error'));
         return;
       }
 
-      console.log('⚡ Product created. Creating inventory in parallel...');
+      console.log('⚡ Product created successfully:', newProduct);
+
+      console.log('⚡ Product created. Creating inventory...');
       
-      // ✅ CREATE INVENTORY RECORD IN PARALLEL (not waiting for this to finish)
-      // This makes the UI responsive immediately
-      supabase
+      // ✅ CREATE INVENTORY RECORD - WAIT for this to complete
+      const { error: inventoryError } = await supabase
         .from('inventory')
         .insert({
           product_id: newProduct.id,
@@ -127,13 +128,15 @@ const OrderInventoryPOSControl = () => {
           minimum_stock: 10,
           reorder_point: 20,
           reorder_quantity: 100
-        })
-        .then(() => {
-          console.log('✅ Inventory record created asynchronously');
-        })
-        .catch(err => {
-          console.warn('⚠️ Inventory creation failed:', err);
         });
+      
+      if (inventoryError) {
+        console.warn('⚠️ Inventory creation failed:', inventoryError);
+        toast.warning('⚠️ Product created but inventory record failed - trying to continue...');
+        // Don't return - let the user still fill in the form
+      } else {
+        console.log('✅ Inventory record created successfully for product:', newProduct.id);
+      }
       
       // ⚡ IMMEDIATELY proceed - don't wait for inventory insert
       // Store the newly created product ID for later update
@@ -152,6 +155,11 @@ const OrderInventoryPOSControl = () => {
       
       // ✅ IMMEDIATELY open form modal for admin to complete details
       setShowAddProductModal(true);
+      
+      // Show success toast
+      toast.success(`✅ Barcode registered! Please complete product details.`, {
+        autoClose: 3000
+      });
       
       // Reload products list in background (silent, non-blocking)
       setTimeout(() => {
@@ -509,6 +517,13 @@ const OrderInventoryPOSControl = () => {
           .select('*')
           .single();
         
+        if (updateError) {
+          console.error('❌ Error updating product:', updateError);
+          console.error('Error details:', updateError.details, updateError.message);
+          throw updateError;
+        }
+        
+        console.log('✅ Product updated successfully:', updated);
         data = updated;
         error = updateError;
         
@@ -531,6 +546,13 @@ const OrderInventoryPOSControl = () => {
           .select('*')
           .single();
         
+        if (createError) {
+          console.error('❌ Error creating product:', createError);
+          console.error('Error details:', createError.details, createError.message);
+          throw createError;
+        }
+        
+        console.log('✅ Product created successfully:', created);
         data = created;
         error = createError;
       }
@@ -560,10 +582,12 @@ const OrderInventoryPOSControl = () => {
       // Update products list
       if (newlyRegisteredProductId) {
         // Update existing product in list
+        console.log('📝 Updating product in list:', newlyRegisteredProductId);
         setProducts(products.map(p => p.id === newlyRegisteredProductId ? data : p));
         setFilteredProducts(filteredProducts.map(p => p.id === newlyRegisteredProductId ? data : p));
       } else {
         // Add new product to list
+        console.log('➕ Adding new product to list');
         setProducts([...products, data]);
         setFilteredProducts([...filteredProducts, data]);
       }
@@ -583,15 +607,30 @@ const OrderInventoryPOSControl = () => {
       setShowAddProductModal(false);
       
       const successMsg = newlyRegisteredProductId 
-        ? '✅ Product updated successfully!' 
+        ? '✅ Product saved successfully!' 
         : '✅ Product added successfully!';
+      console.log('✅ Save operation completed:', successMsg);
       toast.success(successMsg);
       
       // Recalculate stats
       calculateStats([...products, data]);
     } catch (error) {
       console.error('❌ Error saving product:', error);
-      toast.error('❌ Failed to save product: ' + (error.message || 'Unknown error'));
+      console.error('Error details:', error.details, error.message, error.code);
+      
+      // Provide specific error messages
+      let errorMsg = 'Failed to save product';
+      if (error.code === 'PGRST116') {
+        errorMsg = 'Product not found - may have been deleted';
+      } else if (error.code === '23505') {
+        errorMsg = 'Barcode already exists for another product';
+      } else if (error.code === '42P01') {
+        errorMsg = 'Database table not found - contact admin';
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      toast.error('❌ ' + errorMsg);
     }
   };
 
