@@ -29,6 +29,8 @@ const ManagerAuth = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [googleUser, setGoogleUser] = useState(null);
+  const [isOAuthCallback, setIsOAuthCallback] = useState(false);
 
   const handleGoogleSignIn = async () => {
     try {
@@ -159,10 +161,84 @@ const ManagerAuth = () => {
   const checkAuth = async () => {
     try {
       console.log('🔍 Checking manager authentication...');
-      // DISABLED: Auto-redirect has been removed for security
-      // Always show login page - no auto-redirect based on session state
-      console.log('❌ Auto-redirect disabled - requiring manual login');
-      // Do not call navigate() - let user see login page
+      
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        console.log('❌ No authenticated user found');
+        return;
+      }
+
+      console.log('✅ User authenticated:', user.email);
+      
+      // Check if user record exists in database
+      const { data: userData, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching user data:', fetchError);
+        return;
+      }
+
+      if (!userData) {
+        // New OAuth user - show profile form with pre-filled email
+        console.log('📝 New user from OAuth - showing profile completion form');
+        setGoogleUser({
+          email: user.email,
+          full_name: user.user_metadata?.full_name || '',
+          phone: user.user_metadata?.phone || '',
+          auth_id: user.id
+        });
+        setIsOAuthCallback(true);
+        setIsLogin(false);
+        setFormData(prev => ({
+          ...prev,
+          fullName: user.user_metadata?.full_name || '',
+          phone: user.user_metadata?.phone || ''
+        }));
+        return;
+      }
+
+      console.log('👤 User data from database:', userData);
+      setCurrentUser(userData);
+
+      // Check user status
+      if (userData.role === 'manager' && userData.is_active) {
+        // User is approved manager - redirect to portal
+        console.log('✅ Manager approved - redirecting to portal');
+        navigate('/manager-portal');
+        return;
+      }
+
+      if (userData.profile_completed === false) {
+        // Profile not yet completed - show form
+        console.log('📝 Profile incomplete - showing completion form');
+        setGoogleUser({
+          email: user.email,
+          full_name: userData.full_name || user.user_metadata?.full_name || '',
+          phone: userData.phone || user.user_metadata?.phone || '',
+          auth_id: user.id
+        });
+        setIsLogin(false);
+        setFormData(prev => ({
+          ...prev,
+          fullName: userData.full_name || user.user_metadata?.full_name || '',
+          phone: userData.phone || user.user_metadata?.phone || ''
+        }));
+        return;
+      }
+
+      if (userData.profile_completed && !userData.is_active) {
+        // Profile complete but pending approval
+        console.log('⏳ Waiting for admin approval');
+        setCurrentUser(userData);
+        setShowWaitingScreen(true);
+        return;
+      }
+
     } catch (error) {
       console.error('❌ Auth check error:', error);
     }
@@ -179,30 +255,33 @@ const ManagerAuth = () => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.username) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      newErrors.username = 'Username can only contain letters, numbers, and underscores';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    }
-
-    if (!isLogin) {
-      if (!formData.fullName) {
-        newErrors.fullName = 'Full name is required';
+    // OAuth users don't need username validation
+    if (!googleUser?.auth_id) {
+      if (!formData.username) {
+        newErrors.username = 'Username is required';
+      } else if (formData.username.length < 3) {
+        newErrors.username = 'Username must be at least 3 characters';
+      } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
+        newErrors.username = 'Username can only contain letters, numbers, and underscores';
       }
-      if (!formData.department) {
-        newErrors.department = 'Department is required';
+
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else if (formData.password.length < 8) {
+        newErrors.password = 'Password must be at least 8 characters';
       }
+
       if (formData.password !== formData.confirmPassword) {
         newErrors.confirmPassword = 'Passwords do not match';
       }
+    }
+
+    // These are required for all users
+    if (!formData.fullName) {
+      newErrors.fullName = 'Full name is required';
+    }
+    if (!formData.department) {
+      newErrors.department = 'Department is required';
     }
 
     setErrors(newErrors);
@@ -277,6 +356,50 @@ const ManagerAuth = () => {
     setLoading(true);
 
     try {
+      // If this is an OAuth user, use the profile submission RPC instead
+      if (googleUser?.auth_id) {
+        console.log('📝 Submitting OAuth user profile...');
+        const { data: profileResult, error: profileError } = await supabase
+          .rpc('update_manager_profile_on_submission', {
+            p_auth_id: googleUser.auth_id,
+            p_full_name: formData.fullName,
+            p_phone: formData.phone,
+            p_department: formData.department
+          });
+
+        if (profileError) {
+          console.error('❌ Profile submission RPC error:', profileError);
+          throw new Error(profileError.message || 'Failed to submit profile');
+        }
+
+        if (!profileResult?.success) {
+          throw new Error(profileResult?.error || 'Profile submission failed');
+        }
+
+        console.log('✅ Profile submitted:', profileResult);
+        
+        notificationService.show(
+          '✅ Profile submitted! Waiting for admin approval...',
+          'success',
+          2000
+        );
+
+        // Show waiting screen
+        setCurrentUser({
+          email: googleUser.email,
+          full_name: formData.fullName,
+          phone: formData.phone,
+          role: 'manager',
+          is_active: false,
+          profile_completed: true
+        });
+        setShowWaitingScreen(true);
+        setGoogleUser(null);
+        return;
+      }
+
+      // Regular username/password signup
+      console.log('📝 Registering new manager with username...');
       // Call the register_manager RPC function (bypasses RLS, hashes password)
       const { data, error } = await supabase.rpc('register_manager', {
         p_username: formData.username,
@@ -506,14 +629,29 @@ const ManagerAuth = () => {
           {/* Form title */}
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              {isLogin ? 'Welcome back!' : 'Create manager account'}
+              {isLogin ? 'Welcome back!' : googleUser?.auth_id ? 'Complete Your Profile' : 'Create manager account'}
             </h2>
             <p className="text-gray-600">
               {isLogin
                 ? 'Enter your credentials to access the manager portal'
-                : 'Fill in your details to request manager access'}
+                : googleUser?.auth_id 
+                  ? `Signed in as ${googleUser.email}. Please complete your profile to continue.`
+                  : 'Fill in your details to request manager access'}
             </p>
           </div>
+
+          {/* OAuth badge */}
+          {googleUser?.auth_id && (
+            <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4 flex items-start space-x-3">
+              <FiCheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-green-800 font-medium">✅ Google Sign-In Successful</p>
+                <p className="text-xs text-green-700 mt-1">
+                  Please complete your profile details below
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={isLogin ? handleLogin : handleSignup} className="space-y-5">
@@ -547,7 +685,8 @@ const ManagerAuth = () => {
               </div>
             )}
 
-            {/* Username */}
+            {/* Username - only for login and non-OAuth signup */}
+            {(!googleUser?.auth_id || isLogin) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Username *
@@ -574,6 +713,7 @@ const ManagerAuth = () => {
                 </p>
               )}
             </div>
+            )}
 
             {/* Phone and Department (Signup only) */}
             {!isLogin && (
@@ -626,7 +766,8 @@ const ManagerAuth = () => {
               </>
             )}
 
-            {/* Password */}
+            {/* Password - only for login and non-OAuth signup */}
+            {(!googleUser?.auth_id || isLogin) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password *
@@ -660,9 +801,10 @@ const ManagerAuth = () => {
                 </p>
               )}
             </div>
+            )}
 
-            {/* Confirm Password (Signup only) */}
-            {!isLogin && (
+            {/* Confirm Password - only for non-OAuth signup */}
+            {!isLogin && !googleUser?.auth_id && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Confirm Password *
@@ -700,18 +842,30 @@ const ManagerAuth = () => {
               {loading ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>{isLogin ? 'Logging in...' : 'Creating account...'}</span>
+                  <span>
+                    {googleUser?.auth_id 
+                      ? 'Submitting...' 
+                      : isLogin 
+                        ? 'Logging in...' 
+                        : 'Creating account...'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <span>{isLogin ? 'Login to Portal' : 'Request Access'}</span>
+                  <span>
+                    {googleUser?.auth_id 
+                      ? 'Submit Profile' 
+                      : isLogin 
+                        ? 'Login to Portal' 
+                        : 'Request Access'}
+                  </span>
                   <FiArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </>
               )}
             </button>
           </form>
 
-          {isLogin && (
+          {isLogin && !googleUser?.auth_id && (
             <>
               {/* Divider */}
               <div className="relative my-6">
@@ -745,18 +899,41 @@ const ManagerAuth = () => {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              {isLogin ? "Don't have an account? " : 'Already have an account? '}
-              <button
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setErrors({});
-                }}
-                className="text-purple-600 hover:text-purple-700 font-semibold"
-              >
-                {isLogin ? 'Request access here' : 'Login here'}
-              </button>
-            </p>
+            {googleUser?.auth_id ? (
+              <p className="text-sm text-gray-600">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoogleUser(null);
+                    setIsLogin(true);
+                    setFormData({
+                      username: '',
+                      password: '',
+                      confirmPassword: '',
+                      fullName: '',
+                      phone: '',
+                      department: ''
+                    });
+                  }}
+                  className="text-purple-600 hover:text-purple-700 font-semibold"
+                >
+                  Back to login
+                </button>
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                {isLogin ? "Don't have an account? " : 'Already have an account? '}
+                <button
+                  onClick={() => {
+                    setIsLogin(!isLogin);
+                    setErrors({});
+                  }}
+                  className="text-purple-600 hover:text-purple-700 font-semibold"
+                >
+                  {isLogin ? 'Request access here' : 'Login here'}
+                </button>
+              </p>
+            )}
           </div>
 
           {/* Security note */}

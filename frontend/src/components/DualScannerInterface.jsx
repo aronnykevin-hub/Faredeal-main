@@ -33,6 +33,7 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
   const gunInputRef = useRef(null);
+  const gunHandlerRef = useRef(null); // 🔧 Track current gun handler for proper cleanup
   const scanTimeoutRef = useRef(null);
   const lastDetectedRef = useRef(null);
   const lastDetectionTimeRef = useRef(0);
@@ -98,8 +99,11 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
       initializeGunScanner();
     }
     return () => {
-      if (gunInputRef.current) {
-        gunInputRef.current.removeEventListener('keydown', handleGunInput);
+      // Clean up by removing the stored handler reference
+      if (gunInputRef.current && gunHandlerRef.current) {
+        gunInputRef.current.removeEventListener('keydown', gunHandlerRef.current);
+        gunHandlerRef.current = null;
+        console.log('🧹 Gun scanner event listener removed');
       }
     };
   }, [scanMode]);
@@ -570,9 +574,21 @@ const DualScannerInterface = ({ onBarcodeScanned, onClose, inventoryProducts = [
     
     // Focus on hidden input to capture gun scanner input
     if (gunInputRef.current) {
+      // 🔧 CRITICAL FIX: Remove any existing listener before adding new one
+      if (gunHandlerRef.current) {
+        gunInputRef.current.removeEventListener('keydown', gunHandlerRef.current);
+        console.log('🧹 Removed previous gun scanner listener');
+      }
+      
       gunInputRef.current.focus();
       console.log('✅ Gun input focused and ready');
+      
+      // Store handler reference for proper cleanup
+      gunHandlerRef.current = handleGunInput;
       gunInputRef.current.addEventListener('keydown', handleGunInput);
+      console.log('✅ Gun scanner event listener registered');
+    } else {
+      console.warn('⚠️ Gun input ref not available yet');
     }
     
     // Auto-refocus every 100ms to ensure scanner stays focused
